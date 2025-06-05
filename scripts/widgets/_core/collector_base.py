@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Template de base pour les collecteurs de widgets MaxLink
-Version corrigée - Utilise les chemins locaux dans /opt/maxlink
+Version corrigée - Utilise UNIQUEMENT les chemins locaux dans /opt/maxlink
 """
 
 import os
@@ -35,17 +35,10 @@ class BaseCollector(ABC):
         """Initialise le collecteur avec gestion de retry MQTT"""
         self.logger = logging.getLogger(logger_name)
         
-        # CORRECTION: Utiliser les chemins locaux
+        # UTILISER UNIQUEMENT les chemins locaux
         self.local_base_dir = Path("/opt/maxlink")
         self.local_widgets_dir = self.local_base_dir / "widgets"
         self.local_config_dir = self.local_base_dir / "config" / "widgets"
-        
-        # Si config_file est un chemin absolu vers USB, le convertir en chemin local
-        if config_file and "/media/" in str(config_file):
-            # Extraire juste le nom du fichier
-            config_filename = Path(config_file).name
-            config_file = self.local_config_dir / config_filename
-            self.logger.info(f"Redirection config vers: {config_file}")
         
         # Si config_file n'est pas fourni, utiliser la variable d'environnement
         if not config_file:
@@ -89,16 +82,9 @@ class BaseCollector(ABC):
     def load_config(self, config_file):
         """Charge la configuration depuis le fichier JSON"""
         try:
-            # Vérifier d'abord le chemin local
             if not config_file.exists():
                 self.logger.error(f"Fichier de configuration non trouvé: {config_file}")
-                # Essayer de chercher dans le répertoire courant du widget
-                alt_config = Path(__file__).parent / Path(config_file).name
-                if alt_config.exists():
-                    self.logger.info(f"Configuration trouvée dans: {alt_config}")
-                    config_file = alt_config
-                else:
-                    raise FileNotFoundError(f"Configuration introuvable: {config_file}")
+                raise FileNotFoundError(f"Configuration introuvable: {config_file}")
             
             with open(config_file, 'r') as f:
                 config = json.load(f)
@@ -109,28 +95,15 @@ class BaseCollector(ABC):
             sys.exit(1)
     
     def get_widget_file(self, filename):
-        """Retourne le chemin d'un fichier du widget en cherchant dans les bons répertoires"""
+        """Retourne le chemin d'un fichier du widget - CHEMINS LOCAUX UNIQUEMENT"""
         widget_name = self.config['widget']['id']
         
-        # Ordre de recherche:
-        # 1. Répertoire local du widget
+        # Rechercher UNIQUEMENT dans le répertoire local du widget
         local_widget_path = self.local_widgets_dir / widget_name / filename
         if local_widget_path.exists():
             return local_widget_path
         
-        # 2. Répertoire courant (au cas où le script est exécuté directement)
-        current_dir_path = Path(__file__).parent / filename
-        if current_dir_path.exists():
-            return current_dir_path
-        
-        # 3. Ancien chemin USB (fallback pour compatibilité)
-        if 'BASE_DIR' in os.environ:
-            usb_path = Path(os.environ['BASE_DIR']) / 'scripts' / 'widgets' / widget_name / filename
-            if usb_path.exists():
-                self.logger.warning(f"Utilisation du chemin USB (déprécié): {usb_path}")
-                return usb_path
-        
-        raise FileNotFoundError(f"Fichier {filename} non trouvé pour le widget {widget_name}")
+        raise FileNotFoundError(f"Fichier {filename} non trouvé dans {self.local_widgets_dir / widget_name}")
     
     def connect_mqtt(self):
         """Connexion au broker MQTT avec retry robuste"""

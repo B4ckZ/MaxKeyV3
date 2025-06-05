@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION AUTO-SYNC)
-# Script d'installation avec synchronisation automatique depuis la clé USB
+# MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION CORRIGÉE)
+# Script d'installation qui copie tout localement et n'a plus besoin de la clé USB
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -18,7 +18,7 @@ source "$BASE_DIR/scripts/common/logging.sh"
 # ===============================================================================
 
 # Initialiser le logging
-init_logging "Installation/Mise à jour de l'orchestrateur MaxLink" "install"
+init_logging "Installation de l'orchestrateur MaxLink" "install"
 
 # Répertoire local pour les widgets
 LOCAL_WIDGETS_DIR="/opt/maxlink/widgets"
@@ -26,7 +26,6 @@ LOCAL_WIDGETS_CONFIG="/opt/maxlink/config/widgets"
 
 # Flags pour déterminer ce qui doit être fait
 IS_FIRST_INSTALL=false
-WIDGETS_UPDATED=false
 NEED_REBOOT=false
 
 # ===============================================================================
@@ -56,11 +55,11 @@ check_first_install() {
     fi
 }
 
-# Synchroniser les widgets depuis la clé USB
-sync_widgets_from_usb() {
+# Copier tous les widgets depuis la clé USB vers local
+copy_widgets_to_local() {
     echo ""
-    echo "◦ Synchronisation des widgets depuis la clé USB..."
-    log_info "Synchronisation des widgets depuis $BASE_DIR/scripts/widgets"
+    echo "◦ Copie des widgets vers le système local..."
+    log_info "Copie des widgets depuis $BASE_DIR/scripts/widgets vers /opt/maxlink"
     
     # Créer les répertoires si nécessaire
     mkdir -p "$LOCAL_WIDGETS_DIR"
@@ -72,141 +71,41 @@ sync_widgets_from_usb() {
         return 1
     fi
     
-    # Sauvegarder la liste des widgets actuels pour comparaison
-    local old_widgets=""
-    if [ -d "$LOCAL_WIDGETS_DIR" ]; then
-        old_widgets=$(find "$LOCAL_WIDGETS_DIR" -maxdepth 1 -type d -name "[^_]*" -exec basename {} \; | sort)
-    fi
-    
-    # Utiliser rsync pour synchroniser intelligemment
-    echo "  ↦ Synchronisation des fichiers..."
-    
-    # Synchroniser le core
+    # Copier le core
     if [ -d "$BASE_DIR/scripts/widgets/_core" ]; then
-        rsync -av --delete "$BASE_DIR/scripts/widgets/_core/" "$LOCAL_WIDGETS_DIR/_core/" > /dev/null 2>&1
-        echo "    • Core synchronisé ✓"
+        echo "  ↦ Copie du core..."
+        cp -r "$BASE_DIR/scripts/widgets/_core" "$LOCAL_WIDGETS_DIR/"
+        echo "    • Core copié ✓"
     fi
     
-    # Synchroniser chaque widget
-    local sync_count=0
-    local updated_widgets=""
+    # Copier chaque widget
+    local copy_count=0
     
     for widget_dir in "$BASE_DIR/scripts/widgets"/*; do
         if [ -d "$widget_dir" ] && [ "$(basename "$widget_dir")" != "_core" ]; then
             widget_name=$(basename "$widget_dir")
             
-            # Vérifier si le widget a changé
-            if ! diff -r "$widget_dir" "$LOCAL_WIDGETS_DIR/$widget_name" >/dev/null 2>&1; then
-                rsync -av --delete "$widget_dir/" "$LOCAL_WIDGETS_DIR/$widget_name/" > /dev/null 2>&1
-                echo "    • Widget $widget_name mis à jour ✓"
-                updated_widgets="$updated_widgets $widget_name"
-                ((sync_count++))
-                WIDGETS_UPDATED=true
-            fi
+            echo "  ↦ Copie du widget $widget_name..."
+            cp -r "$widget_dir" "$LOCAL_WIDGETS_DIR/"
             
             # Copier la config JSON
             if [ -f "$widget_dir/${widget_name}_widget.json" ]; then
                 cp "$widget_dir/${widget_name}_widget.json" "$LOCAL_WIDGETS_CONFIG/"
             fi
             
-            log_info "Widget $widget_name synchronisé"
+            ((copy_count++))
+            log_info "Widget $widget_name copié"
         fi
     done
-    
-    # Vérifier les widgets supprimés
-    local new_widgets=$(find "$LOCAL_WIDGETS_DIR" -maxdepth 1 -type d -name "[^_]*" -exec basename {} \; | sort)
-    local removed_widgets=$(comm -23 <(echo "$old_widgets") <(echo "$new_widgets"))
-    
-    if [ -n "$removed_widgets" ]; then
-        echo "  ↦ Widgets supprimés détectés:"
-        for widget in $removed_widgets; do
-            echo "    • $widget sera désinstallé"
-            # Désactiver et supprimer le service
-            systemctl stop "maxlink-widget-$widget" 2>/dev/null
-            systemctl disable "maxlink-widget-$widget" 2>/dev/null
-            rm -f "/etc/systemd/system/maxlink-widget-$widget.service"
-            rm -rf "/etc/systemd/system/maxlink-widget-$widget.service.d"
-        done
-        WIDGETS_UPDATED=true
-    fi
     
     # Définir les permissions
     chown -R root:root "$LOCAL_WIDGETS_DIR"
     chmod -R 755 "$LOCAL_WIDGETS_DIR"
     find "$LOCAL_WIDGETS_DIR" -name "*.py" -exec chmod +x {} \;
     
-    if [ $sync_count -gt 0 ]; then
-        echo "  ↦ $sync_count widget(s) mis à jour ✓"
-    else
-        echo "  ↦ Tous les widgets sont déjà à jour ✓"
-    fi
-    
-    log_success "Synchronisation terminée - $sync_count modifications"
+    echo "  ↦ $copy_count widget(s) copié(s) ✓"
+    log_success "Copie terminée - $copy_count widgets"
     return 0
-}
-
-# Mettre à jour uniquement les services modifiés
-update_modified_services() {
-    echo ""
-    echo "◦ Mise à jour des services modifiés..."
-    log_info "Mise à jour des services pour les widgets modifiés"
-    
-    for widget_dir in "$LOCAL_WIDGETS_DIR"/*; do
-        if [ -d "$widget_dir" ] && [ "$(basename "$widget_dir")" != "_core" ]; then
-            widget_name=$(basename "$widget_dir")
-            service_name="maxlink-widget-$widget_name"
-            
-            # Vérifier si le service existe
-            if [ ! -f "/etc/systemd/system/${service_name}.service" ]; then
-                echo "  ↦ Nouveau widget détecté: $widget_name"
-                # Le service sera créé par le script d'installation du widget
-                continue
-            fi
-            
-            # Créer ou mettre à jour l'override pour les chemins locaux
-            mkdir -p "/etc/systemd/system/${service_name}.service.d"
-            
-            cat > "/etc/systemd/system/${service_name}.service.d/local-paths.conf" << EOF
-[Service]
-# Utiliser les chemins locaux au lieu de la clé USB
-ExecStart=
-ExecStart=/usr/bin/python3 $LOCAL_WIDGETS_DIR/$widget_name/${widget_name}_collector.py
-
-# Variables d'environnement mises à jour
-Environment="CONFIG_FILE=$LOCAL_WIDGETS_CONFIG/${widget_name}_widget.json"
-Environment="PYTHONPATH=$LOCAL_WIDGETS_DIR/_core:$LOCAL_WIDGETS_DIR"
-
-# Condition d'existence mise à jour
-ConditionPathExists=$LOCAL_WIDGETS_DIR/$widget_name/${widget_name}_collector.py
-ConditionPathExists=$LOCAL_WIDGETS_CONFIG/${widget_name}_widget.json
-EOF
-            
-            echo "  ↦ Service $service_name mis à jour ✓"
-            log_info "Service $service_name configuré pour utiliser les chemins locaux"
-        fi
-    done
-}
-
-# Créer ou mettre à jour l'infrastructure d'orchestration
-setup_orchestration_infrastructure() {
-    if [ "$IS_FIRST_INSTALL" = true ]; then
-        echo ""
-        echo "========================================================================"
-        echo "INSTALLATION DE L'INFRASTRUCTURE D'ORCHESTRATION"
-        echo "========================================================================"
-        create_healthcheck_scripts
-        create_systemd_services
-        create_systemd_targets
-        setup_service_overrides
-        create_management_script
-        NEED_REBOOT=true
-    else
-        echo ""
-        echo "◦ Vérification de l'infrastructure d'orchestration..."
-        # Vérifier si des mises à jour sont nécessaires
-        update_healthcheck_scripts
-        echo "  ↦ Infrastructure à jour ✓"
-    fi
 }
 
 # Créer les scripts de healthcheck
@@ -465,7 +364,7 @@ echo ""
 echo "========================================================================"
 if [ $ERRORS -eq 0 ]; then
     echo "RÉSULTAT: Système MaxLink opérationnel ✓"
-    echo "Note: Les widgets sont synchronisés automatiquement depuis la clé USB"
+    echo "Note: Le système fonctionne de manière autonome sans la clé USB"
 else
     echo "RÉSULTAT: $ERRORS erreur(s) détectée(s) ✗"
 fi
@@ -479,13 +378,6 @@ EOF
     chmod +x /opt/maxlink/healthchecks/*.sh
     echo "  ↦ Scripts de vérification créés ✓"
     log_success "Scripts de healthcheck créés"
-}
-
-# Mettre à jour les scripts de healthcheck si nécessaire
-update_healthcheck_scripts() {
-    # Pour l'instant, on recrée simplement les scripts
-    # Dans le futur, on pourrait faire une comparaison plus intelligente
-    create_healthcheck_scripts
 }
 
 # Créer les services systemd
@@ -666,7 +558,7 @@ create_management_script() {
 
     cat > /usr/local/bin/maxlink-orchestrator << 'EOF'
 #!/bin/bash
-# Script de gestion de l'orchestrateur MaxLink (version auto-sync)
+# Script de gestion de l'orchestrateur MaxLink
 
 case "$1" in
     status)
@@ -692,6 +584,8 @@ case "$1" in
         echo "▶ Fichiers locaux:"
         echo "  Widgets: /opt/maxlink/widgets/"
         echo "  Configs: /opt/maxlink/config/widgets/"
+        echo ""
+        echo "Note: Le système fonctionne de manière autonome sans la clé USB"
         ;;
         
     check)
@@ -760,7 +654,7 @@ case "$1" in
         ;;
         
     *)
-        echo "MaxLink Orchestrator Control (Version auto-sync)"
+        echo "MaxLink Orchestrator Control"
         echo ""
         echo "Usage: $0 {status|check|restart-all|restart-widgets|logs|enable|disable}"
         echo ""
@@ -772,9 +666,6 @@ case "$1" in
         echo "  enable          - Activer l'orchestrateur au démarrage"
         echo "  disable         - Désactiver l'orchestrateur"
         echo ""
-        echo "Note: Les widgets sont automatiquement synchronisés depuis la clé USB"
-        echo "      lors de chaque exécution du script d'installation."
-        echo ""
         exit 1
         ;;
 esac
@@ -783,6 +674,20 @@ EOF
     chmod +x /usr/local/bin/maxlink-orchestrator
     echo "  ↦ Script de gestion créé ✓"
     log_success "Script de gestion créé"
+}
+
+# Créer l'infrastructure d'orchestration
+setup_orchestration_infrastructure() {
+    echo ""
+    echo "========================================================================"
+    echo "INSTALLATION DE L'INFRASTRUCTURE D'ORCHESTRATION"
+    echo "========================================================================"
+    create_healthcheck_scripts
+    create_systemd_services
+    create_systemd_targets
+    setup_service_overrides
+    create_management_script
+    NEED_REBOOT=true
 }
 
 # ===============================================================================
@@ -798,7 +703,7 @@ fi
 
 echo ""
 echo "========================================================================"
-echo "ORCHESTRATEUR MAXLINK - INSTALLATION/MISE À JOUR"
+echo "ORCHESTRATEUR MAXLINK - INSTALLATION"
 echo "========================================================================"
 echo ""
 
@@ -808,35 +713,24 @@ send_progress 5 "Initialisation..."
 check_first_install
 
 # ===============================================================================
-# ÉTAPE 1 : SYNCHRONISATION DES WIDGETS
+# ÉTAPE 1 : COPIE DES WIDGETS
 # ===============================================================================
 
-send_progress 10 "Synchronisation des widgets..."
+send_progress 10 "Copie des widgets..."
 
-if ! sync_widgets_from_usb; then
+if ! copy_widgets_to_local; then
     echo ""
-    echo "⚠ Impossible de synchroniser les widgets depuis la clé USB"
+    echo "⚠ Impossible de copier les widgets depuis la clé USB"
     echo "  Vérifiez que la clé est bien montée dans: $BASE_DIR"
-    log_error "Échec de la synchronisation des widgets"
+    log_error "Échec de la copie des widgets"
     exit 1
 fi
 
-send_progress 30 "Widgets synchronisés"
+send_progress 50 "Widgets copiés"
 wait_silently 2
 
 # ===============================================================================
-# ÉTAPE 2 : MISE À JOUR DES SERVICES
-# ===============================================================================
-
-send_progress 40 "Mise à jour des services..."
-
-update_modified_services
-
-send_progress 50 "Services mis à jour"
-wait_silently 2
-
-# ===============================================================================
-# ÉTAPE 3 : INFRASTRUCTURE D'ORCHESTRATION
+# ÉTAPE 2 : INFRASTRUCTURE D'ORCHESTRATION
 # ===============================================================================
 
 send_progress 60 "Configuration de l'orchestration..."
@@ -847,7 +741,7 @@ send_progress 80 "Infrastructure configurée"
 wait_silently 2
 
 # ===============================================================================
-# ÉTAPE 4 : ACTIVATION ET RECHARGEMENT
+# ÉTAPE 3 : ACTIVATION ET RECHARGEMENT
 # ===============================================================================
 
 send_progress 85 "Activation des services..."
@@ -856,26 +750,20 @@ echo ""
 echo "◦ Rechargement de systemd..."
 systemctl daemon-reload
 
-if [ "$IS_FIRST_INSTALL" = true ]; then
-    echo "◦ Activation de l'orchestrateur..."
-    systemctl enable maxlink-network.target
-    systemctl enable maxlink-core.target
-    systemctl enable maxlink-widgets.target
-    systemctl enable maxlink-network-ready.service
-    systemctl enable maxlink-mqtt-ready.service
-    systemctl enable maxlink-widgets-ready.service
-    echo "  ↦ Orchestrateur activé ✓"
-elif [ "$WIDGETS_UPDATED" = true ]; then
-    echo "◦ Redémarrage des widgets modifiés..."
-    systemctl restart maxlink-widgets.target
-    echo "  ↦ Widgets redémarrés ✓"
-fi
+echo "◦ Activation de l'orchestrateur..."
+systemctl enable maxlink-network.target
+systemctl enable maxlink-core.target
+systemctl enable maxlink-widgets.target
+systemctl enable maxlink-network-ready.service
+systemctl enable maxlink-mqtt-ready.service
+systemctl enable maxlink-widgets-ready.service
+echo "  ↦ Orchestrateur activé ✓"
 
 send_progress 95 "Services activés"
 wait_silently 2
 
 # ===============================================================================
-# ÉTAPE 5 : TEST
+# ÉTAPE 4 : TEST
 # ===============================================================================
 
 echo ""
@@ -893,23 +781,13 @@ wait_silently 3
 
 echo ""
 echo "========================================================================"
-if [ "$IS_FIRST_INSTALL" = true ]; then
-    echo "INSTALLATION INITIALE TERMINÉE"
-else
-    echo "MISE À JOUR TERMINÉE"
-fi
+echo "INSTALLATION TERMINÉE"
 echo "========================================================================"
 echo ""
 
-if [ "$IS_FIRST_INSTALL" = true ]; then
-    echo "✓ L'orchestrateur MaxLink est maintenant installé et actif."
-    echo "✓ Les widgets ont été copiés localement depuis la clé USB."
-elif [ "$WIDGETS_UPDATED" = true ]; then
-    echo "✓ Les widgets ont été mis à jour depuis la clé USB."
-    echo "✓ Les services modifiés ont été redémarrés."
-else
-    echo "✓ Aucune modification détectée, système déjà à jour."
-fi
+echo "✓ L'orchestrateur MaxLink est maintenant installé et actif."
+echo "✓ Les widgets ont été copiés localement dans /opt/maxlink."
+echo "✓ Le système peut maintenant fonctionner sans la clé USB."
 
 echo ""
 echo "▶ Fichiers locaux :"
@@ -918,17 +796,15 @@ echo "  • Configs    : /opt/maxlink/config/widgets/"
 echo "  • Healthchecks : /opt/maxlink/healthchecks/"
 echo ""
 
-if [ "$IS_FIRST_INSTALL" = true ]; then
-    echo "▶ Architecture de démarrage :"
-    echo "  1. network.target → NetworkManager"
-    echo "  2. maxlink-network.target → Vérification réseau"
-    echo "  3. mosquitto.service → Démarrage MQTT"
-    echo "  4. maxlink-mqtt-ready → Vérification MQTT"
-    echo "  5. maxlink-core.target → Services core (Nginx)"
-    echo "  6. maxlink-widgets-ready → Vérification fichiers widgets"
-    echo "  7. maxlink-widgets.target → Tous les widgets"
-    echo ""
-fi
+echo "▶ Architecture de démarrage :"
+echo "  1. network.target → NetworkManager"
+echo "  2. maxlink-network.target → Vérification réseau"
+echo "  3. mosquitto.service → Démarrage MQTT"
+echo "  4. maxlink-mqtt-ready → Vérification MQTT"
+echo "  5. maxlink-core.target → Services core (Nginx)"
+echo "  6. maxlink-widgets-ready → Vérification fichiers widgets"
+echo "  7. maxlink-widgets.target → Tous les widgets"
+echo ""
 
 echo "▶ Commandes utiles :"
 echo "  • maxlink-orchestrator status    - État du système"
@@ -936,7 +812,7 @@ echo "  • maxlink-orchestrator check     - Vérification complète"
 echo "  • maxlink-orchestrator logs all  - Voir tous les logs"
 echo ""
 
-log_success "Script terminé avec succès"
+log_success "Installation terminée avec succès"
 
 # Décider si un redémarrage est nécessaire
 if [ "$NEED_REBOOT" = true ]; then
