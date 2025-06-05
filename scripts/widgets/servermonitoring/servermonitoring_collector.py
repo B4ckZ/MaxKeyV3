@@ -69,6 +69,11 @@ class SystemMetricsCollector(BaseCollector):
         """Initialise les variables spécifiques au widget"""
         logger.info("Initialisation du collecteur de métriques système")
         logger.info(f"Intervalles: Fast={self.intervals['fast']}s, Normal={self.intervals['normal']}s, Slow={self.intervals['slow']}s")
+        
+        # IMPORTANT: Premier appel pour initialiser les compteurs internes de psutil
+        # Cela permet d'avoir des valeurs correctes dès le deuxième appel
+        psutil.cpu_percent(interval=None, percpu=True)
+        logger.info("Compteurs CPU initialisés")
     
     def get_update_interval(self):
         """Retourne l'intervalle de mise à jour minimum"""
@@ -97,15 +102,24 @@ class SystemMetricsCollector(BaseCollector):
             self.last_update['slow'] = current_time
     
     def collect_cpu_metrics(self):
-        """Collecte les métriques CPU"""
+        """Collecte les métriques CPU sans blocage - comme htop"""
         try:
-            cpu_percents = psutil.cpu_percent(interval=0.1, percpu=True)
+            # Utiliser psutil sans interval (non-bloquant)
+            # Cela calcule le pourcentage depuis le dernier appel
+            cpu_percents = psutil.cpu_percent(interval=None, percpu=True)
+            
+            # Publier les métriques pour chaque core
             for i, percent in enumerate(cpu_percents, 1):
                 self.publish_metric(
                     f"rpi/system/cpu/core{i}", 
                     round(percent, 1), 
                     "%"
                 )
+                
+            # Log occasionnel pour debug
+            if self.stats['messages_sent'] % 60 == 0:  # Toutes les 60 mesures
+                logger.debug(f"CPU usage: {[round(p, 1) for p in cpu_percents]}")
+                
         except Exception as e:
             logger.error(f"Erreur collecte CPU: {e}")
             self.stats['errors'] += 1
