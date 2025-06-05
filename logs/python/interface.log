@@ -1,0 +1,115 @@
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Tue May 13 02:18:20 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-05-13 02:18:20] [INFO] [interface] Interface MaxLink démarrée
+[2025-05-13 02:18:20] [INFO] [interface] Variables chargées: 61 variables
+[2025-05-13 02:18:20] [INFO] [interface] Variables chargées avec succès
+[2025-05-13 02:18:20] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-05-13 02:18:20] [INFO] [interface] Mode root: True
+[2025-05-13 02:18:20] [INFO] [interface] Services chargés: 6
+[2025-05-13 02:18:20] [INFO] [interface] Interface créée avec succès
+[2025-05-13 02:18:24] [INFO] [interface] Exécution action: install sur Update RPI
+[2025-05-13 02:18:24] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/update_install.sh
+[2025-05-13 02:18:24] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/update_install.sh
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Thu Jun  5 10:32:32 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-05 10:32:32] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-05 10:32:32] [INFO] [interface] Variables chargées: 61 variables
+[2025-06-05 10:32:32] [INFO] [interface] Variables chargées avec succès
+[2025-06-05 10:32:32] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-05 10:32:32] [INFO] [interface] Mode root: True
+[2025-06-05 10:32:32] [INFO] [interface] Services chargés: 6
+[2025-06-05 10:32:32] [INFO] [interface] Interface créée avec succès
+[2025-06-05 10:32:38] [INFO] [interface] Exécution action: install sur Network AP
+[2025-06-05 10:32:38] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/ap_install.sh
+[2025-06-05 10:32:38] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/ap_install.sh
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Thu Jun  5 10:33:50 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-05 10:33:50] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-05 10:33:50] [INFO] [interface] Variables chargées: 61 variables
+[2025-06-05 10:33:50] [INFO] [interface] Variables chargées avec succès
+[2025-06-05 10:33:50] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-05 10:33:50] [INFO] [interface] Mode root: True
+[2025-06-05 10:33:50] [INFO] [interface] Services chargés: 6
+[2025-06-05 10:33:50] [INFO] [interface] Interface créée avec succès
+[2025-06-05 10:33:57] [INFO] [interface] Exécution action: install sur NginX Web
+[2025-06-05 10:33:57] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/nginx_install.sh
+[2025-06-05 10:33:57] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/nginx_install.sh
+[2025-06-05 10:33:57] [INFO] [interface] Script terminé avec code: 1
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Thu Jun  5 10:44:15 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-05 10:44:15] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-05 10:44:15] [INFO] [interface] Variables chargées: 61 variables
+[2025-06-05 10:44:15] [INFO] [interface] Variables chargées avec succès
+[2025-06-05 10:44:15] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-05 10:44:15] [INFO] [interface] Mode root: True
+[2025-06-05 10:44:15] [INFO] [interface] Services chargés: 6
+[2025-06-05 10:44:15] [INFO] [interface] Interface créée avec succès
+[2025-06-05 10:44:19] [INFO] [interface] Exécution action: install sur MQTT BKR
+[2025-06-05 10:44:19] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/mqtt_install.sh
+[2025-06-05 10:44:19] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/mqtt_install.sh
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Thu Jun  5 10:45:26 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-05 10:45:26] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-05 10:45:26] [INFO] [interface] Variables chargées: 61 variables
+[2025-06-05 10:45:26] [INFO] [interface] Variables chargées avec succès
+[2025-06-05 10:45:26] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-05 10:45:26] [INFO] [interface] Mode root: True
+[2025-06-05 10:45:26] [INFO] [interface] Services chargés: 6
+[2025-06-05 10:45:26] [INFO] [interface] Interface créée avec succès
+[2025-06-05 10:45:29] [INFO] [interface] Exécution action: install sur MQTT WGS
+[2025-06-05 10:45:29] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/mqtt_wgs_install.sh
+[2025-06-05 10:45:29] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/mqtt_wgs_install.sh
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Thu Jun  5 10:46:35 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-05 10:46:35] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-05 10:46:35] [INFO] [interface] Variables chargées: 61 variables
+[2025-06-05 10:46:35] [INFO] [interface] Variables chargées avec succès
+[2025-06-05 10:46:35] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-05 10:46:35] [INFO] [interface] Mode root: True
+[2025-06-05 10:46:35] [INFO] [interface] Services chargés: 6
+[2025-06-05 10:46:36] [INFO] [interface] Interface créée avec succès
+[2025-06-05 10:46:39] [INFO] [interface] Exécution action: install sur Orchestrateur
+[2025-06-05 10:46:39] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/orchestrator_install.sh
+[2025-06-05 10:46:39] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/orchestrator_install.sh

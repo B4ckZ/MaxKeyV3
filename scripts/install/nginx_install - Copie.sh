@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - INSTALLATION NGINX ET DASHBOARD (VERSION OFFLINE)
-# Installation sans connexion internet - utilise uniquement le cache local
+# MAXLINK - INSTALLATION NGINX ET DASHBOARD (VERSION NETTOYÉE)
+# Installation sans delays - nécessite l'orchestrateur
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -13,13 +13,14 @@ BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$SCRIPT_DIR/../common/variables.sh"
 source "$SCRIPT_DIR/../common/logging.sh"
 source "$SCRIPT_DIR/../common/packages.sh"
+source "$SCRIPT_DIR/../common/wifi_helper.sh"
 
 # ===============================================================================
 # INITIALISATION
 # ===============================================================================
 
 # Initialiser le logging
-init_logging "Installation Nginx et Dashboard (Mode Offline)" "install"
+init_logging "Installation Nginx et Dashboard" "install"
 
 # Variables du cache dashboard
 DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
@@ -40,60 +41,76 @@ wait_silently() {
     sleep "$1"
 }
 
-# Vérifier le cache dashboard
-check_dashboard_cache() {
+# Télécharger le dashboard si nécessaire
+download_dashboard_if_needed() {
     log_info "Vérification du cache dashboard"
     
-    if [ ! -f "$DASHBOARD_ARCHIVE" ]; then
-        echo "  ↦ Archive dashboard non trouvée dans le cache ✗"
-        echo ""
-        echo "ERREUR: Le dashboard doit être téléchargé avec update_install.sh"
-        echo "Fichier manquant: $DASHBOARD_ARCHIVE"
-        log_error "Archive dashboard manquante: $DASHBOARD_ARCHIVE"
+    if [ -f "$DASHBOARD_ARCHIVE" ] && tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
+        echo "  ↦ Dashboard déjà en cache ✓"
+        log_info "Dashboard trouvé dans le cache"
+        return 0
+    fi
+    
+    echo "  ↦ Dashboard manquant, téléchargement nécessaire..."
+    log_info "Dashboard non trouvé dans le cache, téléchargement nécessaire"
+    
+    if ! ensure_internet_connection; then
+        echo "  ↦ Impossible d'établir la connexion ✗"
+        log_error "Pas de connexion pour télécharger le dashboard"
         return 1
     fi
     
-    # Vérifier l'intégrité de l'archive
-    if ! tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
-        echo "  ↦ Archive dashboard corrompue ✗"
-        echo ""
-        echo "ERREUR: L'archive du dashboard est corrompue"
-        echo "Relancez update_install.sh pour retélécharger"
-        log_error "Archive dashboard corrompue: $DASHBOARD_ARCHIVE"
+    mkdir -p "$DASHBOARD_CACHE_DIR"
+    
+    echo "  ↦ Téléchargement depuis GitHub..."
+    GITHUB_ARCHIVE_URL="${GITHUB_REPO_URL}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz"
+    
+    if command -v curl >/dev/null 2>&1; then
+        if curl -L -o "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" >/dev/null 2>&1; then
+            echo "  ↦ Dashboard téléchargé ✓"
+            log_success "Dashboard téléchargé avec curl"
+        else
+            echo "  ↦ Échec du téléchargement ✗"
+            log_error "Échec du téléchargement avec curl"
+            restore_network_state
+            return 1
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if wget -O "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" >/dev/null 2>&1; then
+            echo "  ↦ Dashboard téléchargé ✓"
+            log_success "Dashboard téléchargé avec wget"
+        else
+            echo "  ↦ Échec du téléchargement ✗"
+            log_error "Échec du téléchargement avec wget"
+            restore_network_state
+            return 1
+        fi
+    else
+        echo "  ↦ Aucun outil de téléchargement disponible ✗"
+        log_error "Ni curl ni wget disponibles"
+        restore_network_state
         return 1
     fi
     
-    echo "  ↦ Dashboard trouvé dans le cache ✓"
-    log_info "Dashboard valide trouvé dans le cache"
-    return 0
+    if tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
+        echo "  ↦ Archive valide ✓"
+        log_success "Archive dashboard valide"
+        
+        cat > "$DASHBOARD_CACHE_DIR/metadata.json" << EOF
+{
+    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "version": "$MAXLINK_VERSION",
+    "branch": "$GITHUB_BRANCH",
+    "url": "$GITHUB_ARCHIVE_URL"
 }
-
-# Installer Nginx depuis le cache
-install_nginx_from_cache() {
-    echo "◦ Installation de Nginx depuis le cache..."
-    log_info "Installation de Nginx depuis le cache local"
-    
-    # Vérifier que le cache existe
-    if [ ! -d "$PACKAGE_CACHE_DIR" ]; then
-        echo "  ↦ Cache de paquets non trouvé ✗"
-        echo ""
-        echo "ERREUR: Le cache de paquets n'existe pas"
-        echo "Exécutez d'abord update_install.sh"
-        log_error "Cache de paquets manquant: $PACKAGE_CACHE_DIR"
-        return 1
-    fi
-    
-    # Installer les paquets depuis le cache
-    if install_packages_by_category "nginx"; then
-        echo "  ↦ Nginx installé depuis le cache ✓"
-        log_success "Nginx installé avec succès depuis le cache"
+EOF
+        restore_network_state
         return 0
     else
-        echo "  ↦ Échec de l'installation de Nginx ✗"
-        echo ""
-        echo "ERREUR: Impossible d'installer Nginx depuis le cache"
-        echo "Vérifiez que le cache contient tous les paquets nécessaires"
-        log_error "Échec de l'installation de Nginx depuis le cache"
+        echo "  ↦ Archive corrompue ✗"
+        log_error "Archive dashboard corrompue"
+        rm -f "$DASHBOARD_ARCHIVE"
+        restore_network_state
         return 1
     fi
 }
@@ -136,7 +153,7 @@ update_dns_if_ap_exists() {
 # PROGRAMME PRINCIPAL
 # ===============================================================================
 
-log_info "========== DÉBUT DE L'INSTALLATION NGINX ET DASHBOARD (OFFLINE) =========="
+log_info "========== DÉBUT DE L'INSTALLATION NGINX ET DASHBOARD =========="
 
 echo "========================================================================"
 echo "ÉTAPE 1 : VÉRIFICATIONS"
@@ -156,12 +173,6 @@ log_info "Privilèges root confirmés"
 echo "  ↦ Privilèges root confirmés ✓"
 echo ""
 
-# Vérifier le cache
-echo "◦ Vérification du cache local..."
-if ! check_dashboard_cache; then
-    exit 1
-fi
-
 send_progress 10 "Vérifications terminées"
 echo ""
 sleep 2
@@ -177,8 +188,14 @@ echo ""
 
 send_progress 20 "Installation de Nginx..."
 
-# Installer Nginx depuis le cache uniquement
-if ! install_nginx_from_cache; then
+# Utiliser la fonction hybride pour installer Nginx
+if hybrid_package_install "Nginx" "nginx nginx-common"; then
+    echo ""
+    log_success "Nginx installé avec succès"
+else
+    echo ""
+    echo "  ↦ Échec de l'installation de Nginx ✗"
+    log_error "Impossible d'installer Nginx"
     exit 1
 fi
 
@@ -203,6 +220,14 @@ echo ""
 
 send_progress 40 "Installation du dashboard..."
 
+# Vérifier/télécharger le dashboard
+echo "◦ Vérification du dashboard..."
+if ! download_dashboard_if_needed; then
+    echo "  ↦ Impossible d'obtenir le dashboard ✗"
+    log_error "Échec de l'obtention du dashboard"
+    exit 1
+fi
+
 # Vérifier si le dashboard existe déjà
 if [ -d "$NGINX_DASHBOARD_DIR" ]; then
     echo ""
@@ -220,7 +245,7 @@ fi
 
 # Extraire le dashboard depuis le cache
 echo ""
-echo "◦ Extraction du dashboard depuis le cache..."
+echo "◦ Extraction du dashboard..."
 TEMP_DIR="/tmp/maxlink-dashboard-$(date +%s)"
 mkdir -p "$TEMP_DIR"
 log_info "Répertoire temporaire: $TEMP_DIR"
@@ -241,13 +266,7 @@ if log_command "tar -xzf '$DASHBOARD_ARCHIVE' -C '$TEMP_DIR'" "Extraction archiv
     
     log_info "Dossier racine de l'archive: $EXTRACTED_DIR"
     
-    # Si GITHUB_DASHBOARD_DIR est vide, utiliser la racine
-    if [ -z "$GITHUB_DASHBOARD_DIR" ]; then
-        DASHBOARD_PATH="$EXTRACTED_DIR"
-    else
-        DASHBOARD_PATH="$EXTRACTED_DIR/$GITHUB_DASHBOARD_DIR"
-    fi
-    
+    DASHBOARD_PATH="$EXTRACTED_DIR/$GITHUB_DASHBOARD_DIR"
     log_info "Recherche du dashboard dans: $DASHBOARD_PATH"
     
     if [ -d "$DASHBOARD_PATH" ]; then
@@ -256,12 +275,12 @@ if log_command "tar -xzf '$DASHBOARD_ARCHIVE' -C '$TEMP_DIR'" "Extraction archiv
         
         mkdir -p "$(dirname "$NGINX_DASHBOARD_DIR")"
         
-        log_command "cp -r '$DASHBOARD_PATH'/* '$NGINX_DASHBOARD_DIR'/" "Copie dashboard"
+        log_command "cp -r '$DASHBOARD_PATH' '$NGINX_DASHBOARD_DIR'" "Copie dashboard"
         echo "  ↦ Dashboard installé ✓"
         log_success "Dashboard installé avec succès"
     else
         echo "  ↦ Dossier dashboard non trouvé dans l'archive ✗"
-        log_error "Dossier dashboard non trouvé dans l'archive"
+        log_error "Dossier $GITHUB_DASHBOARD_DIR non trouvé dans l'archive"
         rm -rf "$TEMP_DIR"
         exit 1
     fi
@@ -275,17 +294,24 @@ fi
 rm -rf "$TEMP_DIR"
 log_info "Nettoyage du répertoire temporaire"
 
-# Permissions basiques pour Nginx
+# Permissions pour édition collaborative via FileZilla
 echo ""
-echo "◦ Configuration des permissions..."
+echo "◦ Configuration des permissions pour édition collaborative..."
 
 groupadd -f www-data 2>/dev/null || true
 
-log_command "chown -R www-data:www-data '$NGINX_DASHBOARD_DIR'" "Application propriétaire"
-log_command "chmod -R 755 '$NGINX_DASHBOARD_DIR'" "Permissions standard"
+log_command "chown -R www-data:www-data '$NGINX_DASHBOARD_DIR'" "Application propriétaire et groupe"
+log_command "chmod -R 775 '$NGINX_DASHBOARD_DIR'" "Permissions 775 (lecture/écriture groupe)"
+log_command "find '$NGINX_DASHBOARD_DIR' -type d -exec chmod g+s {} \;" "Sticky bit sur dossiers"
 
-echo "  ↦ Permissions configurées ✓"
-log_info "Permissions appliquées au dashboard"
+echo "  ↦ Permissions configurées pour édition via FileZilla ✓"
+log_info "Dashboard accessible en écriture pour le groupe www-data"
+
+echo ""
+echo "◦ Note : Les utilisateurs suivants peuvent éditer le dashboard :"
+echo "  • $EFFECTIVE_USER (via FileZilla ou local)"
+echo "  • $SFTP_ADMIN_USER (via FileZilla)"
+echo "  • Tout membre du groupe www-data"
 
 send_progress 60 "Dashboard installé"
 echo ""
