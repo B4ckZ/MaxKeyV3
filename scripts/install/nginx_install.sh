@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - INSTALLATION NGINX ET DASHBOARD (VERSION OFFLINE)
+# MAXLINK - INSTALLATION NGINX ET DASHBOARD (VERSION OFFLINE CORRIGÉE)
 # Installation sans connexion internet - utilise uniquement le cache local
 # ===============================================================================
 
@@ -254,8 +254,13 @@ if log_command "tar -xzf '$DASHBOARD_ARCHIVE' -C '$TEMP_DIR'" "Extraction archiv
         echo "  ↦ Dossier dashboard trouvé ✓"
         log_info "Dossier dashboard trouvé: $DASHBOARD_PATH"
         
+        # CORRECTION: Créer le répertoire destination avant la copie
+        echo "  ↦ Création du répertoire destination..."
         mkdir -p "$(dirname "$NGINX_DASHBOARD_DIR")"
+        mkdir -p "$NGINX_DASHBOARD_DIR"
+        log_info "Répertoire destination créé: $NGINX_DASHBOARD_DIR"
         
+        # Copier le contenu du dashboard
         log_command "cp -r '$DASHBOARD_PATH'/* '$NGINX_DASHBOARD_DIR'/" "Copie dashboard"
         echo "  ↦ Dashboard installé ✓"
         log_success "Dashboard installé avec succès"

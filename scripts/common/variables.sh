@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - CONFIGURATION CENTRALE (VERSION NETTOYÉE)
+# MAXLINK - CONFIGURATION CENTRALE (VERSION CORRIGÉE)
 # Toutes les variables sans les delays de démarrage
 # ===============================================================================
 
@@ -92,6 +92,14 @@ MQTT_PASS="mqtt"
 MQTT_PORT="1883"
 MQTT_WEBSOCKET_PORT="9001"
 
+# Topics MQTT à ignorer (CORRIGÉ - ajout de la variable manquante)
+MQTT_IGNORED_TOPICS=(
+    "test/+"
+    "debug/+"
+    "\$SYS/broker/load/+"
+    "\$SYS/broker/subscriptions/+"
+    "\$SYS/broker/heap/+"
+)
 
 # Convertir en string pour l'export (séparateur |)
 MQTT_IGNORED_TOPICS_STRING=$(IFS='|'; echo "${MQTT_IGNORED_TOPICS[*]}")
@@ -133,6 +141,8 @@ SERVICES_LIST=(
     "ap:Network AP:active" 
     "nginx:NginX Web:active"
     "mqtt:MQTT BKR:active"
+    "mqtt_wgs:MQTT WGS:active"
+    "orchestrator:Orchestrateur:active"
 )
 
 # ===============================================================================
@@ -256,7 +266,8 @@ export NETWORK_TIMEOUT PING_COUNT APT_RETRY_MAX_ATTEMPTS APT_RETRY_DELAY
 export DISPLAY_DELAY_STARTUP DISPLAY_DELAY_BETWEEN_STEPS
 export FAN_TEMP_MIN FAN_TEMP_ACTIVATE FAN_TEMP_MAX
 export MQTT_USER MQTT_PASS MQTT_PORT MQTT_WEBSOCKET_PORT
-export MQTT_IGNORED_TOPICS_STRING
+export MQTT_IGNORED_TOPICS MQTT_IGNORED_TOPICS_STRING
+export SERVICES_LIST
 
 # Valider la configuration
 if ! validate_config; then
