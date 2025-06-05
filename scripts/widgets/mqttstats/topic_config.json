@@ -1,0 +1,13 @@
+{
+  "description": "Configuration des topics MQTT à inclure dans les statistiques",
+  "includedPatterns": [
+    "SOUFFLAGE/509/ESP32/#",
+    "SOUFFLAGE/511/ESP32/#",
+    "SOUFFLAGE/999/ESP32/#"
+  ],
+  "excludeOwnTopics": true,
+  "excludePatterns": [
+    "rpi/network/mqtt/stats",
+    "rpi/network/mqtt/topics"
+  ]
+}

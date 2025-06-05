@@ -1,0 +1,52 @@
+{
+  "widget": {
+    "id": "wifistats",
+    "name": "WiFi Statistics",
+    "version": "1.0.0",
+    "description": "Collecte et affiche les statistiques WiFi et clients connectés",
+    "author": "MaxLink Team",
+    "dashboard_compatibility": "1.0+"
+  },
+  "mqtt": {
+    "required": true,
+    "broker": {
+      "host": "localhost",
+      "port": 1883,
+      "username": "mosquitto",
+      "password": "mqtt"
+    },
+    "topics": {
+      "publish": [
+        {
+          "topic": "rpi/network/wifi/clients",
+          "description": "Liste des clients WiFi connectés",
+          "format": "json",
+          "example": "{\"timestamp\": \"2025-05-27T10:00:00Z\", \"clients\": [{\"mac\": \"aa:bb:cc:dd:ee:ff\", \"name\": \"Device\", \"uptime\": \"01j 05h 30m 15s\"}]}"
+        },
+        {
+          "topic": "rpi/network/wifi/status",
+          "description": "État du point d'accès WiFi",
+          "format": "json",
+          "example": "{\"timestamp\": \"2025-05-27T10:00:00Z\", \"ssid\": \"MaxLink-NETWORK\", \"mode\": \"AP\", \"clients_count\": 3}"
+        }
+      ]
+    }
+  },
+  "collector": {
+    "enabled": true,
+    "script": "wifistats_collector.py",
+    "service_name": "maxlink-widget-wifistats",
+    "service_description": "MaxLink WiFi Statistics Collector"
+  },
+  "dependencies": {
+    "python_packages": [
+      "paho-mqtt"
+    ],
+    "system_packages": [
+      "iw",
+      "net-tools"
+    ],
+    "services": ["mosquitto"],
+    "python_version": ">=3.7"
+  }
+}
