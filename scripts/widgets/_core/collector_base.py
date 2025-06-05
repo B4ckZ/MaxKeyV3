@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Template de base pour les collecteurs de widgets MaxLink
-Version nettoyée - Garde le retry MQTT mais sans delays système
+Version corrigée - Utilise les chemins locaux dans /opt/maxlink
 """
 
 import os
@@ -10,6 +10,7 @@ import time
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from abc import ABC, abstractmethod
 
 # Configuration du logging
@@ -33,7 +34,31 @@ class BaseCollector(ABC):
     def __init__(self, config_file, logger_name):
         """Initialise le collecteur avec gestion de retry MQTT"""
         self.logger = logging.getLogger(logger_name)
-        self.config = self.load_config(config_file)
+        
+        # CORRECTION: Utiliser les chemins locaux
+        self.local_base_dir = Path("/opt/maxlink")
+        self.local_widgets_dir = self.local_base_dir / "widgets"
+        self.local_config_dir = self.local_base_dir / "config" / "widgets"
+        
+        # Si config_file est un chemin absolu vers USB, le convertir en chemin local
+        if config_file and "/media/" in str(config_file):
+            # Extraire juste le nom du fichier
+            config_filename = Path(config_file).name
+            config_file = self.local_config_dir / config_filename
+            self.logger.info(f"Redirection config vers: {config_file}")
+        
+        # Si config_file n'est pas fourni, utiliser la variable d'environnement
+        if not config_file:
+            config_file = os.environ.get('CONFIG_FILE')
+            if not config_file:
+                # Deviner le fichier de config basé sur le nom du widget
+                widget_name = os.environ.get('WIDGET_NAME', logger_name.replace('_collector', ''))
+                config_file = self.local_config_dir / f"{widget_name}_widget.json"
+        
+        self.config_file = Path(config_file)
+        self.logger.info(f"Utilisation du fichier de config: {self.config_file}")
+        
+        self.config = self.load_config(self.config_file)
         self.mqtt_client = None
         self.connected = False
         
@@ -58,16 +83,54 @@ class BaseCollector(ABC):
         }
         
         self.logger.info(f"Collecteur initialisé - Version {self.config['widget']['version']}")
+        self.logger.info(f"Chemins locaux - Widgets: {self.local_widgets_dir}, Config: {self.local_config_dir}")
         self.logger.info(f"Retry MQTT: {self.retry_enabled}, Delay: {self.retry_delay}s, Max: {self.max_retries}")
     
     def load_config(self, config_file):
         """Charge la configuration depuis le fichier JSON"""
         try:
+            # Vérifier d'abord le chemin local
+            if not config_file.exists():
+                self.logger.error(f"Fichier de configuration non trouvé: {config_file}")
+                # Essayer de chercher dans le répertoire courant du widget
+                alt_config = Path(__file__).parent / Path(config_file).name
+                if alt_config.exists():
+                    self.logger.info(f"Configuration trouvée dans: {alt_config}")
+                    config_file = alt_config
+                else:
+                    raise FileNotFoundError(f"Configuration introuvable: {config_file}")
+            
             with open(config_file, 'r') as f:
-                return json.load(f)
+                config = json.load(f)
+                self.logger.info(f"Configuration chargée depuis: {config_file}")
+                return config
         except Exception as e:
             self.logger.error(f"Erreur chargement config: {e}")
             sys.exit(1)
+    
+    def get_widget_file(self, filename):
+        """Retourne le chemin d'un fichier du widget en cherchant dans les bons répertoires"""
+        widget_name = self.config['widget']['id']
+        
+        # Ordre de recherche:
+        # 1. Répertoire local du widget
+        local_widget_path = self.local_widgets_dir / widget_name / filename
+        if local_widget_path.exists():
+            return local_widget_path
+        
+        # 2. Répertoire courant (au cas où le script est exécuté directement)
+        current_dir_path = Path(__file__).parent / filename
+        if current_dir_path.exists():
+            return current_dir_path
+        
+        # 3. Ancien chemin USB (fallback pour compatibilité)
+        if 'BASE_DIR' in os.environ:
+            usb_path = Path(os.environ['BASE_DIR']) / 'scripts' / 'widgets' / widget_name / filename
+            if usb_path.exists():
+                self.logger.warning(f"Utilisation du chemin USB (déprécié): {usb_path}")
+                return usb_path
+        
+        raise FileNotFoundError(f"Fichier {filename} non trouvé pour le widget {widget_name}")
     
     def connect_mqtt(self):
         """Connexion au broker MQTT avec retry robuste"""
@@ -81,7 +144,7 @@ class BaseCollector(ABC):
                     self.logger.error(f"Limite de tentatives atteinte ({self.max_retries})")
                     return False
                 
-                self.logger.info(f"Tentative de connexion MQTT #{self.connection_attempts}")
+                self.logger.info(f"Tentative de connexion MQTT #{self.connection_attempts} à {self.mqtt_config['host']}:{self.mqtt_config['port']}")
                 
                 # Créer le client MQTT
                 self.mqtt_client = mqtt.Client()
@@ -95,6 +158,9 @@ class BaseCollector(ABC):
                     self.mqtt_config['username'],
                     self.mqtt_config['password']
                 )
+                
+                # Options de reconnexion automatique
+                self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
                 
                 # Connexion
                 self.mqtt_client.connect(
@@ -216,6 +282,8 @@ class BaseCollector(ABC):
     def run(self):
         """Boucle principale du collecteur"""
         self.logger.info("Démarrage du collecteur")
+        self.logger.info(f"Répertoire de travail: {os.getcwd()}")
+        self.logger.info(f"Variables d'environnement WIDGET: {os.environ.get('WIDGET_NAME', 'Non défini')}")
         
         # Se connecter au broker MQTT
         if not self.connect_mqtt():

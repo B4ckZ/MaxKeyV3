@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Collecteur de métriques système pour le widget Server Monitoring
-Version modifiée avec nouveaux intervalles de rafraîchissement
+Version corrigée pour utiliser les chemins locaux
 """
 
 import os
@@ -35,25 +35,20 @@ except ImportError:
     logger.error("Module paho-mqtt non installé")
     sys.exit(1)
 
-class SystemMetricsCollector:
+# IMPORTANT: Ajouter le chemin du core au PYTHONPATH
+sys.path.insert(0, '/opt/maxlink/widgets/_core')
+try:
+    from collector_base import BaseCollector
+except ImportError:
+    logger.error("Impossible d'importer BaseCollector depuis /opt/maxlink/widgets/_core")
+    sys.exit(1)
+
+class SystemMetricsCollector(BaseCollector):
     def __init__(self, config_file):
         """Initialise le collecteur avec la configuration du widget"""
-        self.config = self.load_config(config_file)
-        self.mqtt_client = None
-        self.connected = False
+        super().__init__(config_file, 'servermonitoring')
         
-        # Configuration MQTT
-        self.mqtt_config = self.config['mqtt']['broker']
-        
-        # Configuration retry MQTT uniquement
-        self.retry_enabled = os.environ.get('MQTT_RETRY_ENABLED', 'true').lower() == 'true'
-        self.retry_delay = int(os.environ.get('MQTT_RETRY_DELAY', '10'))
-        self.max_retries = int(os.environ.get('MQTT_MAX_RETRIES', '0'))  # 0 = infini
-        
-        # Compteur de tentatives
-        self.connection_attempts = 0
-        
-        # Intervalles de mise à jour MODIFIÉS
+        # Intervalles de mise à jour
         self.intervals = {
             'fast': 1,    # CPU usage, Fréquences, RAM/SWAP
             'normal': 5,  # Températures
@@ -65,143 +60,45 @@ class SystemMetricsCollector:
             'normal': 0,
             'slow': 0
         }
+    
+    def on_mqtt_connected(self):
+        """Appelé quand la connexion MQTT est établie"""
+        logger.info("Connecté au broker MQTT - début de la collecte des métriques système")
+    
+    def initialize(self):
+        """Initialise les variables spécifiques au widget"""
+        logger.info("Initialisation du collecteur de métriques système")
+        logger.info(f"Intervalles: Fast={self.intervals['fast']}s, Normal={self.intervals['normal']}s, Slow={self.intervals['slow']}s")
+    
+    def get_update_interval(self):
+        """Retourne l'intervalle de mise à jour minimum"""
+        return 0.1  # Pour vérifier rapidement les différents intervalles
+    
+    def collect_and_publish(self):
+        """Collecte et publie les données selon les intervalles définis"""
+        current_time = time.time()
         
-        # Statistiques
-        self.stats = {
-            'messages_sent': 0,
-            'errors': 0,
-            'start_time': time.time(),
-            'connection_failures': 0
-        }
+        # Groupe FAST (CPU, Fréquences, RAM/SWAP, Uptime)
+        if current_time - self.last_update['fast'] >= self.intervals['fast']:
+            self.collect_cpu_metrics()
+            self.collect_frequency_metrics()
+            self.collect_memory_metrics()
+            self.collect_uptime_metrics()
+            self.last_update['fast'] = current_time
         
-        logger.info(f"Collecteur initialisé - Version {self.config['widget']['version']} (Intervalles modifiés)")
-        logger.info(f"Retry: {self.retry_enabled}, Delay: {self.retry_delay}s, Max: {self.max_retries}")
-    
-    def load_config(self, config_file):
-        """Charge la configuration depuis le fichier JSON"""
-        try:
-            with open(config_file, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Erreur chargement config: {e}")
-            sys.exit(1)
-    
-    def connect_mqtt(self):
-        """Connexion au broker MQTT avec retry robuste"""
-        while True:
-            try:
-                self.connection_attempts += 1
-                
-                # Vérifier si on a atteint la limite
-                if self.max_retries > 0 and self.connection_attempts > self.max_retries:
-                    logger.error(f"Limite de tentatives atteinte ({self.max_retries})")
-                    return False
-                
-                logger.info(f"Tentative de connexion MQTT #{self.connection_attempts} à {self.mqtt_config['host']}:{self.mqtt_config['port']}")
-                
-                # Créer le client MQTT
-                self.mqtt_client = mqtt.Client()
-                
-                # Callbacks
-                self.mqtt_client.on_connect = self.on_connect
-                self.mqtt_client.on_disconnect = self.on_disconnect
-                
-                # Authentification
-                self.mqtt_client.username_pw_set(
-                    self.mqtt_config['username'],
-                    self.mqtt_config['password']
-                )
-                
-                # Options de reconnexion automatique
-                self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
-                
-                # Connexion
-                self.mqtt_client.connect(
-                    self.mqtt_config['host'], 
-                    self.mqtt_config['port'], 
-                    60
-                )
-                
-                # Démarrer la boucle
-                self.mqtt_client.loop_start()
-                
-                # Attendre la connexion
-                timeout = 30
-                while not self.connected and timeout > 0:
-                    time.sleep(0.5)
-                    timeout -= 0.5
-                
-                if self.connected:
-                    logger.info("Connexion MQTT établie avec succès")
-                    self.stats['connection_failures'] = 0
-                    return True
-                else:
-                    raise Exception("Timeout de connexion")
-                
-            except Exception as e:
-                self.stats['connection_failures'] += 1
-                logger.error(f"Erreur connexion MQTT: {e}")
-                
-                if self.mqtt_client:
-                    try:
-                        self.mqtt_client.loop_stop()
-                    except:
-                        pass
-                
-                if not self.retry_enabled:
-                    return False
-                
-                # Attendre avant de réessayer
-                logger.info(f"Nouvelle tentative dans {self.retry_delay} secondes...")
-                time.sleep(self.retry_delay)
-    
-    def on_connect(self, client, userdata, flags, rc):
-        """Callback de connexion"""
-        if rc == 0:
-            logger.info("Connecté au broker MQTT")
-            self.connected = True
-        else:
-            logger.error(f"Échec connexion MQTT, code: {rc}")
-            self.connected = False
-    
-    def on_disconnect(self, client, userdata, rc):
-        """Callback de déconnexion"""
-        logger.warning(f"Déconnecté du broker MQTT (code: {rc})")
-        self.connected = False
-        self.stats['connection_failures'] += 1
-    
-    def publish_metric(self, topic, value, unit=None):
-        """Publie une métrique sur MQTT avec gestion d'erreur"""
-        if not self.connected:
-            return False
+        # Groupe NORMAL (Températures)
+        if current_time - self.last_update['normal'] >= self.intervals['normal']:
+            self.collect_temperature_metrics()
+            self.last_update['normal'] = current_time
         
-        try:
-            payload = {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "value": value
-            }
-            
-            if unit:
-                payload["unit"] = unit
-            
-            result = self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
-            
-            if result.rc == 0:
-                self.stats['messages_sent'] += 1
-                return True
-            else:
-                self.stats['errors'] += 1
-                return False
-                
-        except Exception as e:
-            logger.error(f"Erreur publication: {e}")
-            self.stats['errors'] += 1
-            return False
+        # Groupe SLOW (Disque)
+        if current_time - self.last_update['slow'] >= self.intervals['slow']:
+            self.collect_disk_metrics()
+            self.last_update['slow'] = current_time
     
     def collect_cpu_metrics(self):
         """Collecte les métriques CPU"""
         try:
-            # Usage par core
             cpu_percents = psutil.cpu_percent(interval=0.1, percpu=True)
             for i, percent in enumerate(cpu_percents, 1):
                 self.publish_metric(
@@ -267,9 +164,9 @@ class SystemMetricsCollector:
             self.stats['errors'] += 1
     
     def collect_memory_metrics(self):
-        """Collecte les métriques mémoire - MODIFIÉ pour séparer RAM/SWAP et Disk"""
+        """Collecte les métriques mémoire - RAM et SWAP uniquement"""
         try:
-            # RAM - Toujours dans FAST
+            # RAM
             ram = psutil.virtual_memory()
             self.publish_metric(
                 "rpi/system/memory/ram", 
@@ -277,7 +174,7 @@ class SystemMetricsCollector:
                 "%"
             )
             
-            # SWAP - Maintenant dans FAST
+            # SWAP
             swap = psutil.swap_memory()
             self.publish_metric(
                 "rpi/system/memory/swap", 
@@ -290,9 +187,8 @@ class SystemMetricsCollector:
             self.stats['errors'] += 1
     
     def collect_disk_metrics(self):
-        """Collecte les métriques disque - SÉPARÉ pour SLOW"""
+        """Collecte les métriques disque"""
         try:
-            # Disque - Dans SLOW
             disk = psutil.disk_usage('/')
             self.publish_metric(
                 "rpi/system/memory/disk", 
@@ -316,119 +212,24 @@ class SystemMetricsCollector:
         except Exception as e:
             logger.error(f"Erreur collecte uptime: {e}")
             self.stats['errors'] += 1
-    
-    def log_statistics(self):
-        """Affiche les statistiques"""
-        runtime = time.time() - self.stats['start_time']
-        hours = int(runtime // 3600)
-        minutes = int((runtime % 3600) // 60)
-        
-        logger.info(
-            f"Stats - Runtime: {hours}h {minutes}m | "
-            f"Messages: {self.stats['messages_sent']} | "
-            f"Erreurs: {self.stats['errors']} | "
-            f"Échecs connexion: {self.stats['connection_failures']}"
-        )
-    
-    def run(self):
-        """Boucle principale du collecteur"""
-        logger.info("Démarrage du collecteur avec nouveaux intervalles")
-        logger.info("FAST (1s): CPU, Fréquences, RAM/SWAP")
-        logger.info("NORMAL (5s): Températures")
-        logger.info("SLOW (30s): Disque")
-        
-        # Se connecter au broker MQTT avec retry
-        if not self.connect_mqtt():
-            logger.error("Impossible de se connecter au broker MQTT après toutes les tentatives")
-            return
-        
-        logger.info("Collecteur opérationnel")
-        
-        # Compteur pour les statistiques
-        stats_counter = 0
-        error_count = 0
-        
-        try:
-            while True:
-                try:
-                    current_time = time.time()
-                    
-                    # Vérifier la connexion MQTT
-                    if not self.connected:
-                        logger.warning("Connexion MQTT perdue, reconnexion...")
-                        if not self.connect_mqtt():
-                            logger.error("Reconnexion échouée")
-                            break
-                    
-                    # Groupe FAST (CPU, Fréquences, RAM/SWAP, Uptime)
-                    if current_time - self.last_update['fast'] >= self.intervals['fast']:
-                        self.collect_cpu_metrics()
-                        self.collect_frequency_metrics()
-                        self.collect_memory_metrics()  # RAM et SWAP seulement
-                        self.collect_uptime_metrics()
-                        self.last_update['fast'] = current_time
-                    
-                    # Groupe NORMAL (Températures)
-                    if current_time - self.last_update['normal'] >= self.intervals['normal']:
-                        self.collect_temperature_metrics()
-                        self.last_update['normal'] = current_time
-                    
-                    # Groupe SLOW (Disque)
-                    if current_time - self.last_update['slow'] >= self.intervals['slow']:
-                        self.collect_disk_metrics()
-                        self.last_update['slow'] = current_time
-                    
-                    # Afficher les statistiques toutes les 5 minutes
-                    stats_counter += 1
-                    if stats_counter >= 3000:  # 300 secondes à 0.1s par boucle
-                        self.log_statistics()
-                        stats_counter = 0
-                    
-                    # Réinitialiser le compteur d'erreurs si tout va bien
-                    error_count = 0
-                    
-                    # Pause pour éviter la surcharge CPU
-                    time.sleep(0.1)
-                    
-                except Exception as e:
-                    error_count += 1
-                    logger.error(f"Erreur dans la boucle de collecte: {e}")
-                    self.stats['errors'] += 1
-                    
-                    # Si trop d'erreurs consécutives, arrêter
-                    if error_count > 10:
-                        logger.error("Trop d'erreurs consécutives, arrêt du collecteur")
-                        break
-                    
-                    time.sleep(5)  # Pause plus longue en cas d'erreur
-                
-        except KeyboardInterrupt:
-            logger.info("Arrêt demandé par l'utilisateur")
-        except Exception as e:
-            logger.error(f"Erreur dans la boucle principale: {e}")
-        finally:
-            if self.mqtt_client:
-                self.mqtt_client.loop_stop()
-                self.mqtt_client.disconnect()
-            
-            self.log_statistics()
-            logger.info("Collecteur arrêté")
 
 if __name__ == "__main__":
-    # Récupérer le fichier de configuration depuis l'environnement ou le paramètre
+    # Configuration depuis l'environnement ou paramètres
     config_file = os.environ.get('CONFIG_FILE')
     
     if not config_file and len(sys.argv) > 1:
         config_file = sys.argv[1]
     
+    # Si pas de config spécifiée, utiliser le chemin local par défaut
     if not config_file:
-        # Chemin par défaut
-        widget_dir = os.path.dirname(os.path.abspath(__file__))
-        config_file = os.path.join(widget_dir, "servermonitoring_widget.json")
+        config_file = "/opt/maxlink/config/widgets/servermonitoring_widget.json"
     
-    if not os.path.exists(config_file):
-        logger.error(f"Fichier de configuration non trouvé: {config_file}")
-        sys.exit(1)
+    # Log du démarrage
+    logger.info("="*60)
+    logger.info("Démarrage du collecteur Server Monitoring")
+    logger.info(f"Config recherchée dans: {config_file}")
+    logger.info(f"Répertoire de travail: {os.getcwd()}")
+    logger.info("="*60)
     
     # Lancer le collecteur
     collector = SystemMetricsCollector(config_file)

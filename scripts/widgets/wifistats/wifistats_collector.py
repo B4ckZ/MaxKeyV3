@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Collecteur de statistiques WiFi pour le widget WiFi Stats
-Version simplifiée avec intervalle défini dans le collector
+Version corrigée pour utiliser les chemins locaux
 """
 
 import os
@@ -12,6 +12,7 @@ import subprocess
 import re
 import logging
 from datetime import datetime
+from pathlib import Path
 
 # Configuration du logging
 logging.basicConfig(
@@ -29,27 +30,21 @@ except ImportError:
     logger.error("Module paho-mqtt non installé")
     sys.exit(1)
 
-class WiFiStatsCollector:
+# IMPORTANT: Ajouter le chemin du core au PYTHONPATH
+sys.path.insert(0, '/opt/maxlink/widgets/_core')
+try:
+    from collector_base import BaseCollector
+except ImportError:
+    logger.error("Impossible d'importer BaseCollector depuis /opt/maxlink/widgets/_core")
+    sys.exit(1)
+
+class WiFiStatsCollector(BaseCollector):
     def __init__(self, config_file):
         """Initialise le collecteur"""
-        self.config = self.load_config(config_file)
-        self.mqtt_client = None
-        self.connected = False
-        
-        # Configuration
-        self.mqtt_config = self.config['mqtt']['broker']
+        super().__init__(config_file, 'wifistats')
         
         # Intervalle de mise à jour défini directement dans le collector
-        # Plus simple et évite la redondance avec le JSON
         self.update_interval = 1  # 1 seconde pour voir les connexions/déconnexions rapidement
-        
-        # Configuration retry depuis l'environnement
-        self.retry_enabled = os.environ.get('MQTT_RETRY_ENABLED', 'true').lower() == 'true'
-        self.retry_delay = int(os.environ.get('MQTT_RETRY_DELAY', '10'))
-        self.max_retries = int(os.environ.get('MQTT_MAX_RETRIES', '0'))  # 0 = infini
-        
-        # Compteur de tentatives
-        self.connection_attempts = 0
         
         # Interface WiFi (généralement wlan0)
         self.interface = "wlan0"
@@ -57,123 +52,30 @@ class WiFiStatsCollector:
         # Cache pour stocker les temps de connexion
         self.client_first_seen = {}
         
-        # Statistiques
-        self.stats = {
-            'messages_sent': 0,
-            'errors': 0,
-            'start_time': time.time(),
-            'connection_failures': 0
-        }
-        
-        logger.info(f"Collecteur WiFi Stats initialisé - Version {self.config['widget']['version']}")
         logger.info(f"Intervalle de mise à jour: {self.update_interval}s")
     
-    def load_config(self, config_file):
-        """Charge la configuration"""
-        try:
-            with open(config_file, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Erreur chargement config: {e}")
-            sys.exit(1)
+    def on_mqtt_connected(self):
+        """Appelé quand la connexion MQTT est établie"""
+        logger.info("Connecté au broker MQTT - début de la collecte des stats WiFi")
     
-    def connect_mqtt(self):
-        """Connexion au broker MQTT avec retry robuste"""
-        while True:
-            try:
-                self.connection_attempts += 1
-                
-                if self.max_retries > 0 and self.connection_attempts > self.max_retries:
-                    logger.error(f"Limite de tentatives atteinte ({self.max_retries})")
-                    return False
-                
-                logger.info(f"Tentative de connexion MQTT #{self.connection_attempts}")
-                
-                self.mqtt_client = mqtt.Client()
-                self.mqtt_client.on_connect = lambda c,u,f,rc: self._on_connect(rc)
-                self.mqtt_client.on_disconnect = lambda c,u,rc: self._on_disconnect(rc)
-                
-                self.mqtt_client.username_pw_set(
-                    self.mqtt_config['username'],
-                    self.mqtt_config['password']
-                )
-                
-                self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=120)
-                
-                self.mqtt_client.connect(
-                    self.mqtt_config['host'], 
-                    self.mqtt_config['port'], 
-                    60
-                )
-                
-                self.mqtt_client.loop_start()
-                
-                timeout = 30
-                while not self.connected and timeout > 0:
-                    time.sleep(0.5)
-                    timeout -= 0.5
-                
-                if self.connected:
-                    logger.info("Connexion MQTT établie avec succès")
-                    self.stats['connection_failures'] = 0
-                    return True
-                else:
-                    raise Exception("Timeout de connexion")
-                
-            except Exception as e:
-                self.stats['connection_failures'] += 1
-                logger.error(f"Erreur connexion MQTT: {e}")
-                
-                if self.mqtt_client:
-                    try:
-                        self.mqtt_client.loop_stop()
-                    except:
-                        pass
-                
-                if not self.retry_enabled:
-                    return False
-                
-                logger.info(f"Nouvelle tentative dans {self.retry_delay} secondes...")
-                time.sleep(self.retry_delay)
-    
-    def _on_connect(self, rc):
-        """Callback de connexion"""
-        if rc == 0:
-            logger.info("Connecté au broker MQTT")
-            self.connected = True
-        else:
-            logger.error(f"Échec connexion MQTT, code: {rc}")
-    
-    def _on_disconnect(self, rc):
-        """Callback de déconnexion"""
-        logger.warning(f"Déconnecté du broker MQTT (code: {rc})")
-        self.connected = False
-        self.stats['connection_failures'] += 1
-    
-    def publish_data(self, topic, data):
-        """Publie des données sur MQTT"""
-        if not self.connected:
-            return False
+    def initialize(self):
+        """Initialise les variables spécifiques au widget"""
+        logger.info(f"Initialisation du collecteur WiFi Stats sur interface {self.interface}")
         
+        # Vérifier que l'interface existe
         try:
-            payload = {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                **data
-            }
-            
-            result = self.mqtt_client.publish(topic, json.dumps(payload), qos=1)
-            
-            if result.rc == 0:
-                self.stats['messages_sent'] += 1
-                return True
+            result = subprocess.run(['ip', 'link', 'show', self.interface], 
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"Interface {self.interface} non trouvée")
             else:
-                self.stats['errors'] += 1
-                return False
-            
+                logger.info(f"Interface {self.interface} disponible")
         except Exception as e:
-            logger.error(f"Erreur publication: {e}")
-            self.stats['errors'] += 1
-            return False
+            logger.error(f"Erreur vérification interface: {e}")
+    
+    def get_update_interval(self):
+        """Retourne l'intervalle de mise à jour"""
+        return self.update_interval
     
     def format_uptime(self, seconds):
         """Formate l'uptime en format lisible"""
@@ -330,90 +232,24 @@ class WiFiStatsCollector:
         except Exception as e:
             logger.error(f"Erreur collecte/publication: {e}")
             self.stats['errors'] += 1
-    
-    def log_statistics(self):
-        """Affiche les statistiques"""
-        runtime = time.time() - self.stats['start_time']
-        hours = int(runtime // 3600)
-        minutes = int((runtime % 3600) // 60)
-        
-        logger.info(
-            f"Stats - Runtime: {hours}h {minutes}m | "
-            f"Messages: {self.stats['messages_sent']} | "
-            f"Erreurs: {self.stats['errors']}"
-        )
-    
-    def run(self):
-        """Boucle principale"""
-        logger.info("Démarrage du collecteur WiFi Stats")
-        
-        startup_delay = int(os.environ.get('STARTUP_DELAY', '10'))
-        if startup_delay > 0:
-            logger.info(f"Pause de {startup_delay}s au démarrage...")
-            time.sleep(startup_delay)
-        
-        if not self.connect_mqtt():
-            logger.error("Impossible de se connecter au broker MQTT")
-            return
-        
-        logger.info("Collecteur opérationnel")
-        
-        stats_counter = 0
-        error_count = 0
-        
-        try:
-            while True:
-                try:
-                    if not self.connected:
-                        logger.warning("Connexion MQTT perdue, reconnexion...")
-                        if not self.connect_mqtt():
-                            logger.error("Reconnexion échouée")
-                            break
-                    
-                    self.collect_and_publish()
-                    
-                    stats_counter += 1
-                    if stats_counter >= 300:  # 5 minutes à 1s par boucle
-                        self.log_statistics()
-                        stats_counter = 0
-                    
-                    error_count = 0
-                    time.sleep(self.update_interval)
-                    
-                except Exception as e:
-                    error_count += 1
-                    logger.error(f"Erreur dans la boucle: {e}")
-                    self.stats['errors'] += 1
-                    
-                    if error_count > 10:
-                        logger.error("Trop d'erreurs consécutives")
-                        break
-                    
-                    time.sleep(10)
-                
-        except KeyboardInterrupt:
-            logger.info("Arrêt demandé")
-        finally:
-            if self.mqtt_client:
-                self.mqtt_client.loop_stop()
-                self.mqtt_client.disconnect()
-            
-            self.log_statistics()
-            logger.info("Collecteur arrêté")
 
 if __name__ == "__main__":
+    # Configuration
     config_file = os.environ.get('CONFIG_FILE')
     
     if not config_file and len(sys.argv) > 1:
         config_file = sys.argv[1]
     
     if not config_file:
-        widget_dir = os.path.dirname(os.path.abspath(__file__))
-        config_file = os.path.join(widget_dir, "wifistats_widget.json")
+        config_file = "/opt/maxlink/config/widgets/wifistats_widget.json"
     
-    if not os.path.exists(config_file):
-        logger.error(f"Fichier de configuration non trouvé: {config_file}")
-        sys.exit(1)
+    # Log du démarrage
+    logger.info("="*60)
+    logger.info("Démarrage du collecteur WiFi Stats")
+    logger.info(f"Config recherchée dans: {config_file}")
+    logger.info(f"Répertoire de travail: {os.getcwd()}")
+    logger.info("="*60)
     
+    # Lancer le collecteur
     collector = WiFiStatsCollector(config_file)
     collector.run()
