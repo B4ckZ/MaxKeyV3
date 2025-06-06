@@ -197,8 +197,6 @@ validate_config() {
     [ -z "$WIFI_SSID" ] && echo "ERREUR: WIFI_SSID non défini" && ((errors++))
     [ -z "$AP_SSID" ] && echo "ERREUR: AP_SSID non défini" && ((errors++))
     [ -z "$SYSTEM_USER" ] && echo "ERREUR: SYSTEM_USER non défini" && ((errors++))
-    [ -z "$SFTP_ADMIN_USER" ] && echo "ERREUR: SFTP_ADMIN_USER non défini" && ((errors++))
-    [ -z "$SFTP_DATA_USER" ] && echo "ERREUR: SFTP_DATA_USER non défini" && ((errors++))
     
     if [[ ! "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         echo "ERREUR: AP_IP ($AP_IP) n'est pas une adresse IP valide"

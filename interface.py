@@ -44,14 +44,14 @@ COLORS = {
     "nord6": "#ECEFF4",  # Texte
     "nord8": "#88C0D0",  # Accent primaire
     "nord10": "#5E81AC", # Bouton Installer
-    "nord11": "#BF616A", # Rouge / Désinstaller
-    "nord12": "#D08770", # Orange / Note importante
+    "nord11": "#BF616A", # Rouge
+    "nord12": "#D08770", # Orange
     "nord14": "#A3BE8C", # Vert / Succès
-    "nord15": "#B48EAD", # Violet / Tester
+    "nord15": "#B48EAD", # Violet
 }
 
 # ===============================================================================
-# DIALOGUE DE CONFIRMATION
+# DIALOGUE DE CONFIRMATION (conservé pour utilisation future)
 # ===============================================================================
 
 class StyledConfirmDialog:
@@ -285,7 +285,7 @@ class MaxLinkApp:
         main = tk.Frame(self.root, bg=COLORS["nord0"], padx=20, pady=20)
         main.pack(fill="both", expand=True)
         
-        # Panneau gauche (services + boutons)
+        # Panneau gauche (services + bouton)
         self.left_frame = tk.Frame(main, bg=COLORS["nord1"], width=300)
         self.left_frame.pack_propagate(False)
         self.left_frame.pack(side="left", fill="both", padx=(0, 20))
@@ -307,7 +307,7 @@ class MaxLinkApp:
         for service in self.services:
             self.create_service_item(services_frame, service)
         
-        # Zone des boutons
+        # Zone du bouton
         buttons_frame = tk.Frame(self.left_frame, bg=COLORS["nord1"], padx=20, pady=20)
         buttons_frame.pack(fill="x")
         
@@ -383,7 +383,7 @@ class MaxLinkApp:
             bg=COLORS["nord1"],
             highlightthickness=3,
             padx=15,
-            pady=15
+            pady=10
         )
         frame.pack(fill="x", pady=10)
         
@@ -410,7 +410,7 @@ class MaxLinkApp:
         service["indicator"] = indicator
     
     def create_action_buttons(self, parent):
-        """Crée les boutons d'action"""
+        """Crée le bouton d'action"""
         button_style = {
             "font": ("Arial", 16, "bold"),
             "width": 20,
@@ -420,22 +420,16 @@ class MaxLinkApp:
             "cursor": "hand2"
         }
         
-        actions = [
-            {"text": "Installer", "bg": COLORS["nord10"], "action": "install"},
-            {"text": "Tester", "bg": COLORS["nord15"], "action": "test"},
-            {"text": "Désinstaller", "bg": COLORS["nord11"], "action": "uninstall"}
-        ]
-        
-        for action in actions:
-            btn = tk.Button(
-                parent, 
-                text=action["text"],
-                bg=action["bg"],
-                fg=COLORS["nord6"],
-                command=lambda a=action["action"]: self.run_action(a),
-                **button_style
-            )
-            btn.pack(fill="x", pady=8)
+        # Créer uniquement le bouton Installer
+        btn = tk.Button(
+            parent, 
+            text="Installer",
+            bg=COLORS["nord10"],
+            fg=COLORS["nord6"],
+            command=lambda: self.run_action("install"),
+            **button_style
+        )
+        btn.pack(fill="x", pady=8)
     
     def select_service(self, service):
         """Sélectionne un service"""
@@ -513,21 +507,8 @@ class MaxLinkApp:
         service = self.selected_service
         service_id = service["id"]
         
-        # Confirmation pour désinstallation
-        if action == "uninstall":
-            dialog = StyledConfirmDialog(
-                self.root,
-                "Confirmation",
-                f"Désinstaller {service['name']} ?\n\nCette action est irréversible."
-            )
-            if not dialog.show():
-                return
-        
         script_path = f"scripts/{action}/{service_id}_{action}.sh"
         full_script_path = os.path.join(self.base_path, script_path)
-        
-        if action == "test":
-            self.update_console(f"Note: Le test peut aussi démarrer le service si nécessaire.\n\n")
         
         self.update_console(f"""{"="*70}
 ACTION: {service['name']} - {action.upper()}
@@ -593,14 +574,10 @@ Code de sortie: {return_code}
 """)
             
             if return_code == 0:
-                if action in ["install", "test"]:
+                if action == "install":
                     service["status"] = "active"
                     self.update_status_indicator(service, True)
                     logger.info(f"Service {service['name']} activé")
-                elif action == "uninstall":
-                    service["status"] = "inactive"
-                    self.update_status_indicator(service, False)
-                    logger.info(f"Service {service['name']} désactivé")
             
         except Exception as e:
             logger.error(f"Erreur lors de l'exécution: {str(e)}")
