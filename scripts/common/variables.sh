@@ -10,7 +10,7 @@
 # ===============================================================================
 
 # Version et informations de l'interface
-MAXLINK_VERSION="2.4"
+MAXLINK_VERSION="3"
 MAXLINK_COPYRIGHT="© 2025 WERIT. Tous droits réservés."
 
 # ===============================================================================
@@ -35,26 +35,6 @@ VERSION_OVERLAY_PREFIX="MaxLink "            # Préfixe avant la version
 # Utilisateur principal du Raspberry Pi
 SYSTEM_USER="prod"
 SYSTEM_USER_HOME="/home/$SYSTEM_USER"
-
-# ===============================================================================
-# CONFIGURATION DES UTILISATEURS SFTP/FILEZILLA
-# ===============================================================================
-
-# Super admin FileZilla (accès complet au système)
-SFTP_ADMIN_USER="max"
-SFTP_ADMIN_PASS="max"
-SFTP_ADMIN_DESC="Super Admin FileZilla - Accès complet"
-
-# Utilisateur limité (téléchargement uniquement)
-SFTP_DATA_USER="franck"
-SFTP_DATA_PASS="franck"
-SFTP_DATA_DIR="/home/franck/downloads"
-SFTP_DATA_DESC="Utilisateur limité - Téléchargement uniquement"
-
-# Liste extensible d'utilisateurs limités
-SFTP_LIMITED_USERS=(
-    "franck:franck:/home/franck/downloads:Utilisateur limité - Téléchargement uniquement"
-)
 
 # ===============================================================================
 # CONFIGURATION RÉSEAU WIFI
@@ -250,9 +230,6 @@ export VERSION_OVERLAY_MARGIN_RIGHT VERSION_OVERLAY_MARGIN_BOTTOM
 export VERSION_OVERLAY_FONT_BOLD VERSION_OVERLAY_PREFIX
 export SYSTEM_USER SYSTEM_USER_HOME
 export EFFECTIVE_USER EFFECTIVE_USER_HOME
-export SFTP_ADMIN_USER SFTP_ADMIN_PASS SFTP_ADMIN_DESC
-export SFTP_DATA_USER SFTP_DATA_PASS SFTP_DATA_DIR SFTP_DATA_DESC
-export SFTP_LIMITED_USERS
 export WIFI_SSID WIFI_PASSWORD
 export AP_SSID AP_PASSWORD AP_IP AP_NETMASK AP_DHCP_START AP_DHCP_END
 export GITHUB_REPO_URL GITHUB_BRANCH GITHUB_DASHBOARD_DIR GITHUB_TOKEN

@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - SCRIPT DE MISE À JOUR SYSTÈME V10 AVEC GESTION DES UTILISATEURS SFTP
-# Version avec configuration multi-utilisateurs FileZilla/SFTP et Dashboard V3
+# MAXLINK - SCRIPT DE MISE À JOUR DU SYSTÈME LINUX
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -20,7 +19,7 @@ source "$SCRIPT_DIR/../common/wifi_helper.sh"
 # ===============================================================================
 
 # Initialiser le logging
-init_logging "Mise à jour système MaxLink V10 - Configuration multi-utilisateurs" "install"
+init_logging "Mise à jour système MaxLink"
 
 # Variables pour le contrôle du processus
 AP_WAS_ACTIVE=false
@@ -342,163 +341,11 @@ EOF
     fi
 }
 
-# Configuration SSH et gestion des utilisateurs SFTP
-configure_ssh_and_users() {
-    echo "◦ Configuration SSH et création des utilisateurs FileZilla/SFTP..."
-    log_info "Configuration SSH et gestion des utilisateurs SFTP"
-    
-    # Activer SSH si nécessaire
-    if ! systemctl is-active --quiet ssh; then
-        echo "  ↦ Activation du service SSH..."
-        log_command "systemctl enable ssh" "Activation SSH au démarrage"
-        log_command "systemctl start ssh" "Démarrage SSH"
-        echo "  ↦ Service SSH activé ✓"
-    else
-        echo "  ↦ Service SSH déjà actif ✓"
-    fi
-    
-    echo ""
-    echo "◦ Création des utilisateurs FileZilla/SFTP..."
-    
-    # 1. Créer le super admin FileZilla
-    if ! id "$SFTP_ADMIN_USER" &>/dev/null; then
-        echo "  ↦ Création du super admin : $SFTP_ADMIN_USER"
-        log_command "useradd -m -s /bin/bash '$SFTP_ADMIN_USER'" "Création utilisateur $SFTP_ADMIN_USER"
-        echo "$SFTP_ADMIN_USER:$SFTP_ADMIN_PASS" | chpasswd
-        log_command "usermod -aG sudo '$SFTP_ADMIN_USER'" "Ajout au groupe sudo"
-        echo "    • $SFTP_ADMIN_DESC ✓"
-        log_success "Super admin $SFTP_ADMIN_USER créé avec succès"
-    else
-        echo "  ↦ Utilisateur $SFTP_ADMIN_USER existe déjà ✓"
-        log_info "Utilisateur $SFTP_ADMIN_USER déjà existant"
-    fi
-    
-    # 2. Créer les utilisateurs limités depuis la liste
-    echo ""
-    echo "◦ Création des utilisateurs limités..."
-    
-    for user_config in "${SFTP_LIMITED_USERS[@]}"; do
-        IFS=':' read -r username password directory description <<< "$user_config"
-        
-        if ! id "$username" &>/dev/null; then
-            echo "  ↦ Création de l'utilisateur limité : $username"
-            
-            # Créer l'utilisateur avec un shell restreint
-            log_command "useradd -m -s /usr/sbin/nologin '$username'" "Création utilisateur $username"
-            echo "$username:$password" | chpasswd
-            
-            # Créer le dossier de téléchargement
-            mkdir -p "$directory"
-            
-            # Préparer la structure pour chroot
-            # Le home doit appartenir à root pour le chroot SSH
-            chown root:root "/home/$username"
-            chmod 755 "/home/$username"
-            
-            # Créer le dossier downloads dans le home
-            local download_subdir="$(basename "$directory")"
-            mkdir -p "/home/$username/$download_subdir"
-            chown "$username:$username" "/home/$username/$download_subdir"
-            chmod 755 "/home/$username/$download_subdir"
-            
-            echo "    • $description ✓"
-            log_success "Utilisateur limité $username créé avec succès"
-        else
-            echo "  ↦ Utilisateur $username existe déjà ✓"
-            log_info "Utilisateur $username déjà existant"
-        fi
-    done
-    
-    # 3. Configurer SSH pour le chroot des utilisateurs limités
-    echo ""
-    echo "◦ Configuration du chroot SSH pour les utilisateurs limités..."
-    configure_ssh_chroot
-    
-    # 4. Afficher les informations de connexion
-    echo ""
-    echo "========================================================================"
-    echo "INFORMATIONS DE CONNEXION FILEZILLA/SFTP"
-    echo "========================================================================"
-    
-    local ip_address=$(hostname -I | awk '{print $1}')
-    
-    echo ""
-    echo "◦ Configuration FileZilla :"
-    echo "  • Protocole : SFTP - SSH File Transfer Protocol"
-    echo "  • Hôte : $ip_address"
-    echo "  • Port : 22"
-    echo ""
-    
-    echo "◦ Compte Super Admin :"
-    echo "  • Utilisateur : $SFTP_ADMIN_USER"
-    echo "  • Mot de passe : $SFTP_ADMIN_PASS"
-    echo "  • Accès : Complet au système"
-    echo ""
-    
-    echo "◦ Comptes limités :"
-    for user_config in "${SFTP_LIMITED_USERS[@]}"; do
-        IFS=':' read -r username password directory description <<< "$user_config"
-        echo "  • Utilisateur : $username"
-        echo "    Mot de passe : $password"
-        echo "    Dossier : $directory"
-        echo "    Description : $description"
-        echo ""
-    done
-    
-    echo "========================================================================"
-    
-    log_success "Configuration SSH et utilisateurs SFTP terminée"
-}
-
-# Configuration du chroot SSH
-configure_ssh_chroot() {
-    local sshd_config="/etc/ssh/sshd_config"
-    local config_updated=false
-    
-    # Sauvegarder la configuration originale
-    if [ ! -f "${sshd_config}.maxlink_backup" ]; then
-        cp "$sshd_config" "${sshd_config}.maxlink_backup"
-        log_info "Sauvegarde de la configuration SSH originale"
-    fi
-    
-    # Vérifier et ajouter la configuration pour chaque utilisateur limité
-    for user_config in "${SFTP_LIMITED_USERS[@]}"; do
-        IFS=':' read -r username password directory description <<< "$user_config"
-        
-        if ! grep -q "Match User $username" "$sshd_config"; then
-            cat >> "$sshd_config" << EOF
-
-# Configuration chroot pour $username - $description
-Match User $username
-    ChrootDirectory /home/%u
-    ForceCommand internal-sftp
-    AllowTcpForwarding no
-    X11Forwarding no
-    PasswordAuthentication yes
-EOF
-            config_updated=true
-            echo "  ↦ Configuration chroot ajoutée pour $username ✓"
-            log_info "Configuration SSH chroot ajoutée pour $username"
-        fi
-    done
-    
-    # Redémarrer SSH si la configuration a été modifiée
-    if [ "$config_updated" = true ]; then
-        echo "  ↦ Redémarrage du service SSH..."
-        log_command "systemctl restart ssh" "Redémarrage SSH"
-        echo "  ↦ Service SSH redémarré avec la nouvelle configuration ✓"
-        log_success "Configuration SSH mise à jour et service redémarré"
-    else
-        echo "  ↦ Configuration SSH déjà à jour ✓"
-        log_info "Configuration SSH déjà à jour"
-    fi
-}
-
 # ===============================================================================
 # PROGRAMME PRINCIPAL
 # ===============================================================================
 
-log_info "========== DÉBUT DE LA MISE À JOUR SYSTÈME V10 =========="
+log_info "========== DÉBUT DE LA MISE À JOUR SYSTÈME V11 =========="
 
 # Vérifier les privilèges root
 if [ "$EUID" -ne 0 ]; then
@@ -661,7 +508,7 @@ echo "◦ Installation des mises à jour de sécurité critiques..."
 log_info "Installation des paquets critiques uniquement"
 
 # Liste des paquets critiques
-CRITICAL_PACKAGES="openssh-server openssh-client openssl libssl* sudo systemd apt dpkg libc6 libpam* ca-certificates tzdata"
+CRITICAL_PACKAGES="openssl libssl* sudo systemd apt dpkg libc6 libpam* ca-certificates tzdata"
 
 # Installer uniquement les mises à jour critiques avec gestion d'erreur
 if log_command "DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --allow-unauthenticated $CRITICAL_PACKAGES" "Mise à jour sécurité"; then
@@ -872,31 +719,16 @@ EOF
     log_success "Configuration bureau LXDE appliquée"
 fi
 
-send_progress 85 "Configuration des utilisateurs..."
-
-# ===============================================================================
-# ÉTAPE 7 : CONFIGURATION SSH ET UTILISATEURS
-# ===============================================================================
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 7 : CONFIGURATION SSH ET UTILISATEURS SFTP"
-echo "========================================================================"
-echo ""
-
-# Configuration SSH et création des utilisateurs
-configure_ssh_and_users
-
 send_progress 90 "Configuration terminée"
 echo ""
 sleep 2
 
 # ===============================================================================
-# ÉTAPE 8 : FINALISATION
+# ÉTAPE 7 : FINALISATION
 # ===============================================================================
 
 echo "========================================================================"
-echo "ÉTAPE 8 : FINALISATION"
+echo "ÉTAPE 7 : FINALISATION"
 echo "========================================================================"
 echo ""
 
@@ -922,7 +754,6 @@ echo "◦ Mise à jour terminée avec succès !"
 echo "  ↦ Version: v$MAXLINK_VERSION"
 echo "  ↦ Système à jour et configuré"
 echo "  ↦ Cache de paquets créé pour installation offline"
-echo "  ↦ SSH activé avec utilisateurs SFTP configurés"
 echo "  ↦ Dashboard V3 téléchargé"
 log_success "Mise à jour système terminée - Version: v$MAXLINK_VERSION"
 

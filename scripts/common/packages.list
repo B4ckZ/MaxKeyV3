@@ -20,6 +20,3 @@ python:python3-psutil python3-paho-mqtt python3-pip python3-setuptools
 
 # Outils optionnels mais utiles
 tools:htop iotop net-tools dnsutils python3-pil
-
-# Dépendances système critiques (déjà incluses dans update_install.sh)
-# system:openssh-server openssh-client openssl libssl3 sudo systemd apt dpkg libc6 libpam-modules ca-certificates tzdata
