@@ -261,7 +261,17 @@ class MaxLinkApp:
         # Chemin du fichier de statut
         self.status_file = self.variables.get('SERVICES_STATUS_FILE', '/var/lib/maxlink/services_status.json')
         
+        # Services disponibles dans l'interface - CORRIGÉ: tous inactifs par défaut
         self.services = self.variables.get_services_list()
+        
+        # Ajouter full_install en tête de liste
+        full_install_service = {
+            "id": "full_install",
+            "name": "Installation total",
+            "status": "inactive"
+        }
+        self.services.insert(0, full_install_service)
+        
         # Charger les statuts sauvegardés
         self.load_saved_statuses()
         

@@ -446,12 +446,20 @@ fi
 log_info "Installation terminée avec succès"
 log_info "Dashboard accessible à: http://$AP_IP et http://$NGINX_DASHBOARD_DOMAIN"
 
-echo ""
-echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
-echo ""
-
-log_info "Redémarrage du système prévu dans 15 secondes"
-sleep 15
-
-log_info "Redémarrage du système"
-reboot
+# Vérifier si on doit faire un reboot
+if [ "$SKIP_REBOOT" != "true" ]; then
+    echo ""
+    echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
+    echo ""
+    
+    log_info "Redémarrage du système prévu dans 15 secondes"
+    sleep 15
+    
+    log_info "Redémarrage du système"
+    reboot
+else
+    echo ""
+    echo "  ↦ Redémarrage différé (installation complète en cours)"
+    echo ""
+    log_info "Redémarrage différé - SKIP_REBOOT=true"
+fi

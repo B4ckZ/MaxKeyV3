@@ -2,7 +2,7 @@
 
 # ===============================================================================
 # MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION CORRIGÉE)
-# Script d'installation avec mise à jour du statut
+# Script d'installation avec mise à jour du statut et gestion SKIP_REBOOT
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -823,23 +823,35 @@ echo ""
 
 log_success "Installation terminée avec succès"
 
+# ===============================================================================
+# GESTION DU REDÉMARRAGE AVEC SKIP_REBOOT
+# ===============================================================================
+
 # Décider si un redémarrage est nécessaire
 if [ "$NEED_REBOOT" = true ]; then
-    echo ""
-    echo "========================================================================"
-    echo "⚠ REDÉMARRAGE NÉCESSAIRE"
-    echo "========================================================================"
-    echo ""
-    echo "Un redémarrage est nécessaire pour activer l'orchestration complète."
-    echo ""
-    echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
-    echo ""
-    
-    log_info "Redémarrage du système prévu dans 15 secondes"
-    sleep 15
-    
-    log_info "Redémarrage du système"
-    reboot
+    # Vérifier si on doit faire un reboot
+    if [ "$SKIP_REBOOT" != "true" ]; then
+        echo ""
+        echo "========================================================================"
+        echo "⚠ REDÉMARRAGE NÉCESSAIRE"
+        echo "========================================================================"
+        echo ""
+        echo "Un redémarrage est nécessaire pour activer l'orchestration complète."
+        echo ""
+        echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
+        echo ""
+        
+        log_info "Redémarrage du système prévu dans 15 secondes"
+        sleep 15
+        
+        log_info "Redémarrage du système"
+        reboot
+    else
+        echo ""
+        echo "  ↦ Redémarrage nécessaire (sera effectué à la fin de l'installation complète)"
+        echo ""
+        log_info "Redémarrage différé - SKIP_REBOOT=true"
+    fi
 else
     echo ""
     echo "✓ Aucun redémarrage nécessaire."

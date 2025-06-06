@@ -772,15 +772,20 @@ echo ""
 echo "◦ Résumé du cache créé :"
 get_cache_stats
 
-echo ""
-echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
-echo ""
-
-log_info "Redémarrage du système prévu dans 15 secondes"
-
-# Pause de 15 secondes
-sleep 15
-
-# Redémarrer
-log_info "Redémarrage du système"
-reboot
+# Vérifier si on doit faire un reboot
+if [ "$SKIP_REBOOT" != "true" ]; then
+    echo ""
+    echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
+    echo ""
+    
+    log_info "Redémarrage du système prévu dans 15 secondes"
+    sleep 15
+    
+    log_info "Redémarrage du système"
+    reboot
+else
+    echo ""
+    echo "  ↦ Redémarrage différé (installation complète en cours)"
+    echo ""
+    log_info "Redémarrage différé - SKIP_REBOOT=true"
+fi

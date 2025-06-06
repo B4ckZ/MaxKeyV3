@@ -380,12 +380,20 @@ echo ""
 log_success "Installation MQTT Broker terminée"
 log_info "Configuration: $MQTT_USER/$MQTT_PASS sur ports $MQTT_PORT et $MQTT_WEBSOCKET_PORT"
 
-echo ""
-echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
-echo ""
-
-log_info "Redémarrage du système prévu dans 15 secondes"
-sleep 15
-
-log_info "Redémarrage du système"
-reboot
+# Vérifier si on doit faire un reboot
+if [ "$SKIP_REBOOT" != "true" ]; then
+    echo ""
+    echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
+    echo ""
+    
+    log_info "Redémarrage du système prévu dans 15 secondes"
+    sleep 15
+    
+    log_info "Redémarrage du système"
+    reboot
+else
+    echo ""
+    echo "  ↦ Redémarrage différé (installation complète en cours)"
+    echo ""
+    log_info "Redémarrage différé - SKIP_REBOOT=true"
+fi
