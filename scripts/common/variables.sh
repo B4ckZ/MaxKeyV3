@@ -115,14 +115,14 @@ DESKTOP_BG_COLOR="#000000"
 DESKTOP_FG_COLOR="#ECEFF4"
 DESKTOP_SHADOW_COLOR="#000000"
 
-# Services disponibles dans l'interface
+# Services disponibles dans l'interface - CORRIGÉ: tous inactifs par défaut
 SERVICES_LIST=(
-    "update:Update RPI:active"
-    "ap:Network AP:active" 
-    "nginx:NginX Web:active"
-    "mqtt:MQTT BKR:active"
-    "mqtt_wgs:MQTT WGS:active"
-    "orchestrator:Orchestrateur:active"
+    "update:Update RPI:inactive"
+    "ap:Network AP:inactive" 
+    "nginx:NginX Web:inactive"
+    "mqtt:MQTT BKR:inactive"
+    "mqtt_wgs:MQTT WGS:inactive"
+    "orchestrator:Orchestrateur:inactive"
 )
 
 # ===============================================================================
@@ -157,6 +157,17 @@ FAN_TEMP_ACTIVATE=60
 FAN_TEMP_MAX=60
 
 # ===============================================================================
+# CONFIGURATION DES STATUTS DES SERVICES
+# ===============================================================================
+
+# Fichier de statut pour communication avec l'interface
+SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
+SERVICES_STATUS_DIR="$(dirname "$SERVICES_STATUS_FILE")"
+
+# Créer le répertoire si nécessaire
+[ ! -d "$SERVICES_STATUS_DIR" ] && mkdir -p "$SERVICES_STATUS_DIR"
+
+# ===============================================================================
 # FONCTIONS UTILITAIRES
 # ===============================================================================
 
@@ -184,6 +195,43 @@ get_bg_image_source() {
 
 get_bg_image_dest() {
     echo "$BG_IMAGE_DEST_DIR/$BG_IMAGE_FILENAME"
+}
+
+# Fonction pour mettre à jour le statut d'un service
+update_service_status() {
+    local service_id="$1"
+    local status="$2"  # "active" ou "inactive"
+    
+    # Créer le fichier de statut s'il n'existe pas
+    if [ ! -f "$SERVICES_STATUS_FILE" ]; then
+        echo "{}" > "$SERVICES_STATUS_FILE"
+    fi
+    
+    # Mettre à jour le statut via Python pour gérer le JSON proprement
+    python3 -c "
+import json
+import sys
+from datetime import datetime
+
+service_id = '$service_id'
+status = '$status'
+
+try:
+    with open('$SERVICES_STATUS_FILE', 'r') as f:
+        data = json.load(f)
+except:
+    data = {}
+
+data[service_id] = {
+    'status': status,
+    'last_update': datetime.now().isoformat()
+}
+
+with open('$SERVICES_STATUS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+
+print(f'Statut {service_id} mis à jour: {status}')
+"
 }
 
 # ===============================================================================
@@ -243,6 +291,10 @@ export FAN_TEMP_MIN FAN_TEMP_ACTIVATE FAN_TEMP_MAX
 export MQTT_USER MQTT_PASS MQTT_PORT MQTT_WEBSOCKET_PORT
 export MQTT_IGNORED_TOPICS MQTT_IGNORED_TOPICS_STRING
 export SERVICES_LIST
+export SERVICES_STATUS_FILE SERVICES_STATUS_DIR
+
+# Export de la fonction update_service_status
+export -f update_service_status
 
 # Valider la configuration
 if ! validate_config; then

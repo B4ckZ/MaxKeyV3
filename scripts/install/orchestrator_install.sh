@@ -2,7 +2,7 @@
 
 # ===============================================================================
 # MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION CORRIGÉE)
-# Script d'installation qui copie tout localement et n'a plus besoin de la clé USB
+# Script d'installation avec mise à jour du statut
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -771,6 +771,15 @@ echo "◦ Test du système..."
 echo ""
 
 /usr/local/bin/maxlink-orchestrator check
+
+# MISE À JOUR DU STATUT DU SERVICE
+if [ -n "$SERVICE_ID" ]; then
+    echo ""
+    echo "◦ Mise à jour du statut du service..."
+    update_service_status "$SERVICE_ID" "active"
+    echo "  ↦ Statut du service mis à jour ✓"
+    log_info "Statut du service $SERVICE_ID mis à jour: active"
+fi
 
 send_progress 100 "Installation terminée"
 wait_silently 3

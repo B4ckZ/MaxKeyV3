@@ -8,6 +8,7 @@ from datetime import datetime
 import re
 import logging
 from pathlib import Path
+import json
 
 # ===============================================================================
 # CONFIGURATION DU LOGGING
@@ -189,6 +190,10 @@ class VariablesManager:
                         value = match.group(2)
                         self.variables[key] = value
             
+            # Extraire SERVICES_STATUS_FILE
+            if 'SERVICES_STATUS_FILE' not in self.variables:
+                self.variables['SERVICES_STATUS_FILE'] = '/var/lib/maxlink/services_status.json'
+            
             # Parser SERVICES_LIST avec l'orchestrateur
             services = [
                 "update:Update RPI:inactive",
@@ -253,7 +258,13 @@ class MaxLinkApp:
         self.root_mode = self.check_root_mode()
         logger.info(f"Mode root: {self.root_mode}")
         
+        # Chemin du fichier de statut
+        self.status_file = self.variables.get('SERVICES_STATUS_FILE', '/var/lib/maxlink/services_status.json')
+        
         self.services = self.variables.get_services_list()
+        # Charger les statuts sauvegardés
+        self.load_saved_statuses()
+        
         self.selected_service = self.services[0] if self.services else None
         logger.info(f"Services chargés: {len(self.services)}")
         
@@ -264,6 +275,45 @@ class MaxLinkApp:
         self.current_thread = None
         
         self.create_interface()
+        
+        # Démarrer la vérification périodique des statuts
+        self.check_statuses_periodically()
+    
+    def load_saved_statuses(self):
+        """Charge les statuts sauvegardés depuis le fichier de statut"""
+        try:
+            if os.path.exists(self.status_file):
+                with open(self.status_file, 'r') as f:
+                    saved_statuses = json.load(f)
+                
+                # Mettre à jour les statuts des services
+                for service in self.services:
+                    if service['id'] in saved_statuses:
+                        service['status'] = saved_statuses[service['id']].get('status', 'inactive')
+                
+                logger.info(f"Statuts chargés depuis {self.status_file}")
+        except Exception as e:
+            logger.error(f"Erreur lors du chargement des statuts: {e}")
+    
+    def check_statuses_periodically(self):
+        """Vérifie périodiquement les statuts des services"""
+        def check():
+            self.load_saved_statuses()
+            self.update_all_indicators()
+            # Répéter toutes les 5 secondes
+            self.root.after(5000, check)
+        
+        # Première vérification après 2 secondes
+        self.root.after(2000, check)
+    
+    def update_all_indicators(self):
+        """Met à jour tous les indicateurs de statut"""
+        for service in self.services:
+            if "indicator" in service:
+                is_active = service.get("status") == "active"
+                status_color = COLORS["nord14"] if is_active else COLORS["nord11"]
+                service["indicator"].delete("all")
+                service["indicator"].create_oval(2, 2, 18, 18, fill=status_color, outline="")
     
     def center_window(self):
         """Centre la fenêtre sur l'écran"""
@@ -538,12 +588,18 @@ Script: {script_path}
             
             logger.info(f"Démarrage du processus: {script_path}")
             
+            # Définir la variable d'environnement pour que le script puisse signaler son statut
+            env = os.environ.copy()
+            env['SERVICE_ID'] = service['id']
+            env['SERVICES_STATUS_FILE'] = self.status_file
+            
             self.current_process = subprocess.Popen(
                 ["bash", script_path],
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE, 
                 text=True, 
-                bufsize=1
+                bufsize=1,
+                env=env
             )
             
             for line in iter(self.current_process.stdout.readline, ''):
@@ -578,6 +634,10 @@ Code de sortie: {return_code}
                     service["status"] = "active"
                     self.update_status_indicator(service, True)
                     logger.info(f"Service {service['name']} activé")
+                    
+                    # Recharger les statuts après une courte pause
+                    self.root.after(1000, self.load_saved_statuses)
+                    self.root.after(1500, self.update_all_indicators)
             
         except Exception as e:
             logger.error(f"Erreur lors de l'exécution: {str(e)}")

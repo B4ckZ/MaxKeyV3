@@ -1,0 +1,220 @@
+
+================================================================================
+D�MARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:01:04 2025
+Utilisateur: unknown
+R�pertoire: C:\Windows\system32
+================================================================================
+
+[2025-06-06 21:01:04] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:01:04] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:01:04] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:01:04] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:01:04] [INFO] [interface] Mode root: False
+[2025-06-06 21:01:04] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:01:04] [INFO] [interface] Interface créée avec succès
+
+================================================================================
+FIN: interface
+Date: Fri Jun  6 21:01:10 2025
+================================================================================
+
+[2025-06-06 21:01:10] [INFO] [interface] Interface fermée
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Tue May 13 02:23:34 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-05-13 02:23:34] [INFO] [interface] Interface MaxLink démarrée
+[2025-05-13 02:23:34] [INFO] [interface] Variables chargées: 55 variables
+[2025-05-13 02:23:34] [INFO] [interface] Variables chargées avec succès
+[2025-05-13 02:23:35] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-05-13 02:23:35] [INFO] [interface] Mode root: True
+[2025-05-13 02:23:35] [INFO] [interface] Services chargés: 6
+[2025-05-13 02:23:35] [INFO] [interface] Interface créée avec succès
+[2025-05-13 02:23:44] [INFO] [interface] Exécution action: install sur Update RPI
+[2025-05-13 02:23:44] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/update_install.sh
+[2025-05-13 02:23:44] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/update_install.sh
+[2025-05-13 02:24:28] [INFO] [interface] Script terminé avec code: 1
+[2025-05-13 02:24:41] [INFO] [interface] Exécution action: install sur Update RPI
+[2025-05-13 02:24:41] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/update_install.sh
+[2025-05-13 02:24:41] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/update_install.sh
+[2025-06-06 21:32:52] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:32:57] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:33:02] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:33:34 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:33:34] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:33:34] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:33:34] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:33:34] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:33:34] [INFO] [interface] Mode root: True
+[2025-06-06 21:33:34] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:33:34] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:33:34] [INFO] [interface] Interface créée avec succès
+[2025-06-06 21:33:36] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:33:41] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:33:41] [INFO] [interface] Exécution action: install sur Network AP
+[2025-06-06 21:33:41] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/ap_install.sh
+[2025-06-06 21:33:41] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/ap_install.sh
+[2025-06-06 21:33:46] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:33:51] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:33:56] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:34:01] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:34:06] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:34:11] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:34:16] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:34:21] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:35:33 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:35:33] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:35:33] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:35:33] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:35:33] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:35:33] [INFO] [interface] Mode root: True
+[2025-06-06 21:35:33] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:35:33] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:35:33] [INFO] [interface] Interface créée avec succès
+[2025-06-06 21:35:35] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:35:36] [INFO] [interface] Exécution action: install sur NginX Web
+[2025-06-06 21:35:36] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/nginx_install.sh
+[2025-06-06 21:35:36] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/nginx_install.sh
+[2025-06-06 21:35:40] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:35:45] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:35:50] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:35:55] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:36:00] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:36:05] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:36:10] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:36:46 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:36:47] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:36:47] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:36:47] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:36:47] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:36:47] [INFO] [interface] Mode root: True
+[2025-06-06 21:36:47] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:36:47] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:36:47] [INFO] [interface] Interface créée avec succès
+[2025-06-06 21:36:49] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:36:53] [INFO] [interface] Exécution action: install sur MQTT BKR
+[2025-06-06 21:36:53] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/mqtt_install.sh
+[2025-06-06 21:36:53] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/mqtt_install.sh
+[2025-06-06 21:36:54] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:36:59] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:37:04] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:37:09] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:37:14] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:37:19] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:37:24] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:37:29] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:38:45 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:38:45] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:38:45] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:38:45] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:38:45] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:38:45] [INFO] [interface] Mode root: True
+[2025-06-06 21:38:45] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:38:45] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:38:45] [INFO] [interface] Interface créée avec succès
+[2025-06-06 21:38:47] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:38:51] [INFO] [interface] Exécution action: install sur MQTT WGS
+[2025-06-06 21:38:51] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/mqtt_wgs_install.sh
+[2025-06-06 21:38:51] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/mqtt_wgs_install.sh
+[2025-06-06 21:38:52] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:38:57] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:02] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:07] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:12] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:17] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:22] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:27] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:39:58 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:39:58] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:39:58] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:39:58] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:39:58] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:39:58] [INFO] [interface] Mode root: True
+[2025-06-06 21:39:58] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:39:58] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:39:58] [INFO] [interface] Interface créée avec succès
+[2025-06-06 21:40:00] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:40:04] [INFO] [interface] Exécution action: install sur Orchestrateur
+[2025-06-06 21:40:04] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/orchestrator_install.sh
+[2025-06-06 21:40:04] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/orchestrator_install.sh
+[2025-06-06 21:40:05] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:40:10] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:40:15] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:40:20] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:40:25] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:40:30] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Fri Jun  6 21:41:27 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:41:27] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-06 21:41:27] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-06 21:41:27] [INFO] [interface] Variables chargées avec succès
+[2025-06-06 21:41:27] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-06 21:41:27] [INFO] [interface] Mode root: True
+[2025-06-06 21:41:27] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:41:27] [INFO] [interface] Services chargés: 6
+[2025-06-06 21:41:27] [INFO] [interface] Interface créée avec succès
+[2025-06-06 21:41:29] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:41:34] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:41:39] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-06 21:41:44] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+
+================================================================================
+FIN: interface
+Date: Fri Jun  6 21:41:45 2025
+================================================================================
+
+[2025-06-06 21:41:46] [INFO] [interface] Interface fermée

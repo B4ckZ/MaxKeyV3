@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - INSTALLATION NGINX ET DASHBOARD (VERSION OFFLINE CORRIGÉE)
-# Installation sans connexion internet - utilise uniquement le cache local
+# MAXLINK - INSTALLATION NGINX ET DASHBOARD (VERSION CORRIGÉE)
+# Installation avec mise à jour du statut
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -419,6 +419,15 @@ send_progress 90 "Configuration DNS..."
 # Mettre à jour le DNS si l'AP existe
 update_dns_if_ap_exists
 
+# MISE À JOUR DU STATUT DU SERVICE
+if [ -n "$SERVICE_ID" ]; then
+    echo ""
+    echo "◦ Mise à jour du statut du service..."
+    update_service_status "$SERVICE_ID" "active"
+    echo "  ↦ Statut du service mis à jour ✓"
+    log_info "Statut du service $SERVICE_ID mis à jour: active"
+fi
+
 send_progress 100 "Installation terminée !"
 
 echo ""
@@ -433,9 +442,6 @@ if [ -f "/etc/NetworkManager/dnsmasq-shared.d/00-maxlink-ap.conf" ] && grep -q "
 else
     echo "    • http://$NGINX_DASHBOARD_DOMAIN (nécessite l'installation de l'AP)"
 fi
-echo ""
-echo "◦ IMPORTANT : L'orchestrateur doit être installé pour gérer le démarrage ordonné"
-echo ""
 
 log_info "Installation terminée avec succès"
 log_info "Dashboard accessible à: http://$AP_IP et http://$NGINX_DASHBOARD_DOMAIN"

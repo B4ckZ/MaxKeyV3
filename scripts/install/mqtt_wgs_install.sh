@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - INSTALLATION DE TOUS LES WIDGETS MQTT (VERSION NETTOYÉE)
-# Installation sans delays - nécessite l'orchestrateur
+# MAXLINK - INSTALLATION DE TOUS LES WIDGETS MQTT (VERSION CORRIGÉE)
+# Installation avec mise à jour du statut
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -221,6 +221,20 @@ else
     echo "  ↦ Aucun message reçu (normal au démarrage) ⚠"
 fi
 
+# MISE À JOUR DU STATUT DU SERVICE
+if [ -n "$SERVICE_ID" ]; then
+    echo ""
+    echo "◦ Mise à jour du statut du service..."
+    if [ $FAILED_WIDGETS -eq 0 ]; then
+        update_service_status "$SERVICE_ID" "active"
+        echo "  ↦ Statut du service mis à jour : active ✓"
+        log_info "Statut du service $SERVICE_ID mis à jour: active"
+    else
+        echo "  ↦ Statut non mis à jour (erreurs détectées) ⚠"
+        log_warn "Statut non mis à jour à cause des erreurs"
+    fi
+fi
+
 send_progress 100 "Installation terminée"
 
 # Résumé final
@@ -242,9 +256,6 @@ else
     log_warn "Installation partielle: $FAILED_WIDGETS erreurs"
 fi
 
-echo ""
-echo "◦ IMPORTANT : L'orchestrateur doit être installé pour gérer le démarrage ordonné"
-echo ""
 echo "Commandes utiles :"
 echo "  • Voir tous les logs    : journalctl -u 'maxlink-widget-*' -f"
 echo "  • Voir tous les topics  : mosquitto_sub -h localhost -u $MQTT_USER -P $MQTT_PASS -t '#' -v"

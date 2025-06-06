@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - INSTALLATION MQTT BROKER (VERSION NETTOYÉE)
-# Installation sans delays - nécessite l'orchestrateur
+# MAXLINK - INSTALLATION MQTT BROKER (VERSION CORRIGÉE)
+# Installation avec mise à jour du statut
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -339,6 +339,15 @@ if timeout 2 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_
 else
     echo "  ↦ Topics système non accessibles ⚠"
     log_warn "Topics système non accessibles"
+fi
+
+# MISE À JOUR DU STATUT DU SERVICE
+if [ -n "$SERVICE_ID" ]; then
+    echo ""
+    echo "◦ Mise à jour du statut du service..."
+    update_service_status "$SERVICE_ID" "active"
+    echo "  ↦ Statut du service mis à jour ✓"
+    log_info "Statut du service $SERVICE_ID mis à jour: active"
 fi
 
 send_progress 100 "Installation terminée"

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - INSTALLATION DU MODE ACCESS POINT (VERSION NETTOYÉE)
-# Installation sans delays - nécessite l'orchestrateur
+# MAXLINK - INSTALLATION DU MODE ACCESS POINT (VERSION CORRIGÉE)
+# Installation avec mise à jour du statut
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -417,6 +417,15 @@ send_progress 95 "Finalisation"
 echo "◦ Configuration de démarrage automatique..."
 echo "  ↦ Le point d'accès démarrera automatiquement ✓"
 log_info "Configuration de démarrage automatique activée"
+
+# MISE À JOUR DU STATUT DU SERVICE
+if [ -n "$SERVICE_ID" ]; then
+    echo ""
+    echo "◦ Mise à jour du statut du service..."
+    update_service_status "$SERVICE_ID" "active"
+    echo "  ↦ Statut du service mis à jour ✓"
+    log_info "Statut du service $SERVICE_ID mis à jour: active"
+fi
 
 echo ""
 echo "◦ Informations de connexion :"

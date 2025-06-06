@@ -2,6 +2,7 @@
 
 # ===============================================================================
 # MAXLINK - SCRIPT DE MISE À JOUR DU SYSTÈME LINUX
+# Version corrigée avec mise à jour du statut
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -746,6 +747,15 @@ echo ""
 echo "◦ Restauration de l'état réseau..."
 restore_network_state
 echo "  ↦ État réseau restauré ✓"
+
+# MISE À JOUR DU STATUT DU SERVICE
+if [ -n "$SERVICE_ID" ]; then
+    echo ""
+    echo "◦ Mise à jour du statut du service..."
+    update_service_status "$SERVICE_ID" "active"
+    echo "  ↦ Statut du service mis à jour ✓"
+    log_info "Statut du service $SERVICE_ID mis à jour: active"
+fi
 
 send_progress 100 "Mise à jour terminée !"
 

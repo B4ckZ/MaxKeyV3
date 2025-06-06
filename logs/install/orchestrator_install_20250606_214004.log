@@ -1,0 +1,34 @@
+
+================================================================================
+DÉMARRAGE: orchestrator_install
+Description: Installation de l'orchestrateur MaxLink
+Date: Fri  6 Jun 21:40:04 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-06 21:40:04] [INFO] [orchestrator_install] Script orchestrator_install initialisé
+[2025-06-06 21:40:04] [INFO] [orchestrator_install] Progression: 5% - Initialisation...
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Première installation de l'orchestrateur
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Progression: 10% - Copie des widgets...
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Copie des widgets depuis /media/prod/USBTOOL/scripts/widgets vers /opt/maxlink
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Widget mqttstats copié
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Widget servermonitoring copié
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Widget uptime copié
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Widget wifistats copié
+[2025-06-06 21:40:05] [SUCCESS] [orchestrator_install] Copie terminée - 4 widgets
+[2025-06-06 21:40:05] [INFO] [orchestrator_install] Progression: 50% - Widgets copiés
+[2025-06-06 21:40:08] [INFO] [orchestrator_install] Progression: 60% - Configuration de l'orchestration...
+[2025-06-06 21:40:08] [SUCCESS] [orchestrator_install] Scripts de healthcheck créés
+[2025-06-06 21:40:08] [SUCCESS] [orchestrator_install] Services de healthcheck créés
+[2025-06-06 21:40:08] [SUCCESS] [orchestrator_install] Targets systemd créés
+[2025-06-06 21:40:08] [SUCCESS] [orchestrator_install] Script de gestion créé
+[2025-06-06 21:40:08] [INFO] [orchestrator_install] Progression: 80% - Infrastructure configurée
+[2025-06-06 21:40:10] [INFO] [orchestrator_install] Progression: 85% - Activation des services...
+[2025-06-06 21:40:12] [INFO] [orchestrator_install] Progression: 95% - Services activés
+[2025-06-06 21:40:14] [INFO] [orchestrator_install] Statut du service orchestrator mis à jour: active
+[2025-06-06 21:40:14] [INFO] [orchestrator_install] Progression: 100% - Installation terminée
+[2025-06-06 21:40:17] [SUCCESS] [orchestrator_install] Installation terminée avec succès
+[2025-06-06 21:40:17] [INFO] [orchestrator_install] Redémarrage du système prévu dans 15 secondes
+[2025-06-06 21:40:33] [INFO] [orchestrator_install] Redémarrage du système
+[2025-06-06 21:40:33] [INFO] [orchestrator_install] Script orchestrator_install terminé avec le code 0
