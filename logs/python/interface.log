@@ -1,0 +1,23 @@
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel (Version simplifiée)
+Date: Sat Jun  7 12:08:21 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-07 12:08:21] [INFO] [interface] Interface MaxLink démarrée (version simplifiée)
+[2025-06-07 12:08:21] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-07 12:08:21] [INFO] [interface] Variables chargées avec succès
+[2025-06-07 12:08:22] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-07 12:08:22] [INFO] [interface] Mode root: True
+[2025-06-07 12:08:22] [INFO] [interface] Services chargés: 7
+[2025-06-07 12:08:22] [INFO] [interface] Interface créée avec succès
+
+================================================================================
+FIN: interface
+Date: Sat Jun  7 12:08:25 2025
+================================================================================
+
+[2025-06-07 12:08:25] [INFO] [interface] Interface fermée

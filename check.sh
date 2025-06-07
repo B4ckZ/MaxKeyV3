@@ -3,6 +3,7 @@
 # ===============================================================================
 # MAXLINK - VÉRIFICATION DE L'ÉTAT DE L'INSTALLATION
 # Script pour vérifier où en est l'installation complète
+# Version corrigée - utilise uniquement services_status.json
 # ===============================================================================
 
 # Couleurs pour l'affichage
@@ -12,8 +13,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Fichiers de statut
-INSTALL_STATUS_FILE="/var/lib/maxlink/full_install_status.json"
+# Fichier de statut unique
 SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
 
 # Header
@@ -31,75 +31,67 @@ echo ""
 echo -e "${BLUE}▶ ÉTAT DE L'INSTALLATION${NC}"
 echo "========================================================================"
 
-if [ -f "$INSTALL_STATUS_FILE" ]; then
-    echo "◦ Historique d'installation trouvé"
+if [ -f "$SERVICES_STATUS_FILE" ]; then
+    echo "◦ Fichier de statuts trouvé"
     echo ""
     
-    # Afficher l'état de chaque script
+    # Afficher l'état de chaque service
     python3 << EOF
 import json
 from datetime import datetime
 
-with open('$INSTALL_STATUS_FILE', 'r') as f:
+with open('$SERVICES_STATUS_FILE', 'r') as f:
     data = json.load(f)
 
-# Calculer la durée depuis le début
-if 'start_time' in data:
-    start = datetime.fromisoformat(data['start_time'])
-    print(f"  ↦ Début de l'installation : {start.strftime('%Y-%m-%d %H:%M:%S')}")
-    print("")
-
-# Scripts attendus dans l'ordre
-expected_scripts = [
-    'update_install.sh',
-    'ap_install.sh', 
-    'nginx_install.sh',
-    'mqtt_install.sh',
-    'mqtt_wgs_install.sh',
-    'orchestrator_install.sh'
+# Services attendus dans l'ordre
+expected_services = [
+    ('update', 'Mise à jour système'),
+    ('ap', 'Point d\'accès WiFi'),
+    ('nginx', 'Serveur Web'),
+    ('mqtt', 'Broker MQTT'),
+    ('mqtt_wgs', 'Widgets MQTT'),
+    ('orchestrator', 'Orchestrateur')
 ]
 
 print("  État des composants :")
 print("")
 
-all_success = True
-for script in expected_scripts:
-    if script in data.get('installations', {}):
-        info = data['installations'][script]
-        status = info['status']
+all_active = True
+for service_id, service_name in expected_services:
+    if service_id in data:
+        info = data[service_id]
+        status = info.get('status', 'inactive')
         
-        if status == 'success':
+        if status == 'active':
             symbol = '✓'
             color = '\033[0;32m'  # Green
-        elif status == 'failed':
+        else:
             symbol = '✗'
             color = '\033[0;31m'  # Red
-            all_success = False
-        elif status == 'running':
-            symbol = '⟳'
-            color = '\033[1;33m'  # Yellow
-            all_success = False
-        else:
-            symbol = '○'
-            color = '\033[0m'     # Default
-            all_success = False
+            all_active = False
             
-        script_name = script.replace('_install.sh', '').replace('_', ' ').title()
-        print(f"  {color}{symbol}\033[0m {script_name:20} : {status}")
+        print(f"  {color}{symbol}\033[0m {service_name:20} : {status}")
+        
+        # Afficher la date de mise à jour si disponible
+        if 'last_update' in info:
+            try:
+                dt = datetime.fromisoformat(info['last_update'])
+                print(f"    ↦ Mis à jour: {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+            except:
+                pass
     else:
-        all_success = False
-        script_name = script.replace('_install.sh', '').replace('_', ' ').title()
-        print(f"  ○ {script_name:20} : non installé")
+        all_active = False
+        print(f"  ○ {service_name:20} : non installé")
 
 print("")
-if all_success:
+if all_active:
     print("  \033[0;32m✓ Installation complète réussie !\033[0m")
 else:
-    print("  \033[1;33m⚠ Installation incomplète ou en cours\033[0m")
+    print("  \033[1;33m⚠ Installation incomplète\033[0m")
 EOF
     
 else
-    echo -e "  ${YELLOW}↦ Aucune installation complète détectée${NC}"
+    echo -e "  ${YELLOW}↦ Aucune installation détectée${NC}"
     echo ""
     echo "  Pour lancer l'installation complète :"
     echo "    sudo bash /media/prod/USBTOOL/full_install.sh"
@@ -108,56 +100,10 @@ fi
 echo ""
 
 # ===============================================================================
-# 2. VÉRIFIER L'ÉTAT DES SERVICES
+# 2. VÉRIFIER L'ÉTAT DES SERVICES SYSTEMD
 # ===============================================================================
 
 echo -e "${BLUE}▶ ÉTAT DES SERVICES${NC}"
-echo "========================================================================"
-
-if [ -f "$SERVICES_STATUS_FILE" ]; then
-    echo "◦ État des services MaxLink :"
-    echo ""
-    
-    python3 << EOF
-import json
-
-with open('$SERVICES_STATUS_FILE', 'r') as f:
-    services = json.load(f)
-
-service_names = {
-    'update': 'Mise à jour système',
-    'ap': 'Point d\'accès WiFi',
-    'nginx': 'Serveur Web',
-    'mqtt': 'Broker MQTT',
-    'mqtt_wgs': 'Widgets MQTT',
-    'orchestrator': 'Orchestrateur'
-}
-
-for service_id, info in services.items():
-    status = info.get('status', 'unknown')
-    name = service_names.get(service_id, service_id)
-    
-    if status == 'active':
-        symbol = '✓'
-        color = '\033[0;32m'  # Green
-    else:
-        symbol = '✗'
-        color = '\033[0;31m'  # Red
-        
-    print(f"  {color}{symbol}\033[0m {name:20} : {status}")
-EOF
-    
-else
-    echo -e "  ${YELLOW}↦ Aucun statut de service trouvé${NC}"
-fi
-
-echo ""
-
-# ===============================================================================
-# 3. VÉRIFIER LES SERVICES SYSTEMD
-# ===============================================================================
-
-echo -e "${BLUE}▶ SERVICES SYSTEMD${NC}"
 echo "========================================================================"
 
 # Services critiques à vérifier
@@ -211,25 +157,24 @@ fi
 echo ""
 
 # ===============================================================================
-# 4. RÉSUMÉ ET RECOMMANDATIONS
+# 3. RÉSUMÉ ET RECOMMANDATIONS
 # ===============================================================================
 
 echo -e "${BLUE}▶ RÉSUMÉ${NC}"
 echo "========================================================================"
 
 # Déterminer l'état global
-if [ -f "$INSTALL_STATUS_FILE" ]; then
-    all_installed=$(python3 -c "
+if [ -f "$SERVICES_STATUS_FILE" ]; then
+    all_active=$(python3 -c "
 import json
-with open('$INSTALL_STATUS_FILE', 'r') as f:
+with open('$SERVICES_STATUS_FILE', 'r') as f:
     data = json.load(f)
-installations = data.get('installations', {})
-expected = ['update_install.sh', 'ap_install.sh', 'nginx_install.sh', 'mqtt_install.sh', 'mqtt_wgs_install.sh', 'orchestrator_install.sh']
-all_success = all(installations.get(s, {}).get('status') == 'success' for s in expected)
-print('yes' if all_success else 'no')
+expected = ['update', 'ap', 'nginx', 'mqtt', 'mqtt_wgs', 'orchestrator']
+all_active = all(data.get(s, {}).get('status') == 'active' for s in expected)
+print('yes' if all_active else 'no')
 ")
     
-    if [ "$all_installed" = "yes" ]; then
+    if [ "$all_active" = "yes" ]; then
         echo -e "${GREEN}✓ Installation complète réussie${NC}"
         echo ""
         echo "Tous les composants MaxLink sont installés et configurés."
@@ -241,7 +186,7 @@ print('yes' if all_success else 'no')
     else
         echo -e "${YELLOW}⚠ Installation incomplète${NC}"
         echo ""
-        echo "Certains composants ne sont pas installés ou ont échoué."
+        echo "Certains composants ne sont pas installés ou inactifs."
         echo ""
         echo "Actions recommandées :"
         echo "  1. Relancer l'installation complète :"

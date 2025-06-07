@@ -3,6 +3,7 @@
 # ===============================================================================
 # MAXLINK - INSTALLATION COMPLÈTE AUTOMATISÉE
 # Script unique pour l'interface - Installe tous les composants
+# Version corrigée - utilise uniquement services_status.json
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -31,16 +32,16 @@ INSTALL_SCRIPTS=(
     "orchestrator_install.sh:Orchestrateur et finalisation"
 )
 
-# Fichier de statut pour suivre la progression
-INSTALL_STATUS_FILE="/var/lib/maxlink/full_install_status.json"
-INSTALL_STATUS_DIR="$(dirname "$INSTALL_STATUS_FILE")"
+# Fichier de statut unique
+SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
+SERVICES_STATUS_DIR="$(dirname "$SERVICES_STATUS_FILE")"
 
 # ===============================================================================
 # INITIALISATION
 # ===============================================================================
 
 # Créer le répertoire de statut
-mkdir -p "$INSTALL_STATUS_DIR"
+mkdir -p "$SERVICES_STATUS_DIR"
 
 # Initialiser le logging
 init_logging "Installation complète MaxLink" "install"
@@ -49,10 +50,11 @@ init_logging "Installation complète MaxLink" "install"
 # FONCTIONS
 # ===============================================================================
 
-# Mettre à jour le statut d'installation
+# Mettre à jour le statut d'installation dans services_status.json
 update_install_status() {
-    local script_name="$1"
-    local status="$2"  # "pending", "running", "success", "failed"
+    local service_id="${1%.sh}"  # Enlever l'extension .sh
+    service_id="${service_id%_install}"  # Enlever _install
+    local status="$2"  # "active" ou "inactive"
     local message="$3"
     
     python3 -c "
@@ -60,18 +62,18 @@ import json
 from datetime import datetime
 
 try:
-    with open('$INSTALL_STATUS_FILE', 'r') as f:
+    with open('$SERVICES_STATUS_FILE', 'r') as f:
         data = json.load(f)
 except:
-    data = {'installations': {}, 'start_time': datetime.now().isoformat()}
+    data = {}
 
-data['installations']['$script_name'] = {
+data['$service_id'] = {
     'status': '$status',
-    'message': '$message',
-    'timestamp': datetime.now().isoformat()
+    'last_update': datetime.now().isoformat(),
+    'message': '$message'
 }
 
-with open('$INSTALL_STATUS_FILE', 'w') as f:
+with open('$SERVICES_STATUS_FILE', 'w') as f:
     json.dump(data, f, indent=2)
 "
 }
@@ -83,17 +85,18 @@ show_install_status() {
     echo "STATUT DE L'INSTALLATION"
     echo "========================================================================"
     
-    if [ -f "$INSTALL_STATUS_FILE" ]; then
+    if [ -f "$SERVICES_STATUS_FILE" ]; then
         python3 -c "
 import json
 
-with open('$INSTALL_STATUS_FILE', 'r') as f:
+with open('$SERVICES_STATUS_FILE', 'r') as f:
     data = json.load(f)
 
-for script, info in data.get('installations', {}).items():
-    status = info['status']
-    symbol = '✓' if status == 'success' else '✗' if status == 'failed' else '⟳' if status == 'running' else '○'
-    print(f'  {symbol} {script}: {status}')
+for service_id, info in data.items():
+    if service_id in ['update', 'ap', 'nginx', 'mqtt', 'mqtt_wgs', 'orchestrator']:
+        status = info.get('status', 'inactive')
+        symbol = '✓' if status == 'active' else '✗'
+        print(f'  {symbol} {service_id}: {status}')
 "
     fi
     
@@ -104,15 +107,17 @@ for script, info in data.get('installations', {}).items():
 # Vérifier si un script a déjà été exécuté avec succès
 is_already_installed() {
     local script_name="$1"
+    local service_id="${script_name%.sh}"
+    service_id="${service_id%_install}"
     
-    if [ -f "$INSTALL_STATUS_FILE" ]; then
+    if [ -f "$SERVICES_STATUS_FILE" ]; then
         python3 -c "
 import json
 try:
-    with open('$INSTALL_STATUS_FILE', 'r') as f:
+    with open('$SERVICES_STATUS_FILE', 'r') as f:
         data = json.load(f)
-    status = data.get('installations', {}).get('$script_name', {}).get('status', '')
-    print('yes' if status == 'success' else 'no')
+    status = data.get('$service_id', {}).get('status', '')
+    print('yes' if status == 'active' else 'no')
 except:
     print('no')
 "
@@ -173,8 +178,8 @@ echo ""
 
 log_info "========== DÉBUT DE L'INSTALLATION COMPLÈTE MAXLINK =========="
 
-# Initialiser le fichier de statut
-echo "{}" > "$INSTALL_STATUS_FILE"
+# Initialiser le fichier de statut s'il n'existe pas
+[ ! -f "$SERVICES_STATUS_FILE" ] && echo "{}" > "$SERVICES_STATUS_FILE"
 
 # Timer global
 TOTAL_START_TIME=$(date +%s)
@@ -208,13 +213,15 @@ for script_info in "${INSTALL_SCRIPTS[@]}"; do
         echo "  ↦ Script non trouvé : $script_path ✗"
         echo "  ↦ ERREUR : Impossible de continuer sans ce script"
         log_error "Script non trouvé: $script_path"
-        update_install_status "$script_name" "failed" "Script non trouvé"
+        
+        # Mettre à jour le statut
+        service_id="${script_name%.sh}"
+        service_id="${service_id%_install}"
+        update_install_status "$script_name" "inactive" "Script non trouvé"
+        
         ((FAILED_SCRIPTS++))
         continue
     fi
-    
-    # Mettre à jour le statut
-    update_install_status "$script_name" "running" "Installation en cours"
     
     echo "◦ Exécution de $script_name..."
     echo ""
@@ -222,18 +229,20 @@ for script_info in "${INSTALL_SCRIPTS[@]}"; do
     
     # Exécuter le script avec la variable pour ne pas reboot
     export SKIP_REBOOT=true
-    export SERVICE_ID="${script_name%.sh}"  # Pour la mise à jour des statuts
+    export SERVICE_ID="${script_name%.sh}"
+    SERVICE_ID="${SERVICE_ID%_install}"
+    export SERVICE_ID
     
     if bash "$script_path"; then
         echo ""
         echo "  ↦ $description : Installation réussie ✓"
-        update_install_status "$script_name" "success" "Installation réussie"
+        update_install_status "$script_name" "active" "Installation réussie"
         log_success "$script_name installé avec succès"
     else
         echo ""
         echo "  ↦ $description : Échec de l'installation ✗"
         echo "  ↦ ERREUR : Consultez les logs pour plus de détails"
-        update_install_status "$script_name" "failed" "Échec de l'installation"
+        update_install_status "$script_name" "inactive" "Échec de l'installation"
         log_error "$script_name a échoué"
         ((FAILED_SCRIPTS++))
         
@@ -267,72 +276,6 @@ echo ""
 # Afficher le statut final
 show_install_status
 
-# MISE À JOUR SIMPLIFIÉE DES STATUTS DES SERVICES
-echo "◦ Mise à jour finale des statuts des services..."
-
-# S'assurer que le fichier de statuts existe
-mkdir -p "$(dirname "$SERVICES_STATUS_FILE")"
-[ ! -f "$SERVICES_STATUS_FILE" ] && echo "{}" > "$SERVICES_STATUS_FILE"
-
-# Mettre à jour directement depuis le shell pour chaque installation réussie
-if [ -f "$INSTALL_STATUS_FILE" ]; then
-    # Lire le fichier d'installation et mettre à jour les statuts
-    python3 << EOF
-import json
-import sys
-from datetime import datetime
-
-# Charger le statut d'installation
-try:
-    with open('$INSTALL_STATUS_FILE', 'r') as f:
-        install_data = json.load(f)
-except Exception as e:
-    print(f"  ↦ Erreur lecture install status: {e}")
-    sys.exit(1)
-
-# Charger ou créer le fichier de statuts des services
-try:
-    with open('$SERVICES_STATUS_FILE', 'r') as f:
-        services_data = json.load(f)
-except:
-    services_data = {}
-
-# Mapper les scripts aux service_ids
-script_to_service = {
-    'update_install.sh': 'update',
-    'ap_install.sh': 'ap',
-    'nginx_install.sh': 'nginx',
-    'mqtt_install.sh': 'mqtt',
-    'mqtt_wgs_install.sh': 'mqtt_wgs',
-    'orchestrator_install.sh': 'orchestrator'
-}
-
-# Pour chaque installation réussie, mettre à jour le statut
-updated_count = 0
-for script_name, info in install_data.get('installations', {}).items():
-    if info.get('status') == 'success' and script_name in script_to_service:
-        service_id = script_to_service[script_name]
-        
-        # Mettre à jour le statut
-        services_data[service_id] = {
-            'status': 'active',
-            'last_update': datetime.now().isoformat()
-        }
-        updated_count += 1
-        print(f"  ↦ Statut mis à jour : {service_id} = active")
-
-# Sauvegarder le fichier de statuts
-try:
-    with open('$SERVICES_STATUS_FILE', 'w') as f:
-        json.dump(services_data, f, indent=2)
-    print(f"  ↦ {updated_count} statuts de services mis à jour ✓")
-    print(f"  ↦ Fichier sauvegardé : $SERVICES_STATUS_FILE")
-except Exception as e:
-    print(f"  ↦ Erreur sauvegarde statuts: {e}")
-    sys.exit(1)
-EOF
-fi
-
 if [ $FAILED_SCRIPTS -eq 0 ]; then
     echo "✓ Tous les composants ont été installés avec succès !"
     echo ""
@@ -361,7 +304,7 @@ if [ $FAILED_SCRIPTS -eq 0 ]; then
     echo "  ↦ Redémarrage du système dans 30 secondes..."
     echo ""
     
-    
+    sleep 30
     log_info "Redémarrage du système pour finalisation"
     reboot
 else
@@ -387,6 +330,7 @@ else
         echo "  ↦ Redémarrage du système dans 30 secondes..."
         echo ""
         
+        sleep 30
         log_info "Redémarrage du système malgré les erreurs"
         reboot
     else
