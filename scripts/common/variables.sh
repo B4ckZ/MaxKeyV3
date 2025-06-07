@@ -202,6 +202,9 @@ update_service_status() {
     local service_id="$1"
     local status="$2"  # "active" ou "inactive"
     
+    # S'assurer que le répertoire existe
+    mkdir -p "$(dirname "$SERVICES_STATUS_FILE")"
+    
     # Créer le fichier de statut s'il n'existe pas
     if [ ! -f "$SERVICES_STATUS_FILE" ]; then
         echo "{}" > "$SERVICES_STATUS_FILE"
@@ -217,21 +220,37 @@ service_id = '$service_id'
 status = '$status'
 
 try:
+    # Charger les données existantes
     with open('$SERVICES_STATUS_FILE', 'r') as f:
         data = json.load(f)
-except:
+except Exception as e:
+    print(f'Erreur lecture: {e}', file=sys.stderr)
     data = {}
 
+# Mettre à jour
 data[service_id] = {
     'status': status,
     'last_update': datetime.now().isoformat()
 }
 
-with open('$SERVICES_STATUS_FILE', 'w') as f:
-    json.dump(data, f, indent=2)
-
-print(f'Statut {service_id} mis à jour: {status}')
+# Sauvegarder
+try:
+    with open('$SERVICES_STATUS_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+    print(f'Statut {service_id} mis à jour: {status}')
+except Exception as e:
+    print(f'Erreur sauvegarde: {e}', file=sys.stderr)
+    sys.exit(1)
 "
+    
+    # Vérifier que la mise à jour a réussi
+    if [ $? -eq 0 ]; then
+        echo "  ↦ Statut du service $service_id mis à jour: $status"
+        return 0
+    else
+        echo "  ↦ Erreur lors de la mise à jour du statut"
+        return 1
+    fi
 }
 
 # ===============================================================================

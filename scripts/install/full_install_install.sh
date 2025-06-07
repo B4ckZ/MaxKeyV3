@@ -267,22 +267,35 @@ echo ""
 # Afficher le statut final
 show_install_status
 
-# Mettre à jour explicitement tous les statuts des services installés avec succès
+# MISE À JOUR SIMPLIFIÉE DES STATUTS DES SERVICES
 echo "◦ Mise à jour finale des statuts des services..."
 
 # S'assurer que le fichier de statuts existe
 mkdir -p "$(dirname "$SERVICES_STATUS_FILE")"
 [ ! -f "$SERVICES_STATUS_FILE" ] && echo "{}" > "$SERVICES_STATUS_FILE"
 
+# Mettre à jour directement depuis le shell pour chaque installation réussie
 if [ -f "$INSTALL_STATUS_FILE" ]; then
+    # Lire le fichier d'installation et mettre à jour les statuts
     python3 << EOF
 import json
-import subprocess
 import sys
+from datetime import datetime
 
 # Charger le statut d'installation
-with open('$INSTALL_STATUS_FILE', 'r') as f:
-    install_data = json.load(f)
+try:
+    with open('$INSTALL_STATUS_FILE', 'r') as f:
+        install_data = json.load(f)
+except Exception as e:
+    print(f"  ↦ Erreur lecture install status: {e}")
+    sys.exit(1)
+
+# Charger ou créer le fichier de statuts des services
+try:
+    with open('$SERVICES_STATUS_FILE', 'r') as f:
+        services_data = json.load(f)
+except:
+    services_data = {}
 
 # Mapper les scripts aux service_ids
 script_to_service = {
@@ -299,14 +312,24 @@ updated_count = 0
 for script_name, info in install_data.get('installations', {}).items():
     if info.get('status') == 'success' and script_name in script_to_service:
         service_id = script_to_service[script_name]
-        # Exécuter la commande bash pour mettre à jour le statut
-        cmd = f'source $BASE_DIR/scripts/common/variables.sh && update_service_status {service_id} active'
-        result = subprocess.run(['bash', '-c', cmd], capture_output=True)
-        if result.returncode == 0:
-            updated_count += 1
-            print(f"  ↦ Statut mis à jour : {service_id}")
+        
+        # Mettre à jour le statut
+        services_data[service_id] = {
+            'status': 'active',
+            'last_update': datetime.now().isoformat()
+        }
+        updated_count += 1
+        print(f"  ↦ Statut mis à jour : {service_id} = active")
 
-print(f"  ↦ {updated_count} statuts de services mis à jour ✓")
+# Sauvegarder le fichier de statuts
+try:
+    with open('$SERVICES_STATUS_FILE', 'w') as f:
+        json.dump(services_data, f, indent=2)
+    print(f"  ↦ {updated_count} statuts de services mis à jour ✓")
+    print(f"  ↦ Fichier sauvegardé : $SERVICES_STATUS_FILE")
+except Exception as e:
+    print(f"  ↦ Erreur sauvegarde statuts: {e}")
+    sys.exit(1)
 EOF
 fi
 
@@ -338,12 +361,6 @@ if [ $FAILED_SCRIPTS -eq 0 ]; then
     echo "  ↦ Redémarrage du système dans 30 secondes..."
     echo ""
     
-    # Compte à rebours de 30 secondes
-    for ((i=30; i>0; i--)); do
-        echo -ne "\r  Redémarrage dans $i secondes... "
-        sleep 1
-    done
-    echo ""
     
     log_info "Redémarrage du système pour finalisation"
     reboot
@@ -368,12 +385,6 @@ else
         echo "L'orchestrateur est installé, un redémarrage est recommandé."
         echo ""
         echo "  ↦ Redémarrage du système dans 30 secondes..."
-        echo ""
-        
-        for ((i=30; i>0; i--)); do
-            echo -ne "\r  Redémarrage dans $i secondes... "
-            sleep 1
-        done
         echo ""
         
         log_info "Redémarrage du système malgré les erreurs"
