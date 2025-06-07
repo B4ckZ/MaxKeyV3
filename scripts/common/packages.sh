@@ -110,7 +110,23 @@ EOF
     
     # Télécharger chaque paquet
     local packages=$(get_required_packages)
-    local total_packages=$(echo "$packages" | grep -c ':' | grep -v '^0$' || echo 1)
+    
+    # CORRECTION: Compter le nombre total de paquets, pas de catégories
+    local total_packages=0
+    while IFS=: read -r category package_list; do
+        [ -z "$package_list" ] && continue
+        for package in $package_list; do
+            [ -z "$package" ] && continue
+            ((total_packages++))
+        done
+    done <<< "$packages"
+    
+    # Si le comptage retourne 0, utiliser une méthode alternative
+    if [ $total_packages -eq 0 ]; then
+        # Compter tous les mots après les ':' 
+        total_packages=$(echo "$packages" | cut -d: -f2 | wc -w)
+    fi
+    
     local current_package=0
     local failed_packages=""
     

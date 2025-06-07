@@ -267,6 +267,44 @@ echo ""
 # Afficher le statut final
 show_install_status
 
+# Mettre à jour explicitement tous les statuts des services installés avec succès
+echo "◦ Mise à jour finale des statuts des services..."
+if [ -f "$INSTALL_STATUS_FILE" ]; then
+    python3 << EOF
+import json
+import subprocess
+import sys
+
+# Charger le statut d'installation
+with open('$INSTALL_STATUS_FILE', 'r') as f:
+    install_data = json.load(f)
+
+# Mapper les scripts aux service_ids
+script_to_service = {
+    'update_install.sh': 'update',
+    'ap_install.sh': 'ap',
+    'nginx_install.sh': 'nginx',
+    'mqtt_install.sh': 'mqtt',
+    'mqtt_wgs_install.sh': 'mqtt_wgs',
+    'orchestrator_install.sh': 'orchestrator'
+}
+
+# Pour chaque installation réussie, mettre à jour le statut
+updated_count = 0
+for script_name, info in install_data.get('installations', {}).items():
+    if info.get('status') == 'success' and script_name in script_to_service:
+        service_id = script_to_service[script_name]
+        # Exécuter la commande bash pour mettre à jour le statut
+        cmd = f'source $BASE_DIR/scripts/common/variables.sh && update_service_status {service_id} active'
+        result = subprocess.run(['bash', '-c', cmd], capture_output=True)
+        if result.returncode == 0:
+            updated_count += 1
+            print(f"  ↦ Statut mis à jour : {service_id}")
+
+print(f"  ↦ {updated_count} statuts de services mis à jour ✓")
+EOF
+fi
+
 if [ $FAILED_SCRIPTS -eq 0 ]; then
     echo "✓ Tous les composants ont été installés avec succès !"
     echo ""

@@ -641,13 +641,22 @@ Code de sortie: {return_code}
             
             if return_code == 0:
                 if action == "install":
-                    service["status"] = "active"
-                    self.update_status_indicator(service, True)
-                    logger.info(f"Service {service['name']} activé")
-                    
-                    # Recharger les statuts après une courte pause
-                    self.root.after(1000, self.load_saved_statuses)
-                    self.root.after(1500, self.update_all_indicators)
+                    # Pour full_install, recharger tous les statuts
+                    if service['id'] == 'full_install':
+                        logger.info("Installation complète terminée, rechargement de tous les statuts")
+                        # Attendre un peu pour que tous les scripts aient fini d'écrire
+                        self.root.after(2000, self.load_saved_statuses)
+                        self.root.after(2500, self.update_all_indicators)
+                        # Ne pas marquer full_install comme "active" car ce n'est pas un service
+                    else:
+                        # Pour les installations individuelles
+                        service["status"] = "active"
+                        self.update_status_indicator(service, True)
+                        logger.info(f"Service {service['name']} activé")
+                        
+                        # Recharger les statuts après une courte pause
+                        self.root.after(1000, self.load_saved_statuses)
+                        self.root.after(1500, self.update_all_indicators)
             
         except Exception as e:
             logger.error(f"Erreur lors de l'exécution: {str(e)}")

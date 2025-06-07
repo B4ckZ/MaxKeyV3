@@ -1,0 +1,81 @@
+
+================================================================================
+D�MARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Sat Jun  7 07:33:47 2025
+Utilisateur: unknown
+R�pertoire: C:\Windows\system32
+================================================================================
+
+[2025-06-07 07:33:47] [INFO] [interface] Interface MaxLink démarrée
+[2025-06-07 07:33:47] [INFO] [interface] Variables chargées: 55 variables
+[2025-06-07 07:33:47] [INFO] [interface] Variables chargées avec succès
+[2025-06-07 07:33:47] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-06-07 07:33:47] [INFO] [interface] Mode root: False
+[2025-06-07 07:33:47] [INFO] [interface] Services chargés: 7
+[2025-06-07 07:33:47] [INFO] [interface] Interface créée avec succès
+
+================================================================================
+FIN: interface
+Date: Sat Jun  7 07:34:12 2025
+================================================================================
+
+[2025-06-07 07:34:12] [INFO] [interface] Interface fermée
+
+================================================================================
+DÉMARRAGE: interface
+Description: Interface graphique MaxLink Admin Panel
+Date: Tue May 13 02:19:40 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-05-13 02:19:41] [INFO] [interface] Interface MaxLink démarrée
+[2025-05-13 02:19:41] [INFO] [interface] Variables chargées: 55 variables
+[2025-05-13 02:19:41] [INFO] [interface] Variables chargées avec succès
+[2025-05-13 02:19:41] [INFO] [interface] Initialisation de l'application MaxLink
+[2025-05-13 02:19:41] [INFO] [interface] Mode root: True
+[2025-05-13 02:19:41] [INFO] [interface] Services chargés: 7
+[2025-05-13 02:19:41] [INFO] [interface] Interface créée avec succès
+[2025-05-13 02:19:48] [INFO] [interface] Exécution action: install sur Installation total
+[2025-05-13 02:19:48] [INFO] [interface] Exécution du script: /media/prod/USBTOOL/scripts/install/full_install_install.sh
+[2025-05-13 02:19:48] [INFO] [interface] Démarrage du processus: /media/prod/USBTOOL/scripts/install/full_install_install.sh
+[2025-06-07 07:44:47] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:44:52] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:44:57] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:02] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:07] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:12] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:17] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:22] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:27] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:32] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:37] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:42] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:47] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:52] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:45:57] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:02] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:07] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:12] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:17] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:22] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:27] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:32] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:37] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:42] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:47] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:52] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:46:57] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:02] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:07] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:12] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:17] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:22] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:27] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:32] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:37] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:42] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:47] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:52] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
+[2025-06-07 07:47:57] [INFO] [interface] Statuts chargés depuis /var/lib/maxlink/services_status.json
