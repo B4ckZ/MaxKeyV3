@@ -57,95 +57,62 @@ COLORS = {
 # ===============================================================================
 
 class StatusManager:
-    """Gestionnaire unifié pour tous les statuts"""
+    """Gestionnaire unifié pour tous les statuts - VERSION SIMPLIFIÉE"""
     
     def __init__(self):
         self.status_file = Path("/var/lib/maxlink/services_status.json")
-        self.install_file = Path("/var/lib/maxlink/full_install_status.json")
         
-        # Créer les répertoires si nécessaire
+        # Créer le répertoire si nécessaire
         self.status_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # Cache local des statuts - NE PAS initialiser avec des valeurs par défaut
-        self.statuses = {}
-        
-        # Charger les statuts existants au démarrage
-        self.load_statuses()
+        # Statuts par défaut
+        self.default_statuses = {
+            'full_install': {'status': 'active', 'is_meta': True},
+            'update': {'status': 'inactive'},
+            'ap': {'status': 'inactive'},
+            'nginx': {'status': 'inactive'},
+            'mqtt': {'status': 'inactive'},
+            'mqtt_wgs': {'status': 'inactive'},
+            'orchestrator': {'status': 'inactive'}
+        }
     
     def load_statuses(self):
-        """Charge tous les statuts depuis les fichiers"""
-        # Initialiser avec full_install toujours actif
-        self.statuses = {
-            'full_install': {'status': 'active', 'is_meta': True}
-        }
-        
-        # Charger les statuts depuis le fichier s'il existe
+        """Charge les statuts depuis le fichier - TOUJOURS relire le fichier"""
+        # Si le fichier existe, lire directement depuis le fichier
         if self.status_file.exists():
             try:
                 with open(self.status_file, 'r') as f:
                     saved_statuses = json.load(f)
                 
-                logger.info(f"Chargement des statuts depuis {self.status_file}")
-                
-                # Mettre à jour avec les statuts sauvegardés
+                # Construire le dictionnaire des statuts
+                statuses = {}
                 for service_id, info in saved_statuses.items():
-                    if service_id != 'full_install':  # Ne pas écraser full_install
-                        self.statuses[service_id] = {
-                            'status': info.get('status', 'inactive'),
-                            'last_update': info.get('last_update', '')
-                        }
-                        logger.info(f"Statut chargé: {service_id} = {info.get('status')}")
+                    statuses[service_id] = {
+                        'status': info.get('status', 'inactive'),
+                        'last_update': info.get('last_update', '')
+                    }
+                
+                # Ajouter full_install s'il n'est pas dans le fichier
+                if 'full_install' not in statuses:
+                    statuses['full_install'] = {'status': 'active', 'is_meta': True}
+                    
+                return statuses
                         
             except Exception as e:
                 logger.error(f"Erreur chargement statuts: {e}")
+                # En cas d'erreur, retourner les valeurs par défaut
+                return self.default_statuses.copy()
         else:
-            logger.info(f"Aucun fichier de statuts trouvé: {self.status_file}")
-            # Initialiser les autres services comme inactive s'ils n'existent pas
-            for service_id in ['update', 'ap', 'nginx', 'mqtt', 'mqtt_wgs', 'orchestrator']:
-                if service_id not in self.statuses:
-                    self.statuses[service_id] = {'status': 'inactive'}
-        
-        logger.info(f"Statuts après chargement: {self.statuses}")
-        return self.statuses
-    
-    def update_status(self, service_id, status):
-        """Met à jour le statut d'un service"""
-        if service_id == 'full_install':
-            return  # Ne jamais modifier full_install
-            
-        self.statuses[service_id] = {'status': status}
-        self.save_to_file(service_id, status)
-    
-    def save_to_file(self, service_id, status):
-        """Sauvegarde un statut dans le fichier"""
-        try:
-            # Charger le fichier existant ou créer un nouveau dict
-            data = {}
-            if self.status_file.exists():
-                with open(self.status_file, 'r') as f:
-                    data = json.load(f)
-            
-            # Mettre à jour
-            data[service_id] = {
-                'status': status,
-                'last_update': datetime.now().isoformat()
-            }
-            
-            # Sauvegarder
-            with open(self.status_file, 'w') as f:
-                json.dump(data, f, indent=2)
-                
-            logger.info(f"Statut sauvegardé: {service_id} = {status}")
-            
-        except Exception as e:
-            logger.error(f"Erreur sauvegarde statut: {e}")
+            # Si le fichier n'existe pas, retourner les valeurs par défaut
+            return self.default_statuses.copy()
     
     def get_status(self, service_id):
-        """Retourne le statut d'un service"""
-        return self.statuses.get(service_id, {}).get('status', 'inactive')
+        """Retourne le statut actuel d'un service - RELIRE LE FICHIER"""
+        statuses = self.load_statuses()
+        return statuses.get(service_id, {}).get('status', 'inactive')
     
     def is_active(self, service_id):
-        """Vérifie si un service est actif"""
+        """Vérifie si un service est actif - RELIRE LE FICHIER"""
         return self.get_status(service_id) == 'active'
 
 # ===============================================================================
@@ -236,7 +203,7 @@ class MaxLinkApp:
         
         self.center_window()
         
-        # Vérifier les privilèges root (compatible Windows/Linux)
+        # Vérifier les privilèges root
         self.root_mode = self.check_root_mode()
         logger.info(f"Mode root: {self.root_mode}")
         
@@ -246,9 +213,6 @@ class MaxLinkApp:
         # Services disponibles
         self.services = self.variables.get_services_list()
         self.selected_service = self.services[0] if self.services else None
-        
-        # Mettre à jour les services avec les statuts chargés
-        self.update_services_with_statuses()
         
         logger.info(f"Services chargés: {len(self.services)}")
         
@@ -266,45 +230,27 @@ class MaxLinkApp:
         # Vérification périodique
         self.periodic_refresh()
     
-    def update_services_with_statuses(self):
-        """Met à jour la liste des services avec les statuts chargés"""
-        statuses = self.status_manager.statuses
-        
-        for service in self.services:
-            service_id = service['id']
-            if service_id in statuses:
-                service['status'] = statuses[service_id].get('status', 'inactive')
-            else:
-                service['status'] = 'inactive'
-            
-            logger.debug(f"Service {service_id}: status = {service.get('status')}")
-    
     def refresh_all_statuses(self):
-        """Recharge tous les statuts et met à jour l'interface"""
-        # Recharger les statuts depuis le fichier
-        self.status_manager.load_statuses()
-        
-        # Mettre à jour les services
-        self.update_services_with_statuses()
-        
-        # Mettre à jour tous les indicateurs visuels
+        """Recharge tous les statuts et met à jour l'interface - SIMPLIFIÉ"""
+        # Les statuts sont toujours relus depuis le fichier par le StatusManager
+        # On met juste à jour l'interface
         self.update_all_indicators()
-        
-        logger.debug("Rafraîchissement des statuts effectué")
+        logger.debug("Rafraîchissement des indicateurs effectué")
     
     def periodic_refresh(self):
         """Rafraîchissement périodique simple"""
         # Ne rafraîchir que si aucune installation en cours
         if self.current_thread is None:
             self.refresh_all_statuses()
-        # Répéter toutes les 3 secondes
-        self.root.after(3000, self.periodic_refresh)
+        # Répéter toutes les 2 secondes (plus réactif)
+        self.root.after(2000, self.periodic_refresh)
     
     def update_all_indicators(self):
-        """Met à jour tous les indicateurs visuels"""
+        """Met à jour tous les indicateurs visuels - LECTURE DIRECTE DU FICHIER"""
         for service in self.services:
             if "indicator" in service:
-                is_active = service.get('status') == 'active'
+                # Lire le statut actuel depuis le fichier
+                is_active = self.status_manager.is_active(service['id'])
                 status_color = COLORS["nord14"] if is_active else COLORS["nord11"]
                 
                 service["indicator"].delete("all")
@@ -313,7 +259,7 @@ class MaxLinkApp:
                 logger.debug(f"Indicateur mis à jour pour {service['id']}: {'vert' if is_active else 'rouge'}")
     
     def check_root_mode(self):
-        """Vérifier si l'interface est lancée avec les privilèges root (multi-plateforme)"""
+        """Vérifier si l'interface est lancée avec les privilèges root"""
         try:
             # Sur Linux/Unix
             if hasattr(os, 'geteuid'):
@@ -454,8 +400,10 @@ class MaxLinkApp:
         )
         label.pack(side="left", fill="both", expand=True)
         
-        # Indicateur de statut
-        status_color = COLORS["nord14"] if service.get("status") == "active" else COLORS["nord11"]
+        # Indicateur de statut - lire directement depuis le fichier
+        is_active = self.status_manager.is_active(service['id'])
+        status_color = COLORS["nord14"] if is_active else COLORS["nord11"]
+        
         indicator = tk.Canvas(frame, width=20, height=20, bg=COLORS["nord1"], highlightthickness=0)
         indicator.pack(side="right", padx=10)
         indicator.create_oval(2, 2, 18, 18, fill=status_color, outline="")
@@ -486,20 +434,16 @@ class MaxLinkApp:
     
     def select_service(self, service):
         """Sélectionne un service"""
-        # Éviter de re-sélectionner le même service
         if self.selected_service == service:
             return
             
-        # Stocker l'ancien service sélectionné
         old_selected = self.selected_service
         self.selected_service = service
         
-        # Mise à jour optimisée - seulement les 2 services concernés
         self.update_selection_optimized(old_selected, service)
         
-        # Log moins fréquent
         if hasattr(self, '_last_log_time'):
-            if time.time() - self._last_log_time > 0.5:  # Log max toutes les 500ms
+            if time.time() - self._last_log_time > 0.5:
                 logger.debug(f"Service sélectionné: {service['name']}")
                 self._last_log_time = time.time()
         else:
@@ -513,15 +457,13 @@ class MaxLinkApp:
             service["frame"].config(highlightbackground=border_color, highlightcolor=border_color)
     
     def update_selection_optimized(self, old_service, new_service):
-        """Met à jour seulement les services qui changent (optimisé)"""
-        # Désélectionner l'ancien
+        """Met à jour seulement les services qui changent"""
         if old_service and "frame" in old_service:
             old_service["frame"].config(
                 highlightbackground=COLORS["nord1"], 
                 highlightcolor=COLORS["nord1"]
             )
         
-        # Sélectionner le nouveau
         if new_service and "frame" in new_service:
             new_service["frame"].config(
                 highlightbackground=COLORS["nord8"], 
@@ -666,17 +608,11 @@ Code de sortie: {return_code}
             if return_code == 0 and action == "install":
                 logger.info(f"Installation réussie pour {service['name']}")
                 
-                # Mise à jour du statut local
-                self.status_manager.update_status(service['id'], 'active')
+                # Forcer le rafraîchissement immédiat des indicateurs
+                # Le script a déjà mis à jour le fichier JSON
+                self.root.after(500, self.update_all_indicators)
                 
-                # Mettre à jour le service dans la liste
-                service['status'] = 'active'
-                
-                # Rafraîchir l'interface immédiatement
-                self.root.after(100, self.update_all_indicators)
-                
-                # Log pour debug
-                logger.info(f"Statut mis à jour localement pour {service['id']}")
+                logger.info(f"Rafraîchissement des indicateurs déclenché")
             
         except Exception as e:
             logger.error(f"Erreur lors de l'exécution: {str(e)}")
@@ -713,13 +649,13 @@ if __name__ == "__main__":
         with open(log_file, 'a') as f:
             f.write("\n" + "="*80 + "\n")
             f.write(f"DÉMARRAGE: {script_name}\n")
-            f.write(f"Description: Interface graphique MaxLink Admin Panel (Version corrigée)\n")
+            f.write(f"Description: Interface graphique MaxLink Admin Panel (Version simplifiée)\n")
             f.write(f"Date: {datetime.now().strftime('%c')}\n")
             f.write(f"Utilisateur: {os.environ.get('USER', 'unknown')}\n")
             f.write(f"Répertoire: {os.getcwd()}\n")
             f.write("="*80 + "\n\n")
         
-        logger.info("Interface MaxLink démarrée (version corrigée)")
+        logger.info("Interface MaxLink démarrée (version simplifiée)")
         
         # Charger les variables
         base_path = os.path.dirname(os.path.abspath(__file__))
