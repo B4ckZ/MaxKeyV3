@@ -358,7 +358,7 @@ else
     echo "Actions possibles :"
     echo "  • Relancer ce script pour réessayer les installations échouées"
     echo "  • Installer manuellement les composants manquants"
-    echo "  • Vérifier l'état avec : sudo $BASE_DIR/check_install_status.sh"
+    echo "  • Vérifier l'état avec : sudo $BASE_DIR/check.sh"
     echo ""
     
     log_error "Installation terminée avec $FAILED_SCRIPTS erreurs"
