@@ -300,6 +300,9 @@ class MaxLinkApp:
                 for service in self.services:
                     if service['id'] in saved_statuses:
                         service['status'] = saved_statuses[service['id']].get('status', 'inactive')
+                    # Ne pas écraser le statut de full_install depuis le fichier
+                    elif service['id'] != 'full_install':
+                        service['status'] = 'inactive'
                 
                 logger.info(f"Statuts chargés depuis {self.status_file}")
         except Exception as e:
@@ -320,7 +323,23 @@ class MaxLinkApp:
         """Met à jour tous les indicateurs de statut"""
         for service in self.services:
             if "indicator" in service:
-                is_active = service.get("status") == "active"
+                # Pour full_install, vérifier si au moins une installation est réussie
+                if service['id'] == 'full_install':
+                    # Vérifier dans le fichier d'installation
+                    is_active = False
+                    if os.path.exists("/var/lib/maxlink/full_install_status.json"):
+                        try:
+                            with open("/var/lib/maxlink/full_install_status.json", 'r') as f:
+                                install_data = json.load(f)
+                                # Considérer actif si au moins une installation est réussie
+                                installations = install_data.get('installations', {})
+                                is_active = any(info.get('status') == 'success' for info in installations.values())
+                        except:
+                            pass
+                else:
+                    # Pour les autres services
+                    is_active = service.get("status") == "active"
+                
                 status_color = COLORS["nord14"] if is_active else COLORS["nord11"]
                 service["indicator"].delete("all")
                 service["indicator"].create_oval(2, 2, 18, 18, fill=status_color, outline="")
@@ -641,22 +660,27 @@ Code de sortie: {return_code}
             
             if return_code == 0:
                 if action == "install":
-                    # Pour full_install, recharger tous les statuts
+                    logger.info(f"Installation réussie pour {service['name']}")
+                    
+                    # Pour full_install, marquer comme actif visuellement mais ne pas sauvegarder
                     if service['id'] == 'full_install':
-                        logger.info("Installation complète terminée, rechargement de tous les statuts")
-                        # Attendre un peu pour que tous les scripts aient fini d'écrire
-                        self.root.after(2000, self.load_saved_statuses)
-                        self.root.after(2500, self.update_all_indicators)
-                        # Ne pas marquer full_install comme "active" car ce n'est pas un service
+                        logger.info("Installation complète terminée")
+                        # Marquer visuellement en vert sans sauvegarder
+                        self.update_status_indicator(service, True)
+                        # Attendre que tous les scripts aient mis à jour leurs statuts
+                        self.root.after(3000, self.load_saved_statuses)
+                        self.root.after(3500, self.update_all_indicators)
                     else:
                         # Pour les installations individuelles
+                        # D'abord mettre à jour visuellement
                         service["status"] = "active"
                         self.update_status_indicator(service, True)
-                        logger.info(f"Service {service['name']} activé")
+                        logger.info(f"Service {service['name']} marqué comme actif")
                         
-                        # Recharger les statuts après une courte pause
-                        self.root.after(1000, self.load_saved_statuses)
-                        self.root.after(1500, self.update_all_indicators)
+                        # Forcer le rechargement immédiat depuis le fichier
+                        # car le script a mis à jour le statut via update_service_status
+                        self.root.after(500, self.load_saved_statuses)
+                        self.root.after(1000, self.update_all_indicators)
             
         except Exception as e:
             logger.error(f"Erreur lors de l'exécution: {str(e)}")

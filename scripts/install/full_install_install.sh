@@ -269,6 +269,11 @@ show_install_status
 
 # Mettre à jour explicitement tous les statuts des services installés avec succès
 echo "◦ Mise à jour finale des statuts des services..."
+
+# S'assurer que le fichier de statuts existe
+mkdir -p "$(dirname "$SERVICES_STATUS_FILE")"
+[ ! -f "$SERVICES_STATUS_FILE" ] && echo "{}" > "$SERVICES_STATUS_FILE"
+
 if [ -f "$INSTALL_STATUS_FILE" ]; then
     python3 << EOF
 import json
