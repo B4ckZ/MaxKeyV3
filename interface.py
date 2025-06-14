@@ -157,13 +157,13 @@ class VariablesManager:
             
             # Services disponibles (ordre fixe)
             self.services = [
-                {"id": "full_install", "name": "Installation totale", "is_meta": True},
+                {"id": "full_install", "name": "One-click install", "is_meta": True},
                 {"id": "update", "name": "Update RPI"},
                 {"id": "ap", "name": "Network AP"},
                 {"id": "nginx", "name": "NginX Web"},
                 {"id": "mqtt", "name": "MQTT BKR"},
                 {"id": "mqtt_wgs", "name": "MQTT WGS"},
-                {"id": "orchestrator", "name": "Orchestrateur"}
+                {"id": "orchestrator", "name": "Finalisation"}
             ]
             
             logger.info(f"Variables chargées: {len(self.variables)} variables")
@@ -247,14 +247,20 @@ class MaxLinkApp:
     
     def update_all_indicators(self):
         """Met à jour tous les indicateurs visuels - LECTURE DIRECTE DU FICHIER"""
+        # Toujours relire le fichier pour avoir l'état le plus récent
+        current_statuses = self.status_manager.load_statuses()
+        
         for service in self.services:
             if "indicator" in service:
-                # Lire le statut actuel depuis le fichier
-                is_active = self.status_manager.is_active(service['id'])
-                status_color = COLORS["nord14"] if is_active else COLORS["nord11"]
+                # Lire le statut actuel depuis les données rechargées
+                is_active = current_statuses.get(service['id'], {}).get('status', 'inactive') == 'active'
                 
+                # Mettre à jour seulement si le statut a changé
+                current_color = COLORS["nord14"] if is_active else COLORS["nord11"]
+                
+                # Effacer et redessiner l'indicateur
                 service["indicator"].delete("all")
-                service["indicator"].create_oval(2, 2, 18, 18, fill=status_color, outline="")
+                service["indicator"].create_oval(2, 2, 18, 18, fill=current_color, outline="")
                 
                 logger.debug(f"Indicateur mis à jour pour {service['id']}: {'vert' if is_active else 'rouge'}")
     
@@ -585,6 +591,17 @@ Script: {script_path}
                         if progress_match:
                             progress_value = int(progress_match.group(1))
                             self.root.after(0, self.update_progress_bar, progress_value)
+                            
+                            # Si on détecte une fin d'étape dans full_install
+                            if service['id'] == 'full_install' and 'Installation réussie' in line:
+                                # Forcer un rafraîchissement des indicateurs
+                                self.root.after(100, self.update_all_indicators)
+                    elif "REFRESH_INDICATORS" in line:
+                        # Signal explicite pour rafraîchir les indicateurs
+                        logger.info("Signal de rafraîchissement reçu")
+                        self.root.after(200, self.update_all_indicators)
+                        # Ne pas afficher cette ligne dans la console
+                        continue
                     else:
                         self.update_console(line)
             
@@ -610,7 +627,14 @@ Code de sortie: {return_code}
                 
                 # Forcer le rafraîchissement immédiat des indicateurs
                 # Le script a déjà mis à jour le fichier JSON
-                self.root.after(500, self.update_all_indicators)
+                # Utiliser un délai plus long pour s'assurer que le fichier est bien écrit
+                self.root.after(1000, self.update_all_indicators)
+                
+                # Si c'est une installation complète, rafraîchir aussi après chaque étape
+                if service_id == "full_install":
+                    # Rafraîchir plus fréquemment pendant l'installation complète
+                    for delay in [2000, 4000, 6000]:
+                        self.root.after(delay, self.update_all_indicators)
                 
                 logger.info(f"Rafraîchissement des indicateurs déclenché")
             

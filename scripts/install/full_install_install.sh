@@ -238,6 +238,10 @@ for script_info in "${INSTALL_SCRIPTS[@]}"; do
         echo "  ↦ $description : Installation réussie ✓"
         update_install_status "$script_name" "active" "Installation réussie"
         log_success "$script_name installé avec succès"
+        
+        # Signal spécial pour l'interface pour rafraîchir les indicateurs
+        echo "REFRESH_INDICATORS"
+        sleep 1  # Petit délai pour s'assurer que le fichier JSON est bien écrit
     else
         echo ""
         echo "  ↦ $description : Échec de l'installation ✗"
