@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - SCRIPT DE MISE À JOUR DU SYSTÈME LINUX
-# Version corrigée avec mise à jour du statut
+# MAXLINK - MISE À JOUR SYSTÈME ET CRÉATION DU CACHE (VERSION CORRIGÉE)
+# Installation avec mise à jour du statut et vérification dashboard
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -20,11 +20,11 @@ source "$SCRIPT_DIR/../common/wifi_helper.sh"
 # ===============================================================================
 
 # Initialiser le logging
-init_logging "Mise à jour système MaxLink"
+init_logging "Mise à jour système et création du cache" "install"
 
-# Variables pour le contrôle du processus
-AP_WAS_ACTIVE=false
-APT_CLEANUP_DONE=false
+# Configuration réseau
+ORIGINAL_CONNECTION=""
+BACKUP_CONNECTION="MaxLink-Setup-Temp"
 
 # ===============================================================================
 # FONCTIONS
@@ -36,305 +36,250 @@ send_progress() {
     log_info "Progression: $1% - $2" false
 }
 
-# Attente simple avec message
-wait_with_message() {
-    local seconds=$1
-    local message=$2
-    echo "  ↦ $message (${seconds}s)..."
-    log_info "$message - attente ${seconds}s"
-    sleep "$seconds"
-}
-
-# Attente simple silencieuse
+# Attente silencieuse
 wait_silently() {
     sleep "$1"
 }
 
-# Fonction pour attendre qu'APT soit libre
-wait_for_apt() {
-    local max_wait=300  # Maximum 5 minutes d'attente
-    local waited=0
-    
-    echo "◦ Vérification de l'état d'APT..."
-    log_info "Vérification de l'état d'APT"
-    
-    # Vérifier tous les verrous possibles
-    while [ $waited -lt $max_wait ]; do
-        # Vérifier si APT ou DPKG sont actifs
-        if fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
-           fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
-           fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
-           fuser /var/cache/apt/archives/lock >/dev/null 2>&1; then
-            
-            if [ $waited -eq 0 ]; then
-                echo "  ↦ APT est occupé, attente qu'il termine..."
-                log_info "APT occupé détecté, attente"
-            fi
-            
-            # Afficher un point toutes les 10 secondes
-            if [ $((waited % 10)) -eq 0 ] && [ $waited -gt 0 ]; then
-                echo -n "."
-            fi
-            
-            sleep 1
-            ((waited++))
-        else
-            if [ $waited -gt 0 ]; then
-                echo ""  # Nouvelle ligne après les points
-                echo "  ↦ APT est maintenant libre ✓"
-                log_info "APT libre après ${waited}s d'attente"
-            else
-                echo "  ↦ APT est libre ✓"
-                log_info "APT libre immédiatement"
-            fi
-            return 0
-        fi
+# Attente avec message
+wait_with_message() {
+    local seconds=$1
+    local message=$2
+    echo -n "  ↦ $message"
+    for ((i=$seconds; i>0; i--)); do
+        echo -n "."
+        sleep 1
     done
-    
-    echo ""
-    echo "  ↦ Timeout: APT toujours occupé après ${max_wait}s ⚠"
-    log_warn "Timeout APT après ${max_wait}s"
-    return 1
+    echo " ✓"
 }
 
-# Nettoyer proprement APT
-clean_apt_properly() {
-    echo "◦ Nettoyage sécurisé du système de paquets..."
-    log_info "Début du nettoyage APT sécurisé"
+# Sauvegarder l'état réseau actuel
+save_network_state() {
+    log_info "Sauvegarde de l'état réseau actuel"
     
-    # 1. D'abord, attendre qu'APT soit libre
-    if ! wait_for_apt; then
-        echo "  ↦ Forçage du nettoyage APT..."
-        log_warn "Forçage du nettoyage APT nécessaire"
-        
-        # Arrêter les services qui pourraient utiliser APT
-        systemctl stop unattended-upgrades.service 2>/dev/null || true
-        systemctl stop apt-daily.service 2>/dev/null || true
-        systemctl stop apt-daily-upgrade.service 2>/dev/null || true
-        
+    # Sauvegarder la connexion WiFi active
+    ORIGINAL_CONNECTION=$(nmcli -t -f NAME connection show --active | grep -v "^lo$" | head -n1)
+    
+    if [ -n "$ORIGINAL_CONNECTION" ]; then
+        log_info "Connexion active sauvegardée: $ORIGINAL_CONNECTION"
+    else
+        log_warn "Aucune connexion active à sauvegarder"
+    fi
+}
+
+# Restaurer l'état réseau
+restore_network_state() {
+    log_info "Restauration de l'état réseau"
+    
+    # Désactiver AP si actif
+    if nmcli con show --active | grep -q "$AP_SSID"; then
+        log_info "Désactivation de l'AP temporaire"
+        nmcli con down "$AP_SSID" >/dev/null 2>&1 || true
+    fi
+    
+    # Restaurer la connexion originale si elle existait
+    if [ -n "$ORIGINAL_CONNECTION" ]; then
+        log_info "Restauration de la connexion: $ORIGINAL_CONNECTION"
+        nmcli con up "$ORIGINAL_CONNECTION" >/dev/null 2>&1 || true
         wait_silently 3
     fi
-    
-    # 2. Nettoyer les processus zombies s'il y en a
-    echo "  ↦ Nettoyage des processus zombies..."
-    log_info "Nettoyage des processus zombies"
-    
-    # Terminer proprement (SIGTERM) au lieu de tuer brutalement (SIGKILL)
-    pkill -15 apt 2>/dev/null || true
-    pkill -15 dpkg 2>/dev/null || true
-    
-    # Attendre un peu pour la terminaison propre
-    wait_silently 2
-    
-    # 3. Supprimer les verrous uniquement s'ils sont orphelins
-    echo "  ↦ Vérification des verrous orphelins..."
-    log_info "Vérification des verrous orphelins"
-    
-    for lock in /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock; do
-        if [ -f "$lock" ] && ! fuser "$lock" >/dev/null 2>&1; then
-            echo "    • Suppression du verrou orphelin: $lock"
-            log_info "Suppression verrou orphelin: $lock"
-            rm -f "$lock"
-        fi
-    done
-    
-    # 4. Reconfigurer dpkg si nécessaire
-    echo "  ↦ Reconfiguration de dpkg..."
-    log_command "dpkg --configure -a" "Configuration dpkg"
-    
-    # 5. Nettoyer le cache APT si corrompu
-    if [ -d "/var/lib/apt/lists/partial" ]; then
-        local partial_files=$(ls -1 /var/lib/apt/lists/partial 2>/dev/null | wc -l)
-        if [ $partial_files -gt 0 ]; then
-            echo "  ↦ Nettoyage des fichiers partiels corrompus ($partial_files fichiers)..."
-            log_info "Nettoyage de $partial_files fichiers partiels"
-            rm -rf /var/lib/apt/lists/*
-            APT_CLEANUP_DONE=true
-        fi
-    fi
-    
-    echo "  ↦ Système de paquets nettoyé ✓"
-    log_success "Nettoyage APT terminé"
-    
-    # Pause de sécurité
-    wait_silently 2
 }
 
-# Mise à jour APT sécurisée avec retry
-safe_apt_update() {
+# Vérifier et télécharger le dashboard avec retry
+download_dashboard_with_retry() {
     local max_attempts=3
     local attempt=1
+    local success=false
     
-    echo "◦ Mise à jour de la liste des paquets..."
-    log_info "Début de la mise à jour APT"
+    DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
+    DASHBOARD_ARCHIVE="$DASHBOARD_CACHE_DIR/dashboard.tar.gz"
     
-    while [ $attempt -le $max_attempts ]; do
+    # Créer le répertoire de cache pour le dashboard
+    mkdir -p "$DASHBOARD_CACHE_DIR"
+    
+    # Supprimer l'ancienne archive si elle existe
+    rm -f "$DASHBOARD_ARCHIVE"
+    
+    # Construire l'URL de téléchargement
+    GITHUB_ARCHIVE_URL="${GITHUB_REPO_URL}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz"
+    
+    echo ""
+    echo "◦ Téléchargement du dashboard MaxLink V3..."
+    echo "  ↦ URL: $GITHUB_ARCHIVE_URL"
+    log_info "Téléchargement du dashboard V3 depuis GitHub"
+    
+    while [ $attempt -le $max_attempts ] && [ "$success" = false ]; do
+        echo ""
         echo "  ↦ Tentative $attempt/$max_attempts..."
-        log_info "Tentative APT update $attempt/$max_attempts"
         
-        # Si on a nettoyé les listes, on doit tout retélécharger
-        if [ "$APT_CLEANUP_DONE" = true ]; then
-            echo "    • Reconstruction complète du cache APT..."
-            log_info "Reconstruction complète du cache APT"
-        fi
-        
-        if apt-get update -y 2>&1 | tee /tmp/apt_update.log; then
-            # Vérifier qu'il n'y a pas d'erreurs dans la sortie
-            if ! grep -E "(^Err:|^E:|Failed)" /tmp/apt_update.log >/dev/null 2>&1; then
-                echo "  ↦ Liste des paquets mise à jour ✓"
-                log_success "APT update réussi"
-                rm -f /tmp/apt_update.log
-                return 0
+        # Essayer avec curl d'abord
+        if command -v curl >/dev/null 2>&1; then
+            echo "  ↦ Utilisation de curl..."
+            if curl -L -f -o "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" 2>/dev/null; then
+                success=true
+                log_success "Dashboard téléchargé avec curl (tentative $attempt)"
             else
-                echo "  ↦ Des erreurs ont été détectées dans la mise à jour ⚠"
-                log_warn "Erreurs détectées dans APT update"
+                log_warn "Échec curl tentative $attempt"
             fi
+        # Sinon essayer avec wget
+        elif command -v wget >/dev/null 2>&1; then
+            echo "  ↦ Utilisation de wget..."
+            if wget -O "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" 2>/dev/null; then
+                success=true
+                log_success "Dashboard téléchargé avec wget (tentative $attempt)"
+            else
+                log_warn "Échec wget tentative $attempt"
+            fi
+        else
+            echo "  ↦ ERREUR: Ni curl ni wget disponibles ✗"
+            log_error "Aucun outil de téléchargement disponible"
+            return 1
         fi
         
-        # En cas d'échec
-        if [ $attempt -lt $max_attempts ]; then
-            echo "  ↦ Échec, nouvelle tentative dans 10 secondes..."
-            log_info "Échec APT update, attente avant retry"
-            
-            # Nettoyer plus agressivement avant le retry
-            apt-get clean
-            rm -rf /var/lib/apt/lists/*
-            APT_CLEANUP_DONE=true
-            
-            wait_silently 10
+        # Si échec, attendre avant de réessayer
+        if [ "$success" = false ] && [ $attempt -lt $max_attempts ]; then
+            echo "  ↦ Échec, nouvelle tentative dans 5 secondes..."
+            wait_silently 5
+            ((attempt++))
+        elif [ "$success" = false ]; then
+            ((attempt++))
         fi
-        
-        ((attempt++))
     done
     
-    echo "  ↦ Impossible de mettre à jour les listes après $max_attempts tentatives ✗"
-    log_error "Échec définitif d'APT update après $max_attempts tentatives"
-    return 1
+    # Vérifier le résultat final
+    if [ "$success" = true ]; then
+        echo ""
+        echo "  ↦ Téléchargement réussi ✓"
+        
+        # Vérifier que le fichier existe et n'est pas vide
+        if [ -f "$DASHBOARD_ARCHIVE" ]; then
+            local file_size=$(stat -c%s "$DASHBOARD_ARCHIVE" 2>/dev/null || stat -f%z "$DASHBOARD_ARCHIVE" 2>/dev/null || echo "0")
+            
+            if [ "$file_size" -gt 1000 ]; then
+                echo "  ↦ Taille du fichier: $(( file_size / 1024 )) KB"
+                
+                # Vérifier l'intégrité de l'archive
+                if tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
+                    echo "  ↦ Archive valide ✓"
+                    log_success "Archive dashboard valide"
+                    
+                    # Créer les métadonnées
+                    cat > "$DASHBOARD_CACHE_DIR/metadata.json" << EOF
+{
+    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "version": "$MAXLINK_VERSION",
+    "branch": "$GITHUB_BRANCH",
+    "url": "$GITHUB_ARCHIVE_URL",
+    "size": $file_size
+}
+EOF
+                    return 0
+                else
+                    echo "  ↦ ERREUR: Archive corrompue ✗"
+                    log_error "Archive dashboard corrompue"
+                    rm -f "$DASHBOARD_ARCHIVE"
+                    return 1
+                fi
+            else
+                echo "  ↦ ERREUR: Fichier trop petit (${file_size} bytes) ✗"
+                log_error "Fichier dashboard trop petit"
+                rm -f "$DASHBOARD_ARCHIVE"
+                return 1
+            fi
+        else
+            echo "  ↦ ERREUR: Fichier non créé ✗"
+            log_error "Fichier dashboard non créé"
+            return 1
+        fi
+    else
+        echo ""
+        echo "  ↦ ERREUR: Échec du téléchargement après $max_attempts tentatives ✗"
+        log_error "Échec définitif du téléchargement du dashboard"
+        
+        # Proposer une solution alternative
+        echo ""
+        echo "========================================================================"
+        echo "SOLUTION ALTERNATIVE"
+        echo "========================================================================"
+        echo ""
+        echo "Le dashboard n'a pas pu être téléchargé automatiquement."
+        echo ""
+        echo "Options disponibles :"
+        echo ""
+        echo "1. Vérifier votre connexion Internet :"
+        echo "   - ping -c 3 github.com"
+        echo "   - curl -I https://github.com"
+        echo ""
+        echo "2. Télécharger manuellement sur un PC avec Internet :"
+        echo "   - URL: $GITHUB_ARCHIVE_URL"
+        echo "   - Copier sur la clé USB dans : cache/dashboard.tar.gz"
+        echo ""
+        echo "3. Puis copier sur le Raspberry Pi :"
+        echo "   sudo cp /media/prod/WERIT/cache/dashboard.tar.gz $DASHBOARD_ARCHIVE"
+        echo ""
+        echo "4. Relancer nginx_install.sh après avoir copié le fichier"
+        echo ""
+        echo "========================================================================"
+        
+        return 1
+    fi
 }
 
-# Ajouter la version sur l'image de fond avec configuration avancée
+# Fonction pour ajouter la version sur l'image
 add_version_to_image() {
-    local source_image=$1
-    local dest_image=$2
-    local version_text="${VERSION_OVERLAY_PREFIX}v$MAXLINK_VERSION"
+    local source_image="$1"
+    local dest_image="$2"
     
-    log_info "Ajout de la version $version_text sur l'image de fond"
+    if [ ! -f "$source_image" ]; then
+        log_error "Image source non trouvée: $source_image"
+        return 1
+    fi
     
-    # Vérifier si l'overlay est activé
+    log_info "Ajout de la version sur l'image de fond"
+    
+    # Vérifier si ImageMagick est disponible
+    if ! command -v convert >/dev/null 2>&1; then
+        log_warn "ImageMagick non disponible, copie simple de l'image"
+        cp "$source_image" "$dest_image"
+        return 0
+    fi
+    
+    # Si l'overlay est désactivé, copier simplement l'image
     if [ "$VERSION_OVERLAY_ENABLED" != "true" ]; then
-        log_info "Overlay de version désactivé, copie simple de l'image"
+        log_info "Overlay désactivé, copie simple de l'image"
         cp "$source_image" "$dest_image"
         return 0
     fi
     
-    # Si PIL n'est pas disponible, copier simplement l'image
-    if ! python3 -c "import PIL" >/dev/null 2>&1; then
-        log_info "PIL non disponible, copie simple de l'image"
-        cp "$source_image" "$dest_image"
-        return 0
+    # Ajouter la version sur l'image
+    local text="${VERSION_OVERLAY_PREFIX} v${MAXLINK_VERSION}"
+    local font_size="${VERSION_OVERLAY_FONT_SIZE:-14}"
+    local font_color="${VERSION_OVERLAY_FONT_COLOR:-#FFFFFF}"
+    local shadow_color="${VERSION_OVERLAY_SHADOW_COLOR:-#000000}"
+    local margin_right="${VERSION_OVERLAY_MARGIN_RIGHT:-20}"
+    local margin_bottom="${VERSION_OVERLAY_MARGIN_BOTTOM:-20}"
+    
+    # Construire la commande convert
+    local convert_cmd="convert '$source_image'"
+    
+    # Ajouter l'ombre si configurée
+    if [ -n "$shadow_color" ]; then
+        convert_cmd="$convert_cmd -gravity southeast -fill '$shadow_color' -pointsize $font_size"
+        convert_cmd="$convert_cmd -annotate +$((margin_right+1))+$((margin_bottom-1)) '$text'"
     fi
     
-    # Script Python avec configuration avancée
-    python3 << EOF
-import sys
-import os
-from PIL import Image, ImageDraw, ImageFont
-
-def hex_to_rgb(hex_color):
-    """Convertir une couleur hex en RGB"""
-    hex_color = hex_color.lstrip('#')
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-try:
-    # Charger l'image
-    img = Image.open("$source_image")
+    # Ajouter le texte principal
+    convert_cmd="$convert_cmd -gravity southeast -fill '$font_color' -pointsize $font_size"
     
-    # Si l'image n'a pas de canal alpha, la convertir en RGBA
-    if img.mode != 'RGBA':
-        img = img.convert('RGBA')
+    # Gras si demandé
+    if [ "$VERSION_OVERLAY_FONT_BOLD" = "true" ]; then
+        convert_cmd="$convert_cmd -weight Bold"
+    fi
     
-    # Créer un overlay transparent pour le texte
-    txt_layer = Image.new('RGBA', img.size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(txt_layer)
+    convert_cmd="$convert_cmd -annotate +${margin_right}+${margin_bottom} '$text' '$dest_image'"
     
-    # Configuration
-    font_size = $VERSION_OVERLAY_FONT_SIZE
-    margin_right = $VERSION_OVERLAY_MARGIN_RIGHT
-    margin_bottom = $VERSION_OVERLAY_MARGIN_BOTTOM
-    text_color = hex_to_rgb("$VERSION_OVERLAY_FONT_COLOR")
-    shadow_color = hex_to_rgb("$VERSION_OVERLAY_SHADOW_COLOR")
-    shadow_opacity = $VERSION_OVERLAY_SHADOW_OPACITY
-    is_bold = "$VERSION_OVERLAY_FONT_BOLD" == "true"
-    
-    # Essayer de charger une police système
-    font = None
-    font_paths = [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if is_bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if is_bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf" if is_bold else "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    ]
-    
-    for font_path in font_paths:
-        if os.path.exists(font_path):
-            try:
-                font = ImageFont.truetype(font_path, font_size)
-                break
-            except:
-                pass
-    
-    # Si aucune police trouvée, utiliser la police par défaut
-    if font is None:
-        font = ImageFont.load_default()
-        print("Utilisation de la police par défaut")
-    
-    # Obtenir la taille du texte
-    if font != ImageFont.load_default():
-        bbox = draw.textbbox((0, 0), "$version_text", font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-    else:
-        # Pour la police par défaut, estimation
-        text_width = len("$version_text") * 10
-        text_height = 15
-    
-    # Calculer la position (ancrage coin bas-droit)
-    x = img.width - margin_right - text_width
-    y = img.height - margin_bottom - text_height
-    
-    # Dessiner l'ombre avec opacité
-    shadow_offset = max(2, int(font_size / 20))
-    if font != ImageFont.load_default():
-        # Ombre avec transparence
-        for offset_x in range(-shadow_offset, shadow_offset + 1):
-            for offset_y in range(-shadow_offset, shadow_offset + 1):
-                if offset_x != 0 or offset_y != 0:
-                    draw.text(
-                        (x + offset_x, y + offset_y), 
-                        "$version_text", 
-                        font=font, 
-                        fill=shadow_color + (shadow_opacity,)
-                    )
-    
-    # Dessiner le texte principal
-    draw.text((x, y), "$version_text", font=font, fill=text_color + (255,))
-    
-    # Composer l'image finale
-    out = Image.alpha_composite(img, txt_layer)
-    
-    # Sauvegarder (convertir en RGB si nécessaire pour JPEG)
-    if dest_image.lower().endswith('.jpg') or dest_image.lower().endswith('.jpeg'):
-        out = out.convert('RGB')
-    
-    out.save("$dest_image", quality=95)
-    print("Version ajoutée avec succès")
-    
-except Exception as e:
-    print(f"Erreur: {e}")
-    import shutil
-    shutil.copy2("$source_image", "$dest_image")
-EOF
-    
-    if [ $? -eq 0 ]; then
+    # Exécuter la commande
+    if eval "$convert_cmd" 2>/dev/null; then
         log_success "Version ajoutée sur l'image"
     else
         cp "$source_image" "$dest_image"
@@ -366,11 +311,11 @@ echo ""
 
 send_progress 5 "Préparation du système..."
 
-# Stabilisation initiale plus longue pour OS frais
+# Stabilisation initiale
 echo "◦ Stabilisation du système après démarrage..."
 echo "  ↦ Initialisation des services réseau..."
 log_info "Stabilisation du système - attente 10s pour OS frais"
-wait_silently 10  # Plus long pour laisser le système se stabiliser
+wait_silently 10
 
 # Désactiver temporairement les mises à jour automatiques
 echo ""
@@ -393,7 +338,7 @@ if ip link show wlan0 >/dev/null 2>&1; then
     echo "  ↦ Interface WiFi détectée ✓"
     log_info "Interface WiFi wlan0 détectée"
     log_command "nmcli radio wifi on >/dev/null 2>&1" "Activation WiFi"
-    wait_silently 3  # Attendre que le WiFi s'active complètement
+    wait_silently 3
     echo "  ↦ WiFi activé ✓"
 else
     echo "  ↦ Interface WiFi non disponible ✗"
@@ -417,133 +362,106 @@ echo ""
 send_progress 15 "Connexion au réseau..."
 
 # Établir la connexion internet
-if ! ensure_internet_connection; then
-    echo "  ↦ Impossible d'établir la connexion ✗"
-    log_error "Échec de la connexion réseau"
+if ! connect_to_wifi; then
+    echo "  ↦ Impossible de se connecter au WiFi ✗"
+    log_error "Échec de connexion WiFi"
+    restore_network_state
     exit 1
 fi
 
-# Attendre que la connexion soit stable
-wait_with_message 5 "Stabilisation de la connexion"
+echo "  ↦ Connexion établie ✓"
+log_success "Connexion WiFi établie"
 
-send_progress 30 "Connexion établie"
+send_progress 25 "Réseau connecté"
 echo ""
 sleep 2
 
 # ===============================================================================
-# ÉTAPE 3 : SYNCHRONISATION DE L'HORLOGE
+# ÉTAPE 3 : MISE À JOUR DES SOURCES APT
 # ===============================================================================
 
 echo "========================================================================"
-echo "ÉTAPE 3 : SYNCHRONISATION HORLOGE"
+echo "ÉTAPE 3 : MISE À JOUR DES SOURCES APT"
 echo "========================================================================"
 echo ""
 
-send_progress 35 "Synchronisation de l'horloge..."
+send_progress 30 "Mise à jour des sources..."
 
-echo "◦ Synchronisation de l'horloge système..."
-log_info "Synchronisation NTP"
+echo "◦ Configuration temporaire du DNS..."
+cat > /etc/resolv.conf << EOF
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+nameserver 1.1.1.1
+EOF
+echo "  ↦ DNS configuré ✓"
+log_info "DNS configuré pour la mise à jour"
 
-if command -v timedatectl >/dev/null 2>&1; then
-    log_command "timedatectl set-ntp true" "Activation NTP"
-    
-    echo "  ↦ Attente de la synchronisation NTP..."
-    log_info "Attente synchronisation NTP - 15s"
-    wait_silently 15  # Plus de temps pour la synchro
-    
-    # Vérifier plusieurs fois
-    local sync_attempts=0
-    while [ $sync_attempts -lt 3 ]; do
-        if timedatectl status | grep -q "synchronized: yes"; then
-            echo "  ↦ Horloge synchronisée ✓"
-            log_success "Synchronisation NTP confirmée"
-            break
+echo ""
+echo "◦ Mise à jour de la liste des paquets..."
+echo "  ↦ Cette opération peut prendre quelques minutes..."
+
+if retry_apt_update; then
+    echo "  ↦ Sources APT mises à jour ✓"
+    log_success "Mise à jour APT réussie"
+else
+    echo "  ↦ Échec de la mise à jour APT ✗"
+    log_error "Impossible de mettre à jour les sources APT"
+    restore_network_state
+    exit 1
+fi
+
+send_progress 40 "Sources mises à jour"
+echo ""
+sleep 2
+
+# ===============================================================================
+# ÉTAPE 4 : INSTALLATION DES PAQUETS ESSENTIELS
+# ===============================================================================
+
+echo "========================================================================"
+echo "ÉTAPE 4 : INSTALLATION DES PAQUETS ESSENTIELS"
+echo "========================================================================"
+echo ""
+
+send_progress 45 "Installation des paquets..."
+
+# Installer les paquets essentiels en ligne
+echo "◦ Installation des paquets de base..."
+
+ESSENTIAL_PACKAGES="curl wget git htop iotop net-tools dnsutils rfkill wireless-tools python3-pip python3-pil"
+
+for package in $ESSENTIAL_PACKAGES; do
+    if ! dpkg -l | grep -q "^ii  $package "; then
+        echo "  ↦ Installation de $package..."
+        if apt-get install -y $package >/dev/null 2>&1; then
+            echo "    → $package installé ✓"
+            log_success "Paquet installé: $package"
         else
-            echo "  ↦ Synchronisation en cours... (tentative $((sync_attempts+1))/3)"
-            log_info "Attente supplémentaire pour NTP"
-            wait_silently 5
-            ((sync_attempts++))
+            echo "    → $package échec ⚠"
+            log_warn "Échec installation: $package"
         fi
-    done
-    
-    echo "  ↦ Date/Heure: $(date '+%d/%m/%Y %H:%M:%S')"
-    log_info "Heure synchronisée: $(date)"
-else
-    echo "  ↦ timedatectl non disponible ⚠"
-    log_warn "timedatectl non disponible"
-fi
+    else
+        echo "  ↦ $package déjà installé ✓"
+    fi
+done
 
-send_progress 40 "Horloge synchronisée"
+send_progress 55 "Paquets installés"
 echo ""
 sleep 2
 
 # ===============================================================================
-# ÉTAPE 4 : MISE À JOUR DE SÉCURITÉ
+# ÉTAPE 5 : CRÉATION DU CACHE OFFLINE
 # ===============================================================================
 
 echo "========================================================================"
-echo "ÉTAPE 4 : MISE À JOUR DE SÉCURITÉ"
+echo "ÉTAPE 5 : CRÉATION DU CACHE POUR MODE OFFLINE"
 echo "========================================================================"
 echo ""
 
-send_progress 45 "Préparation des mises à jour..."
+send_progress 60 "Création du cache..."
 
-# Nettoyer APT proprement
-clean_apt_properly
-
-# Attendre un peu après le nettoyage
-wait_with_message 3 "Stabilisation après nettoyage"
-
-# Mise à jour des dépôts avec retry
-if ! safe_apt_update; then
-    echo "  ↦ Impossible de mettre à jour les dépôts ✗"
-    echo "  ↦ Continuation sans mises à jour de sécurité ⚠"
-    log_error "APT update impossible, continuation sans mises à jour"
-fi
-
-send_progress 55 "Installation des mises à jour critiques..."
-
-# Installation des mises à jour de sécurité critiques uniquement
-echo ""
-echo "◦ Installation des mises à jour de sécurité critiques..."
-log_info "Installation des paquets critiques uniquement"
-
-# Liste des paquets critiques
-CRITICAL_PACKAGES="openssl libssl* sudo systemd apt dpkg libc6 libpam* ca-certificates tzdata"
-
-# Installer uniquement les mises à jour critiques avec gestion d'erreur
-if log_command "DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --allow-unauthenticated $CRITICAL_PACKAGES" "Mise à jour sécurité"; then
-    echo "  ↦ Mises à jour de sécurité installées ✓"
-    log_success "Mises à jour de sécurité installées"
-else
-    echo "  ↦ Certaines mises à jour ont échoué ⚠"
-    log_warn "Certaines mises à jour ont échoué"
-    
-    # Essayer de réparer
-    echo "  ↦ Tentative de réparation..."
-    dpkg --configure -a
-    apt-get install -f -y
-fi
-
-# Pause après les mises à jour
-wait_with_message 5 "Stabilisation après mises à jour"
-
-send_progress 65 "Création du cache de paquets..."
-
-# ===============================================================================
-# ÉTAPE 5 : CRÉATION DU CACHE COMPLET
-# ===============================================================================
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 5 : CRÉATION DU CACHE DE PAQUETS"
-echo "========================================================================"
-echo ""
-
-echo "◦ Initialisation du système de cache..."
-log_info "Initialisation du cache de paquets"
-
-# Initialiser le cache
+# Initialiser le cache de paquets
+echo "◦ Initialisation du cache de paquets..."
 if init_package_cache; then
     echo "  ↦ Cache initialisé ✓"
     log_success "Cache initialisé avec succès"
@@ -573,64 +491,26 @@ else
     log_warn "Cache créé partiellement"
 fi
 
-# TÉLÉCHARGEMENT DU DASHBOARD V3
-echo ""
-echo "◦ Téléchargement du dashboard MaxLink V3..."
-DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
-DASHBOARD_ARCHIVE="$DASHBOARD_CACHE_DIR/dashboard.tar.gz"
-
-# Créer le répertoire de cache pour le dashboard
-mkdir -p "$DASHBOARD_CACHE_DIR"
-
-echo "  ↦ Téléchargement depuis GitHub..."
-log_info "Téléchargement du dashboard V3 depuis GitHub"
-
-# Supprimer l'ancienne archive si elle existe
-rm -f "$DASHBOARD_ARCHIVE"
-
-# Construire l'URL de téléchargement
-GITHUB_ARCHIVE_URL="${GITHUB_REPO_URL}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz"
-
-# Télécharger avec curl ou wget
-if command -v curl >/dev/null 2>&1; then
-    if log_command "curl -L -o '$DASHBOARD_ARCHIVE' '$GITHUB_ARCHIVE_URL'" "Téléchargement dashboard (curl)"; then
-        echo "  ↦ Dashboard téléchargé ✓"
-        log_success "Dashboard téléchargé avec curl"
-    else
-        echo "  ↦ Erreur lors du téléchargement ✗"
-        log_error "Échec du téléchargement du dashboard"
-    fi
-elif command -v wget >/dev/null 2>&1; then
-    if log_command "wget -O '$DASHBOARD_ARCHIVE' '$GITHUB_ARCHIVE_URL'" "Téléchargement dashboard (wget)"; then
-        echo "  ↦ Dashboard téléchargé ✓"
-        log_success "Dashboard téléchargé avec wget"
-    else
-        echo "  ↦ Erreur lors du téléchargement ✗"
-        log_error "Échec du téléchargement du dashboard"
-    fi
-else
-    echo "  ↦ Ni curl ni wget disponibles ✗"
-    log_error "Aucun outil de téléchargement disponible"
-fi
-
-# Vérifier que l'archive est valide
-if [ -f "$DASHBOARD_ARCHIVE" ] && tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
-    echo "  ↦ Archive dashboard valide ✓"
-    log_success "Archive dashboard valide"
+# TÉLÉCHARGEMENT DU DASHBOARD V3 AVEC VÉRIFICATION
+if ! download_dashboard_with_retry; then
+    echo ""
+    echo "========================================================================"
+    echo "⚠ ATTENTION: Le dashboard n'a pas pu être téléchargé"
+    echo "========================================================================"
+    echo ""
+    echo "L'installation peut continuer mais nginx_install.sh échouera."
+    echo "Suivez les instructions ci-dessus pour résoudre ce problème."
+    echo ""
+    log_error "Dashboard non téléchargé - nginx_install.sh échouera"
     
-    # Créer aussi les métadonnées pour le dashboard
-    cat > "$DASHBOARD_CACHE_DIR/metadata.json" << EOF
-{
-    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-    "version": "$MAXLINK_VERSION",
-    "branch": "$GITHUB_BRANCH",
-    "url": "$GITHUB_ARCHIVE_URL"
-}
-EOF
-else
-    echo "  ↦ Archive dashboard corrompue ✗"
-    log_error "Archive dashboard corrompue"
-    rm -f "$DASHBOARD_ARCHIVE"
+    # Demander si on continue
+    read -p "Continuer malgré l'absence du dashboard ? (o/N) : " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Oo]$ ]]; then
+        echo "Installation annulée."
+        restore_network_state
+        exit 1
+    fi
 fi
 
 # Nettoyage APT
@@ -659,16 +539,30 @@ send_progress 80 "Configuration du système..."
 echo "◦ Configuration du ventilateur..."
 log_info "Configuration du ventilateur"
 
-if [ -f "$CONFIG_FILE" ]; then
+# Chercher le fichier config.txt dans plusieurs emplacements possibles
+CONFIG_LOCATIONS=("/boot/config.txt" "/boot/firmware/config.txt")
+CONFIG_FILE=""
+
+for loc in "${CONFIG_LOCATIONS[@]}"; do
+    if [ -f "$loc" ]; then
+        CONFIG_FILE="$loc"
+        break
+    fi
+done
+
+if [ -n "$CONFIG_FILE" ]; then
     if ! grep -q "dtparam=fan_temp0" "$CONFIG_FILE"; then
         {
             echo ""
             echo "# Configuration ventilateur MaxLink"
             echo "dtparam=fan_temp0=$FAN_TEMP_MIN"
+            echo "dtparam=fan_temp0_hyst=2"
             echo "dtparam=fan_temp1=$FAN_TEMP_ACTIVATE"
+            echo "dtparam=fan_temp1_hyst=2"
             echo "dtparam=fan_temp2=$FAN_TEMP_MAX"
+            echo "dtparam=fan_temp2_hyst=5"
         } >> "$CONFIG_FILE"
-        echo "  ↦ Configuration ajoutée ✓"
+        echo "  ↦ Configuration ajoutée dans $CONFIG_FILE ✓"
         log_success "Configuration ventilateur ajoutée"
     else
         echo "  ↦ Configuration existante ✓"
@@ -676,7 +570,7 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
 else
     echo "  ↦ Fichier config.txt non trouvé ⚠"
-    log_warn "Fichier $CONFIG_FILE non trouvé"
+    log_warn "Fichier config.txt non trouvé dans les emplacements standards"
 fi
 
 # Personnalisation de l'interface
@@ -692,35 +586,45 @@ if [ -f "$BG_IMAGE_SOURCE" ]; then
     add_version_to_image "$BG_IMAGE_SOURCE" "$BG_IMAGE_DEST"
     echo "  ↦ Fond d'écran installé ✓"
 else
-    echo "  ↦ Fond d'écran source non trouvé ⚠"
-    log_warn "Fond d'écran source non trouvé: $BG_IMAGE_SOURCE"
+    echo "  ↦ Image source non trouvée ⚠"
+    log_warn "Image source non trouvée: $BG_IMAGE_SOURCE"
 fi
 
-# Configuration bureau LXDE
-if [ -d "$EFFECTIVE_USER_HOME/.config" ]; then
-    mkdir -p "$EFFECTIVE_USER_HOME/.config/pcmanfm/LXDE-pi"
+# Configuration du bureau pour l'utilisateur
+if [ -n "$EFFECTIVE_USER" ] && [ -d "$EFFECTIVE_USER_HOME" ]; then
+    echo ""
+    echo "◦ Configuration du bureau pour $EFFECTIVE_USER..."
     
-    cat > "$EFFECTIVE_USER_HOME/.config/pcmanfm/LXDE-pi/desktop-items-0.conf" << EOF
+    # Créer le répertoire de config si nécessaire
+    DESKTOP_CONFIG_DIR="$EFFECTIVE_USER_HOME/.config/pcmanfm/LXDE-pi"
+    mkdir -p "$DESKTOP_CONFIG_DIR"
+    chown -R $EFFECTIVE_USER:$EFFECTIVE_USER "$EFFECTIVE_USER_HOME/.config"
+    
+    # Configurer le fond d'écran
+    DESKTOP_CONFIG="$DESKTOP_CONFIG_DIR/desktop-items-0.conf"
+    if [ -f "$BG_IMAGE_DEST" ]; then
+        cat > "$DESKTOP_CONFIG" << EOF
 [*]
-wallpaper_mode=stretch
+wallpaper_mode=crop
 wallpaper_common=1
 wallpaper=$BG_IMAGE_DEST
 desktop_bg=$DESKTOP_BG_COLOR
 desktop_fg=$DESKTOP_FG_COLOR
 desktop_shadow=$DESKTOP_SHADOW_COLOR
-desktop_font=$DESKTOP_FONT
+desktop_font=Sans 10
 show_wm_menu=0
+sort_order=0
 show_documents=0
 show_trash=0
 show_mounts=0
 EOF
-    
-    chown -R $EFFECTIVE_USER:$EFFECTIVE_USER "$EFFECTIVE_USER_HOME/.config"
-    echo "  ↦ Bureau configuré ✓"
-    log_success "Configuration bureau LXDE appliquée"
+        chown $EFFECTIVE_USER:$EFFECTIVE_USER "$DESKTOP_CONFIG"
+        echo "  ↦ Bureau configuré ✓"
+        log_success "Configuration bureau appliquée"
+    fi
 fi
 
-send_progress 90 "Configuration terminée"
+send_progress 90 "Système configuré"
 echo ""
 sleep 2
 
@@ -735,57 +639,50 @@ echo ""
 
 send_progress 95 "Finalisation..."
 
+# Restaurer l'état réseau initial
+echo "◦ Restauration de la configuration réseau..."
+restore_network_state
+echo "  ↦ Configuration réseau restaurée ✓"
+
 # Réactiver les mises à jour automatiques
-echo "◦ Réactivation des mises à jour automatiques..."
+echo ""
+echo "◦ Réactivation des services système..."
 systemctl start apt-daily.timer 2>/dev/null || true
 systemctl start apt-daily-upgrade.timer 2>/dev/null || true
-echo "  ↦ Services de mise à jour réactivés ✓"
-log_info "Services de mise à jour réactivés"
+echo "  ↦ Services réactivés ✓"
 
-# Restaurer l'état réseau
+# Résumé final
 echo ""
-echo "◦ Restauration de l'état réseau..."
-restore_network_state
-echo "  ↦ État réseau restauré ✓"
-
-# MISE À JOUR DU STATUT DU SERVICE
-if [ -n "$SERVICE_ID" ]; then
-    echo ""
-    echo "◦ Mise à jour du statut du service..."
-    update_service_status "$SERVICE_ID" "active"
-    echo "  ↦ Statut du service mis à jour ✓"
-    log_info "Statut du service $SERVICE_ID mis à jour: active"
-fi
-
-send_progress 100 "Mise à jour terminée !"
-
+echo "========================================================================"
+echo "INSTALLATION TERMINÉE AVEC SUCCÈS"
+echo "========================================================================"
 echo ""
-echo "◦ Mise à jour terminée avec succès !"
-echo "  ↦ Version: v$MAXLINK_VERSION"
-echo "  ↦ Système à jour et configuré"
-echo "  ↦ Cache de paquets créé pour installation offline"
-echo "  ↦ Dashboard V3 téléchargé"
-log_success "Mise à jour système terminée - Version: v$MAXLINK_VERSION"
 
-# Afficher le résumé du cache
-echo ""
-echo "◦ Résumé du cache créé :"
-get_cache_stats
-
-# Vérifier si on doit faire un reboot
-if [ "$SKIP_REBOOT" != "true" ]; then
-    echo ""
-    echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
-    echo ""
-    
-    log_info "Redémarrage du système prévu dans 15 secondes"
-    sleep 15
-    
-    log_info "Redémarrage du système"
-    reboot
+# Vérifier spécifiquement le dashboard
+if [ -f "$DASHBOARD_ARCHIVE" ]; then
+    echo "✓ Système mis à jour"
+    echo "✓ Cache de paquets créé"
+    echo "✓ Dashboard téléchargé et vérifié"
+    echo "✓ Personnalisation appliquée"
+    log_success "Installation complète avec dashboard"
 else
-    echo ""
-    echo "  ↦ Redémarrage différé (installation complète en cours)"
-    echo ""
-    log_info "Redémarrage différé - SKIP_REBOOT=true"
+    echo "✓ Système mis à jour"
+    echo "✓ Cache de paquets créé"
+    echo "⚠ Dashboard NON téléchargé - nginx_install.sh échouera"
+    echo "✓ Personnalisation appliquée"
+    log_warn "Installation sans dashboard - nginx échouera"
 fi
+
+echo ""
+echo "Le système est prêt pour l'installation offline des composants."
+echo ""
+
+send_progress 100 "Installation terminée"
+log_success "Mise à jour système terminée"
+
+# Retourner un code d'erreur si le dashboard n'est pas téléchargé
+if [ ! -f "$DASHBOARD_ARCHIVE" ]; then
+    exit 2  # Code spécial pour indiquer succès partiel
+fi
+
+exit 0
