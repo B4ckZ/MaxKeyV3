@@ -1,0 +1,90 @@
+2025-06-16 14:10:21,083 - MaxLinkApp - INFO - ======================================================================
+2025-06-16 14:10:21,083 - MaxLinkApp - INFO - Démarrage de MaxLink Admin Panel (version simplifiée)
+2025-06-16 14:10:21,083 - MaxLinkApp - INFO - ======================================================================
+2025-06-16 14:10:21,083 - MaxLinkApp - INFO - Variables chargées: 60 variables
+2025-06-16 14:10:21,137 - MaxLinkApp - INFO - Initialisation de l'application MaxLink (version simplifiée)
+2025-06-16 14:10:21,144 - MaxLinkApp - INFO - Mode root: True
+2025-06-16 14:10:21,145 - MaxLinkApp - INFO - Services chargés: 6
+2025-06-16 14:10:21,189 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:10:21,190 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-06-16 14:10:21,191 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:10:21,191 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:10:21,191 - MaxLinkApp - DEBUG - Rafraîchissement des indicateurs effectué
+2025-06-16 14:10:21,191 - MaxLinkApp - INFO - Interface prête
+2025-06-16 14:10:23,191 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: rouge
+2025-06-16 14:10:23,191 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:10:23,191 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:10:23,191 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-06-16 14:10:23,192 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:10:23,192 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:10:23,192 - MaxLinkApp - DEBUG - Rafraîchissement des indicateurs effectué
+2025-06-16 14:10:23,523 - MaxLinkApp - INFO - Lancement de l'installation complète
+2025-06-16 14:10:25,012 - MaxLinkApp - INFO - Exécution du script: /media/prod/WERIT/scripts/install/full_install_install.sh
+2025-06-16 14:13:59,498 - MaxLinkApp - INFO - Signal de rafraîchissement reçu
+2025-06-16 14:13:59,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:13:59,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:13:59,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:13:59,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-06-16 14:13:59,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:13:59,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:13:59,699 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:13:59,699 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:13:59,699 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:13:59,699 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-06-16 14:13:59,699 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:13:59,699 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:14:57,407 - MaxLinkApp - INFO - Signal de rafraîchissement reçu
+2025-06-16 14:14:57,450 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:14:57,450 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:14:57,451 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:14:57,451 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:14:57,451 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:14:57,451 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:14:57,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:14:57,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:14:57,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:14:57,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:14:57,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-06-16 14:14:57,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:15:26,369 - MaxLinkApp - INFO - Signal de rafraîchissement reçu
+2025-06-16 14:15:26,469 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:15:26,469 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:15:26,469 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:15:26,469 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:15:26,469 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: vert
+2025-06-16 14:15:26,469 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:15:26,570 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:15:26,570 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:15:26,570 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:15:26,570 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:15:26,570 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: vert
+2025-06-16 14:15:26,570 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-06-16 14:15:38,540 - MaxLinkApp - INFO - Signal de rafraîchissement reçu
+2025-06-16 14:15:38,609 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:15:38,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:15:38,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:15:38,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:15:38,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: vert
+2025-06-16 14:15:38,610 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: vert
+2025-06-16 14:15:38,746 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:15:38,746 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:15:38,746 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:15:38,746 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:15:38,746 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: vert
+2025-06-16 14:15:38,747 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: vert
+2025-06-16 14:15:39,596 - MaxLinkApp - INFO - Installation terminée avec code: 0
+2025-06-16 14:15:39,596 - MaxLinkApp - INFO - Installation complète réussie
+2025-06-16 14:15:40,597 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: vert
+2025-06-16 14:15:40,597 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-06-16 14:15:40,597 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-06-16 14:15:40,597 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: vert
+2025-06-16 14:15:40,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: vert
+2025-06-16 14:15:40,598 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: vert

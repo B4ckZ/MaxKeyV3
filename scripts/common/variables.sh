@@ -1,186 +1,209 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - CONFIGURATION CENTRALE (VERSION NETTOYÉE)
-# Toutes les variables sans SSH/FileZilla
+# MAXLINK - VARIABLES GLOBALES (VERSION USB LOGS)
+# Version modifiée avec logs sur clé USB
 # ===============================================================================
 
 # ===============================================================================
-# INFORMATIONS GÉNÉRALES DU PROJET
+# INFORMATIONS DU PROJET
 # ===============================================================================
 
-# Version et informations de l'interface
-MAXLINK_VERSION="3"
-MAXLINK_COPYRIGHT="© 2025 WERIT. Tous droits réservés."
+export MAXLINK_VERSION="3.0.0"
+export MAXLINK_COPYRIGHT="© 2024 MaxLink Network System"
 
 # ===============================================================================
 # CONFIGURATION DE L'OVERLAY DE VERSION
 # ===============================================================================
 
-# Configuration de l'overlay de version sur le fond d'écran
-VERSION_OVERLAY_ENABLED=true                 # Activer/désactiver l'overlay
-VERSION_OVERLAY_FONT_SIZE=48                 # Taille de la police (pixels)
-VERSION_OVERLAY_FONT_COLOR="#FFFFFF"         # Couleur du texte (hex)
-VERSION_OVERLAY_SHADOW_COLOR="#000000"       # Couleur de l'ombre (hex)
-VERSION_OVERLAY_SHADOW_OPACITY=128           # Opacité de l'ombre (0-255)
-VERSION_OVERLAY_MARGIN_RIGHT=50              # Marge depuis le bord droit
-VERSION_OVERLAY_MARGIN_BOTTOM=50             # Marge depuis le bas
-VERSION_OVERLAY_FONT_BOLD=true               # Police en gras
-VERSION_OVERLAY_PREFIX="MaxLink "            # Préfixe avant la version
+export VERSION_OVERLAY_ENABLED="true"
+export VERSION_OVERLAY_FONT_SIZE="14"
+export VERSION_OVERLAY_FONT_COLOR="#FFFFFF"
+export VERSION_OVERLAY_SHADOW_COLOR="#000000"
+export VERSION_OVERLAY_SHADOW_OPACITY="0.5"
+export VERSION_OVERLAY_MARGIN_RIGHT="20"
+export VERSION_OVERLAY_MARGIN_BOTTOM="20"
+export VERSION_OVERLAY_FONT_BOLD="true"
+export VERSION_OVERLAY_PREFIX="MaxLink Network"
 
 # ===============================================================================
-# CONFIGURATION UTILISATEUR SYSTÈME
+# DÉTECTION DE BASE
 # ===============================================================================
 
-# Utilisateur principal du Raspberry Pi
-SYSTEM_USER="prod"
-SYSTEM_USER_HOME="/home/$SYSTEM_USER"
+# Déterminer BASE_DIR si pas déjà défini
+if [ -z "$BASE_DIR" ]; then
+    # Obtenir le répertoire du script actuel
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # BASE_DIR doit pointer vers la racine de la clé USB (3 niveaux au-dessus)
+    export BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
 
 # ===============================================================================
-# CONFIGURATION RÉSEAU WIFI
+# CONFIGURATION DES LOGS (NOUVELLE SECTION)
 # ===============================================================================
 
-# Réseau WiFi pour les mises à jour
-WIFI_SSID="Max"
-WIFI_PASSWORD="1234567890"
+# Détection automatique de la clé USB
+USB_MOUNT_POINT=$(df "$BASE_DIR" | tail -1 | awk '{print $6}')
 
-# Configuration du point d'accès WiFi
-AP_SSID="MaxLink-NETWORK"
-AP_PASSWORD="MDPsupersecret007"
-AP_IP="192.168.4.1"
-AP_NETMASK="24"
-AP_DHCP_START="192.168.4.10"
-AP_DHCP_END="192.168.4.100"
+# Dossier de logs sur la clé USB
+export USB_LOG_DIR="$USB_MOUNT_POINT/logs"
+export LOG_DIR="$USB_LOG_DIR"
+
+# Définir les chemins de logs directement dans le dossier logs
+export LOG_BASE="$USB_LOG_DIR"
+export LOG_SYSTEM="$LOG_BASE/system"
+export LOG_INSTALL="$LOG_BASE/install"
+export LOG_WIDGETS="$LOG_BASE/widgets"
+export LOG_PYTHON="$LOG_BASE/python"
+
+# Créer la structure des logs sur la clé USB
+mkdir -p "$LOG_SYSTEM" "$LOG_INSTALL" "$LOG_WIDGETS" "$LOG_PYTHON" 2>/dev/null || true
+
+# Configuration des logs par défaut
+export LOG_TO_CONSOLE_DEFAULT="true"
+export LOG_TO_FILE_DEFAULT="true"
+
+# ===============================================================================
+# UTILISATEURS SYSTÈME
+# ===============================================================================
+
+export SYSTEM_USER="prod"
+export SYSTEM_USER_HOME="/home/prod"
+
+# ===============================================================================
+# CONFIGURATION WIFI
+# ===============================================================================
+
+export WIFI_SSID="prodfloor"
+export WIFI_PASSWORD="proditec"
+
+# ===============================================================================
+# CONFIGURATION ACCESS POINT
+# ===============================================================================
+
+export AP_SSID="MaxLink-NETWORK"
+export AP_PASSWORD="maxlink2024"
+export AP_IP="192.168.4.1"
+export AP_NETMASK="255.255.255.0"
+export AP_DHCP_START="192.168.4.2"
+export AP_DHCP_END="192.168.4.20"
 
 # ===============================================================================
 # CONFIGURATION GITHUB
 # ===============================================================================
 
-# Configuration du dépôt GitHub pour le dashboard
-GITHUB_REPO_URL="https://github.com/B4ckZ/DashboardV3"
-GITHUB_BRANCH="main"
-GITHUB_DASHBOARD_DIR=""
-GITHUB_TOKEN=""
+export GITHUB_REPO_URL="https://github.com/Harvey13/Cp-terminal"
+export GITHUB_BRANCH="main"
+export GITHUB_DASHBOARD_DIR="DashBoardV1"
+export GITHUB_TOKEN=""
+
+# ===============================================================================
+# CONFIGURATION NGINX
+# ===============================================================================
+
+export NGINX_DASHBOARD_DIR="/var/www/html"
+export NGINX_DASHBOARD_DOMAIN="maxlink.local"
+export NGINX_PORT="80"
+
+# ===============================================================================
+# CONFIGURATION FAN CONTROL
+# ===============================================================================
+
+export FAN_TEMP_MIN="40"
+export FAN_TEMP_ACTIVATE="45"
+export FAN_TEMP_MAX="65"
 
 # ===============================================================================
 # CONFIGURATION MQTT
 # ===============================================================================
 
-# Configuration du broker MQTT
-MQTT_USER="mosquitto"
-MQTT_PASS="mqtt"
-MQTT_PORT="1883"
-MQTT_WEBSOCKET_PORT="9001"
+export MQTT_USER="mosquitto"
+export MQTT_PASS="mqtt"
+export MQTT_PORT="1883"
+export MQTT_WEBSOCKET_PORT="9001"
 
-# Topics MQTT à ignorer
-MQTT_IGNORED_TOPICS=(
-    "\$SYS/#"
-    "homeassistant/#"
-    "zigbee2mqtt/bridge/#"
-    "frigate/#"
+# Topics à ignorer dans les logs MQTT
+export MQTT_IGNORED_TOPICS=(
+    "rpi/wifi/quality"
+    "rpi/mqtt/stats"
+    "rpi/cpu/percent"
+)
+export MQTT_IGNORED_TOPICS_STRING=$(IFS='|'; echo "${MQTT_IGNORED_TOPICS[*]}")
+
+# ===============================================================================
+# FICHIERS DE CONFIGURATION
+# ===============================================================================
+
+export CONFIG_FILE="/etc/maxlink/maxlink.conf"
+
+# ===============================================================================
+# IMAGES ET PERSONNALISATION
+# ===============================================================================
+
+export BG_IMAGE_SOURCE_DIR="assets/images"
+export BG_IMAGE_FILENAME="bg.jpg"
+export BG_IMAGE_DEST_DIR="/usr/share/backgrounds"
+
+# Couleurs du bureau
+export DESKTOP_FONT="0xffffff"
+export DESKTOP_BG_COLOR="0x2e3440"
+export DESKTOP_FG_COLOR="0xd8dee9"
+export DESKTOP_SHADOW_COLOR="0x000000"
+
+# ===============================================================================
+# TIMEOUTS ET RETRY
+# ===============================================================================
+
+export NETWORK_TIMEOUT="10"
+export PING_COUNT="3"
+export APT_RETRY_MAX_ATTEMPTS="3"
+export APT_RETRY_DELAY="5"
+
+# ===============================================================================
+# SERVICES
+# ===============================================================================
+
+export SERVICES_LIST=(
+    "update:Update System:update_install.sh:Version 3.0:Mise à jour et personnalisation système"
+    "ap:Access Point:ap_install.sh:Version 1.0:Point d'accès WiFi MaxLink-NETWORK"
+    "nginx:Web Server:nginx_install.sh:Version 1.0:Serveur web pour dashboard"
+    "mqtt:MQTT Broker:mqtt_install.sh:Version 1.0:Broker MQTT Mosquitto"
+    "mqtt_wgs:MQTT Widgets:mqtt_wgs_install.sh:Version 1.0:Widgets MQTT pour monitoring"
+    "orchestrator:Orchestrateur:orchestrator_install.sh:Version 1.0:Orchestrateur de démarrage systemd"
 )
 
-# Convertir en string pour utilisation dans les configurations
-MQTT_IGNORED_TOPICS_STRING=$(IFS=','; echo "${MQTT_IGNORED_TOPICS[*]}")
-
-# ===============================================================================
-# CONFIGURATION NGINX ET DASHBOARD
-# ===============================================================================
-
-# Configuration du serveur web NGINX
-NGINX_DASHBOARD_DIR="/var/www/dashboard"
-NGINX_DASHBOARD_DOMAIN="maxlink.local"
-NGINX_PORT="80"
-
-# ===============================================================================
-# CONFIGURATION BUREAU ET AFFICHAGE
-# ===============================================================================
-
-# Image de fond d'écran
-BG_IMAGE_SOURCE_DIR="assets/bg.jpg"
-BG_IMAGE_FILENAME="fond_ecran_logo.png"
-BG_IMAGE_DEST_DIR="/usr/share/backgrounds"
-
-# Configuration du bureau LXDE
-DESKTOP_FONT="Roboto 11"
-DESKTOP_BG_COLOR="#2E3440"
-DESKTOP_FG_COLOR="#D8DEE9"
-DESKTOP_SHADOW_COLOR="#000000"
-
-# ===============================================================================
-# CONFIGURATION SYSTÈME
-# ===============================================================================
-
-# Fichier de configuration système
-CONFIG_FILE="/boot/config.txt"
-
-# Configuration des logs
-LOG_BASE="/var/log/maxlink"
-LOG_SYSTEM="$LOG_BASE/system"
-LOG_INSTALL="$LOG_BASE/install"
-LOG_WIDGETS="$LOG_BASE/widgets"
-LOG_PYTHON="$LOG_BASE/python"
-LOG_SSH="$LOG_BASE/ssh"
-
-# Configuration des logs par défaut
-LOG_TO_CONSOLE_DEFAULT=true
-LOG_TO_FILE_DEFAULT=true
-
-# ===============================================================================
-# CONFIGURATION RÉSEAU ET TIMEOUTS
-# ===============================================================================
-
-# Timeouts et tentatives réseau
-NETWORK_TIMEOUT=30
-PING_COUNT=3
-APT_RETRY_MAX_ATTEMPTS=3
-APT_RETRY_DELAY=5
-
-# ===============================================================================
-# CONFIGURATION MATÉRIEL
-# ===============================================================================
-
-# Gestion du ventilateur (températures en Celsius)
-FAN_TEMP_MIN=45
-FAN_TEMP_ACTIVATE=60
-FAN_TEMP_MAX=80
-
-# ===============================================================================
-# CONFIGURATION DES SERVICES
-# ===============================================================================
-
-# Liste des services gérés par MaxLink
-SERVICES_LIST=(
-    "mosquitto"          # Broker MQTT
-    "nginx"              # Serveur web
-    "hostapd"            # Point d'accès WiFi
-    "dnsmasq"            # Serveur DNS/DHCP
-    "maxlink-mqtt"       # Service MQTT MaxLink
-    "maxlink-fan"        # Contrôle du ventilateur
-    "maxlink-gpio"       # Gestion des GPIO
-    "maxlink-orchestrator" # Orchestrateur principal
-)
-
-# Fichier de statut des services
-SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
-SERVICES_STATUS_DIR="/var/lib/maxlink"
-
-# Créer le répertoire si nécessaire
-[ ! -d "$SERVICES_STATUS_DIR" ] && mkdir -p "$SERVICES_STATUS_DIR"
+export SERVICES_STATUS_DIR="/var/lib/maxlink"
+export SERVICES_STATUS_FILE="$SERVICES_STATUS_DIR/services_status.json"
 
 # ===============================================================================
 # FONCTIONS UTILITAIRES
 # ===============================================================================
 
-# Fonction pour mettre à jour le statut d'un service
+# Mettre à jour le statut d'un service
 update_service_status() {
     local service_id="$1"
-    local status="$2"  # "active" ou "inactive"
+    local status="$2"
     local message="${3:-}"
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     
+    # Créer le répertoire si nécessaire
+    mkdir -p "$SERVICES_STATUS_DIR"
+    
+    # Créer le fichier s'il n'existe pas
+    if [ ! -f "$SERVICES_STATUS_FILE" ]; then
+        echo "{}" > "$SERVICES_STATUS_FILE"
+    fi
+    
+    # Utiliser Python pour mettre à jour le JSON
     python3 -c "
 import json
-from datetime import datetime
+import sys
+
+service_id = '$service_id'
+status = '$status'
+message = '$message'
+timestamp = '$timestamp'
 
 try:
     with open('$SERVICES_STATUS_FILE', 'r') as f:
@@ -188,20 +211,23 @@ try:
 except:
     data = {}
 
-data['$service_id'] = {
-    'status': '$status',
-    'last_update': datetime.now().isoformat(),
-    'message': '$message'
+data[service_id] = {
+    'status': status,
+    'message': message,
+    'timestamp': timestamp
 }
 
 with open('$SERVICES_STATUS_FILE', 'w') as f:
     json.dump(data, f, indent=2)
 "
+    
+    # Log du changement de statut
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Service $service_id: $status - $message" >> "$LOG_SYSTEM/service_status.log"
 }
 
-# Détecter l'utilisateur effectif
+# Obtenir l'utilisateur effectif
 get_effective_user() {
-    if [ -n "$SUDO_USER" ]; then
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
         echo "$SUDO_USER"
     else
         echo "$SYSTEM_USER"
@@ -211,38 +237,45 @@ get_effective_user() {
 # Obtenir le home de l'utilisateur effectif
 get_effective_user_home() {
     local user=$(get_effective_user)
-    if [ "$user" = "root" ]; then
-        echo "/root"
-    else
-        echo "/home/$user"
-    fi
+    echo "/home/$user"
 }
 
-# Chemins dynamiques pour l'image de fond
+# Obtenir le chemin source de l'image de fond
 get_bg_image_source() {
     echo "$BASE_DIR/$BG_IMAGE_SOURCE_DIR/$BG_IMAGE_FILENAME"
 }
 
+# Obtenir le chemin destination de l'image de fond
 get_bg_image_dest() {
     echo "$BG_IMAGE_DEST_DIR/$BG_IMAGE_FILENAME"
 }
 
-# Validation de la configuration
+# ===============================================================================
+# VALIDATION DE LA CONFIGURATION
+# ===============================================================================
+
+# Valider la configuration
 validate_config() {
     local errors=0
     
-    # Vérifier les variables critiques
-    if [ -z "$SYSTEM_USER" ]; then
-        echo "ERREUR: SYSTEM_USER non défini"
+    # Vérifier les chemins critiques
+    if [ ! -d "$BASE_DIR" ]; then
+        echo "ERREUR: BASE_DIR ($BASE_DIR) n'existe pas"
         ((errors++))
     fi
     
-    if [ -z "$AP_SSID" ]; then
-        echo "ERREUR: AP_SSID non défini"
+    # Vérifier le point de montage USB
+    if [ -z "$USB_MOUNT_POINT" ]; then
+        echo "ERREUR: Impossible de détecter le point de montage USB"
         ((errors++))
     fi
     
-    # Vérifier format IP
+    # Vérifier l'utilisateur système
+    if ! id "$SYSTEM_USER" &>/dev/null; then
+        echo "ATTENTION: L'utilisateur système $SYSTEM_USER n'existe pas"
+    fi
+    
+    # Vérifier l'adresse IP AP
     if ! [[ "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         echo "ERREUR: AP_IP ($AP_IP) n'est pas une adresse IP valide"
         ((errors++))
@@ -288,6 +321,8 @@ export MQTT_USER MQTT_PASS MQTT_PORT MQTT_WEBSOCKET_PORT
 export MQTT_IGNORED_TOPICS MQTT_IGNORED_TOPICS_STRING
 export SERVICES_LIST
 export SERVICES_STATUS_FILE SERVICES_STATUS_DIR
+export USB_MOUNT_POINT USB_LOG_DIR LOG_DIR
+export LOG_BASE LOG_SYSTEM LOG_INSTALL LOG_WIDGETS LOG_PYTHON
 
 # Export de la fonction update_service_status
 export -f update_service_status

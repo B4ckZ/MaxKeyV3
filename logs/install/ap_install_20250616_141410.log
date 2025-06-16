@@ -1,0 +1,47 @@
+
+================================================================================
+DÉMARRAGE: ap_install
+Description: Installation du mode Access Point
+Date: Mon 16 Jun 14:14:10 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/WERIT
+Fichier de log: /media/prod/WERIT/logs/install/ap_install_20250616_141410.log
+================================================================================
+[2025-06-16 14:14:10] [INFO] [ap_install] Initialisation du logging pour ap_install
+[2025-06-16 14:14:10] [INFO] [ap_install] Installation du mode Access Point
+[2025-06-16 14:14:10] [INFO] [ap_install] ========== DÉBUT DE L'INSTALLATION AP ==========
+[2025-06-16 14:14:10] [INFO] [ap_install] Progression: 10% - Vérifications initiales
+[2025-06-16 14:14:10] [INFO] [ap_install] Privilèges root confirmés
+[2025-06-16 14:14:10] [INFO] [ap_install] Interface wlan0 disponible
+[2025-06-16 14:14:10] [INFO] [ap_install] NetworkManager actif
+[2025-06-16 14:14:12] [INFO] [ap_install] Progression: 25% - Installation des paquets
+[2025-06-16 14:14:12] [INFO] [ap_install] Installation hybride de Point d'accès
+[2025-06-16 14:14:12] [INFO] [ap_install] Point d'accès déjà installé
+[2025-06-16 14:14:12] [SUCCESS] [ap_install] Tous les paquets AP installés
+[2025-06-16 14:14:14] [INFO] [ap_install] Progression: 35% - Préparation du système
+[2025-06-16 14:14:14] [INFO] [ap_install] Configuration du resolv.conf
+[2025-06-16 14:14:14] [INFO] [ap_install] Protection du resolv.conf
+[2025-06-16 14:14:14] [CMD] [ap_install] Exécution: chattr +i /etc/resolv.conf 2>/dev/null || true
+[2025-06-16 14:14:14] [SUCCESS] [ap_install] Commande réussie (code: 0)
+[2025-06-16 14:14:14] [INFO] [ap_install] resolv.conf configuré avec succès
+[2025-06-16 14:14:14] [INFO] [ap_install] Désactivation des services DNS conflictuels
+[2025-06-16 14:14:14] [INFO] [ap_install] Nettoyage des connexions WiFi existantes
+[2025-06-16 14:14:14] [INFO] [ap_install] Déconnexion interface
+[2025-06-16 14:14:14] [CMD] [ap_install] Exécution: nmcli device disconnect wlan0 2>/dev/null || true
+[2025-06-16 14:14:14] [OUT] [ap_install] Device 'wlan0' successfully disconnected.
+[2025-06-16 14:14:14] [SUCCESS] [ap_install] Commande réussie (code: 0)
+[2025-06-16 14:14:14] [INFO] [ap_install] Suppression ancienne config AP
+[2025-06-16 14:14:14] [CMD] [ap_install] Exécution: nmcli connection delete 'MaxLink-NETWORK' 2>/dev/null || true
+[2025-06-16 14:14:14] [SUCCESS] [ap_install] Commande réussie (code: 0)
+[2025-06-16 14:14:14] [INFO] [ap_install] Configuration de NetworkManager pour dnsmasq
+[2025-06-16 14:14:14] [INFO] [ap_install] Sauvegarde config NetworkManager
+[2025-06-16 14:14:14] [CMD] [ap_install] Exécution: cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf.original
+[2025-06-16 14:14:14] [SUCCESS] [ap_install] Commande réussie (code: 0)
+[2025-06-16 14:14:14] [INFO] [ap_install] NetworkManager configuré avec succès
+[2025-06-16 14:14:16] [INFO] [ap_install] Progression: 50% - Configuration du point d'accès
+[2025-06-16 14:14:16] [INFO] [ap_install] Configuration AP - SSID: MaxLink-NETWORK, IP: 192.168.4.1/255.255.255.0, Canal: 6
+[2025-06-16 14:14:16] [INFO] [ap_install] Création profil AP
+[2025-06-16 14:14:16] [CMD] [ap_install] Exécution: nmcli connection add     type wifi     ifname wlan0     con-name 'MaxLink-NETWORK'     autoconnect yes     ssid 'MaxLink-NETWORK'     mode ap     802-11-wireless.band bg     802-11-wireless.channel 6     802-11-wireless-security.key-mgmt wpa-psk 	802-11-wireless-security.proto rsn 	802-11-wireless-security.pairwise ccmp 	802-11-wireless-security.group ccmp     802-11-wireless-security.psk 'maxlink2024'     ipv4.method shared     ipv4.addresses '192.168.4.1/255.255.255.0'     ipv6.method disabled
+[2025-06-16 14:14:16] [OUT] [ap_install] Error: failed to modify ipv4.addresses: invalid prefix '255.255.255.0'; <0-32> allowed.
+[2025-06-16 14:14:17] [ERROR] [ap_install] Commande échouée (code: 2)
+[2025-06-16 14:14:17] [ERROR] [ap_install] Échec de la création du profil AP

@@ -1,0 +1,16 @@
+
+================================================================================
+DÉMARRAGE: nginx_install
+Description: Installation Nginx et Dashboard (Mode Offline)
+Date: Mon 16 Jun 14:14:27 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/WERIT
+Fichier de log: /media/prod/WERIT/logs/install/nginx_install_20250616_141427.log
+================================================================================
+[2025-06-16 14:14:27] [INFO] [nginx_install] Initialisation du logging pour nginx_install
+[2025-06-16 14:14:27] [INFO] [nginx_install] Installation Nginx et Dashboard (Mode Offline)
+[2025-06-16 14:14:27] [INFO] [nginx_install] ========== DÉBUT DE L'INSTALLATION NGINX ET DASHBOARD (OFFLINE) ==========
+[2025-06-16 14:14:27] [INFO] [nginx_install] Progression: 5% - Vérifications initiales...
+[2025-06-16 14:14:27] [INFO] [nginx_install] Privilèges root confirmés
+[2025-06-16 14:14:27] [INFO] [nginx_install] Vérification du cache dashboard
+[2025-06-16 14:14:27] [ERROR] [nginx_install] Archive dashboard manquante: /var/cache/maxlink/dashboard/dashboard.tar.gz

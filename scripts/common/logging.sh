@@ -1,16 +1,32 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - MODULE DE LOGGING (VERSION INTERFACE)
-# Avec mode sans préfixe pour l'interface graphique
+# MAXLINK - MODULE DE LOGGING (VERSION USB)
+# Logs créés sur la clé USB pour faciliter le debug
 # ===============================================================================
 
 # ===============================================================================
 # VARIABLES GLOBALES
 # ===============================================================================
 
-# Définir les variables si pas déjà définies
-LOG_BASE="${LOG_BASE:-/var/log/maxlink}"
+# Vérifier si les variables USB sont définies
+if [ -z "$USB_LOG_DIR" ] || [ -z "$LOG_BASE" ]; then
+    # Fallback si variables.sh n'a pas été sourcé correctement
+    # Essayer de détecter la clé USB
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    USB_MOUNT_POINT=$(df "$SCRIPT_DIR" | tail -1 | awk '{print $6}')
+    
+    # Si on est sur une clé USB (contient 'media' dans le path)
+    if [[ "$USB_MOUNT_POINT" == *"/media/"* ]]; then
+        USB_LOG_DIR="$USB_MOUNT_POINT/logs"
+        LOG_BASE="$USB_LOG_DIR"
+    else
+        # Fallback sur /var/log si pas sur USB
+        LOG_BASE="/var/log/maxlink"
+    fi
+fi
+
+# Définir les sous-dossiers
 LOG_SYSTEM="${LOG_SYSTEM:-$LOG_BASE/system}"
 LOG_INSTALL="${LOG_INSTALL:-$LOG_BASE/install}"
 LOG_WIDGETS="${LOG_WIDGETS:-$LOG_BASE/widgets}"
@@ -35,7 +51,6 @@ LOG_CATEGORY="${LOG_CATEGORY:-system}"
 # Créer les répertoires s'ils n'existent pas
 create_log_directories() {
     local dirs=(
-        "$LOG_BASE"
         "$LOG_SYSTEM"
         "$LOG_INSTALL"
         "$LOG_WIDGETS"
@@ -44,8 +59,8 @@ create_log_directories() {
     
     for dir in "${dirs[@]}"; do
         if [ ! -d "$dir" ]; then
-            mkdir -p "$dir"
-            chmod 755 "$dir"
+            mkdir -p "$dir" 2>/dev/null || true
+            chmod 755 "$dir" 2>/dev/null || true
         fi
     done
 }
@@ -111,9 +126,11 @@ log() {
         echo "$formatted_message" >> "$SCRIPT_LOG"
     fi
     
-    # Toujours écrire les erreurs critiques dans syslog
+    # Toujours écrire les erreurs critiques dans syslog (si disponible)
     if [ "$level" = "CRITICAL" ] || [ "$level" = "ERROR" ]; then
-        logger -t "maxlink[$SCRIPT_NAME]" -p user.err "$message"
+        if command -v logger >/dev/null 2>&1; then
+            logger -t "maxlink[$SCRIPT_NAME]" -p user.err "$message" 2>/dev/null || true
+        fi
     fi
 }
 
@@ -244,6 +261,9 @@ init_logging() {
             ;;
     esac
     
+    # Créer le fichier de log
+    touch "$SCRIPT_LOG" 2>/dev/null || true
+    
     # Header dans le log (toujours dans le fichier, pas sur la console en mode interface)
     if [ "$INTERFACE_MODE" != "true" ] || [ "$LOG_TO_FILE" = true ]; then
         {
@@ -254,6 +274,7 @@ init_logging() {
             echo "Date: $(date)"
             echo "Utilisateur: $(whoami)"
             echo "Répertoire: $(pwd)"
+            echo "Fichier de log: $SCRIPT_LOG"
             echo "================================================================================"
         } >> "$SCRIPT_LOG"
     fi
