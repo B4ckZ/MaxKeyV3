@@ -1,9 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - LANCEUR DE L'INTERFACE D'ADMINISTRATION SIMPLIFIÉE
-# Script pour démarrer l'interface avec installation complète uniquement
-# Version 3.0 - © 2025 WERIT. Tous droits réservés.
+# MAXLINK - LANCEUR DE L'INTERFACE D'ADMINISTRATION
+# Script simplifié pour démarrer l'interface avec les privilèges root
 # ===============================================================================
 
 # Détection du répertoire de base
@@ -27,11 +26,9 @@ fi
 # Header d'accueil
 clear
 echo "========================================================================"
-echo "  MaxLink™ Admin Panel - Installation Complète"
+echo "  MaxLink™ Admin Panel"
 echo "  © 2025 WERIT. Tous droits réservés."
 echo "========================================================================"
-echo ""
-echo "  Version simplifiée avec installation complète uniquement"
 echo ""
 
 # Vérifications système
@@ -41,7 +38,7 @@ echo "◦ Vérifications système..."
 if ! command -v python3 &> /dev/null; then
     echo "  ↦ Python3 non installé ✗"
     echo ""
-    echo "Veuillez installer Python3 avant de continuer."
+    echo "Veuillez d'abord exécuter le script update_install.sh"
     echo ""
     exit 1
 fi
@@ -57,24 +54,12 @@ if [ ! -f "$SCRIPT_DIR/interface.py" ]; then
 fi
 echo "  ↦ Interface trouvée ✓"
 
-# Vérifier le script d'installation complète
-if [ ! -f "$SCRIPT_DIR/scripts/install/full_install_install.sh" ]; then
-    echo "  ↦ Script d'installation complète non trouvé ✗"
-    echo ""
-    echo "Fichier full_install_install.sh manquant"
-    echo ""
-    exit 1
-fi
-echo "  ↦ Script d'installation complète trouvé ✓"
-
-# Créer les répertoires nécessaires
+# Créer les répertoires de logs si nécessaire
 mkdir -p "$SCRIPT_DIR/logs/python" 2>/dev/null
-mkdir -p "/var/lib/maxlink" 2>/dev/null
 
 echo ""
-echo "◦ Démarrage de l'interface simplifiée..."
+echo "◦ Démarrage de l'interface..."
 echo "  ↦ Mode privilégié actif (root)"
-echo "  ↦ Installation complète disponible"
 echo "  ↦ Logs: $SCRIPT_DIR/logs/"
 echo ""
 
@@ -84,8 +69,7 @@ if [ -n "$DISPLAY" ] && [ -n "$SUDO_USER" ]; then
 fi
 
 # Petit délai avant le lancement
-echo "Lancement dans 3 secondes..."
-sleep 3
+sleep 5
 
 # Lancer l'interface Python
 cd "$SCRIPT_DIR"

@@ -1,215 +1,92 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - MODULE DE LOGGING (VERSION USB)
-# Logs créés sur la clé USB pour faciliter le debug
+# SYSTÈME DE LOGGING UNIFIÉ MAXLINK - VERSION SIMPLIFIÉE
+# Logs centralisés sur clé USB pour analyse externe
 # ===============================================================================
 
-# ===============================================================================
-# VARIABLES GLOBALES
-# ===============================================================================
-
-# Vérifier si les variables USB sont définies
-if [ -z "$USB_LOG_DIR" ] || [ -z "$LOG_BASE" ]; then
-    # Fallback si variables.sh n'a pas été sourcé correctement
-    # Essayer de détecter la clé USB
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    USB_MOUNT_POINT=$(df "$SCRIPT_DIR" | tail -1 | awk '{print $6}')
+# Détection automatique du répertoire de base
+if [ -z "$BASE_DIR" ]; then
+    CALLING_SCRIPT="${BASH_SOURCE[1]:-$0}"
+    SCRIPT_DIR="$(cd "$(dirname "$CALLING_SCRIPT")" && pwd)"
     
-    # Si on est sur une clé USB (contient 'media' dans le path)
-    if [[ "$USB_MOUNT_POINT" == *"/media/"* ]]; then
-        USB_LOG_DIR="$USB_MOUNT_POINT/logs"
-        LOG_BASE="$USB_LOG_DIR"
+    # Remonter jusqu'à trouver config.sh
+    TEMP_DIR="$SCRIPT_DIR"
+    while [ ! -f "$TEMP_DIR/config.sh" ] && [ "$TEMP_DIR" != "/" ]; do
+        TEMP_DIR="$(dirname "$TEMP_DIR")"
+    done
+    
+    if [ -f "$TEMP_DIR/config.sh" ]; then
+        BASE_DIR="$TEMP_DIR"
     else
-        # Fallback sur /var/log si pas sur USB
-        LOG_BASE="/var/log/maxlink"
+        BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
     fi
 fi
 
-# Définir les sous-dossiers
-LOG_SYSTEM="${LOG_SYSTEM:-$LOG_BASE/system}"
-LOG_INSTALL="${LOG_INSTALL:-$LOG_BASE/install}"
-LOG_WIDGETS="${LOG_WIDGETS:-$LOG_BASE/widgets}"
-LOG_PYTHON="${LOG_PYTHON:-$LOG_BASE/python}"
-
-# Configuration par défaut
-LOG_TO_CONSOLE="${LOG_TO_CONSOLE:-${LOG_TO_CONSOLE_DEFAULT:-true}}"
-LOG_TO_FILE="${LOG_TO_FILE:-${LOG_TO_FILE_DEFAULT:-true}}"
-
-# Mode interface - désactive le préfixe pour la console
-INTERFACE_MODE="${INTERFACE_MODE:-false}"
-
-# Variables de session
-SCRIPT_NAME="${SCRIPT_NAME:-unknown}"
-SCRIPT_LOG="${SCRIPT_LOG:-}"
-LOG_CATEGORY="${LOG_CATEGORY:-system}"
-
 # ===============================================================================
-# CRÉATION DES RÉPERTOIRES DE LOGS
+# CONFIGURATION
 # ===============================================================================
 
-# Créer les répertoires s'ils n'existent pas
-create_log_directories() {
-    local dirs=(
-        "$LOG_SYSTEM"
-        "$LOG_INSTALL"
-        "$LOG_WIDGETS"
-        "$LOG_PYTHON"
-    )
-    
-    for dir in "${dirs[@]}"; do
-        if [ ! -d "$dir" ]; then
-            mkdir -p "$dir" 2>/dev/null || true
-            chmod 755 "$dir" 2>/dev/null || true
-        fi
-    done
-}
+# Structure des logs sur la clé USB
+LOG_ROOT="$BASE_DIR/logs"
+LOG_INSTALL="$LOG_ROOT/install"
+LOG_WIDGETS="$LOG_ROOT/widgets"
+LOG_SYSTEM="$LOG_ROOT/system"
+LOG_PYTHON="$LOG_ROOT/python"
 
-# Appeler automatiquement la création des répertoires
-create_log_directories
+# Créer les répertoires
+mkdir -p "$LOG_INSTALL" "$LOG_WIDGETS" "$LOG_SYSTEM" "$LOG_PYTHON"
 
-# ===============================================================================
-# FONCTIONS DE FORMATAGE
-# ===============================================================================
+# Variables pour le script courant
+SCRIPT_NAME=""
+SCRIPT_LOG=""
+LOG_CATEGORY="system"
 
-# Obtenir le timestamp formaté
-get_timestamp() {
-    date '+%Y-%m-%d %H:%M:%S'
-}
-
-# Formater un message de log pour fichier (toujours avec préfixe)
-format_log_message() {
-    local level="$1"
-    local message="$2"
-    local timestamp=$(get_timestamp)
-    
-    # Format : [TIMESTAMP] [LEVEL] [SCRIPT] MESSAGE
-    echo "[$timestamp] [$level] [$SCRIPT_NAME] $message"
-}
+# Configuration d'affichage
+LOG_TO_CONSOLE=${LOG_TO_CONSOLE:-true}
+LOG_TO_FILE=${LOG_TO_FILE:-true}
 
 # ===============================================================================
-# FONCTIONS DE LOGGING PRINCIPALES
+# FONCTIONS PRINCIPALES
 # ===============================================================================
 
-# Fonction générique de logging
+# Fonction de logging principale
 log() {
     local level="$1"
     local message="$2"
-    local console_only="${3:-false}"
+    local show_console="${3:-$LOG_TO_CONSOLE}"
     
-    # Message formaté pour le fichier (toujours avec préfixe)
-    local formatted_message=$(format_log_message "$level" "$message")
+    # Format unifié : [YYYY-MM-DD HH:MM:SS] [NIVEAU] [SCRIPT] Message
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local log_entry="[$timestamp] [$level] [$SCRIPT_NAME] $message"
     
-    # Afficher sur la console si activé
-    if [ "$LOG_TO_CONSOLE" = true ]; then
-        # En mode interface, format simplifié sans couleurs
-        if [ "$INTERFACE_MODE" = "true" ]; then
-            # Format : [LEVEL] MESSAGE
-            if [ "$level" = "ERROR" ] || [ "$level" = "CRITICAL" ]; then
-                echo "[$level] $message" >&2
-            else
-                echo "[$level] $message"
-            fi
-        else
-            # Mode normal avec format complet
-            if [ "$level" = "ERROR" ] || [ "$level" = "CRITICAL" ]; then
-                echo "$formatted_message" >&2
-            else
-                echo "$formatted_message"
-            fi
-        fi
+    # Console (si demandé)
+    if [ "$show_console" = true ]; then
+        echo "[$level] $message"
     fi
     
-    # Écrire dans le fichier si activé et si le fichier est défini
-    # Toujours avec le format complet dans les fichiers
-    if [ "$LOG_TO_FILE" = true ] && [ -n "$SCRIPT_LOG" ] && [ "$console_only" = false ]; then
-        echo "$formatted_message" >> "$SCRIPT_LOG"
-    fi
-    
-    # Toujours écrire les erreurs critiques dans syslog (si disponible)
-    if [ "$level" = "CRITICAL" ] || [ "$level" = "ERROR" ]; then
-        if command -v logger >/dev/null 2>&1; then
-            logger -t "maxlink[$SCRIPT_NAME]" -p user.err "$message" 2>/dev/null || true
-        fi
+    # Fichier
+    if [ "$LOG_TO_FILE" = true ] && [ -n "$SCRIPT_LOG" ]; then
+        echo "$log_entry" >> "$SCRIPT_LOG"
     fi
 }
 
-# ===============================================================================
-# ALIAS DE LOGGING PAR NIVEAU
-# ===============================================================================
-
-log_debug() {
-    local message="$1"
-    local console_only="${2:-false}"
-    log "DEBUG" "$message" "$console_only"
-}
-
-log_info() {
-    local message="$1"
-    local console_only="${2:-false}"
-    log "INFO" "$message" "$console_only"
-}
-
-log_warn() {
-    local message="$1"
-    local console_only="${2:-false}"
-    log "WARN" "$message" "$console_only"
-}
-
-log_warning() {
-    log_warn "$1" "${2:-false}"
-}
-
-log_error() {
-    local message="$1"
-    local console_only="${2:-false}"
-    log "ERROR" "$message" "$console_only"
-}
-
-log_critical() {
-    local message="$1"
-    local console_only="${2:-false}"
-    log "CRITICAL" "$message" "$console_only"
-}
-
-log_success() {
-    local message="$1"
-    local console_only="${2:-false}"
-    log "SUCCESS" "$message" "$console_only"
-}
-
-# ===============================================================================
-# FONCTIONS UTILITAIRES
-# ===============================================================================
-
-# Logger une séparation
-log_separator() {
-    local char="${1:--}"
-    local width="${2:-80}"
-    local separator=$(printf "%${width}s" | tr ' ' "$char")
-    log "INFO" "$separator"
-}
-
-# Logger un header
-log_header() {
-    local title="$1"
-    log_separator "="
-    log "INFO" "$title"
-    log_separator "="
-}
+# Fonctions spécialisées
+log_info() { log "INFO" "$1" "${2:-$LOG_TO_CONSOLE}"; }
+log_warn() { log "WARN" "$1" "${2:-$LOG_TO_CONSOLE}"; }
+log_error() { log "ERROR" "$1" "${2:-$LOG_TO_CONSOLE}"; }
+log_success() { log "SUCCESS" "$1" "${2:-$LOG_TO_CONSOLE}"; }
+log_debug() { log "DEBUG" "$1" "${2:-false}"; }
 
 # Logger une commande et son résultat
 log_command() {
     local cmd="$1"
-    local description="${2:-}"
+    local desc="$2"
     
-    if [ -n "$description" ]; then
-        log "INFO" "$description"
-    fi
+    log "CMD" "Exécution: $desc"
+    log "CMD" "Commande: $cmd"
     
-    log "CMD" "Exécution: $cmd"
-    
-    # Exécuter la commande et capturer la sortie
+    # Exécuter et capturer
     local output
     local exit_code
     
@@ -223,12 +100,7 @@ log_command() {
         done
     fi
     
-    if [ $exit_code -eq 0 ]; then
-        log "SUCCESS" "Commande réussie (code: $exit_code)"
-    else
-        log "ERROR" "Commande échouée (code: $exit_code)"
-    fi
-    
+    log "CMD" "Code de sortie: $exit_code"
     return $exit_code
 }
 
@@ -261,69 +133,113 @@ init_logging() {
             ;;
     esac
     
-    # Créer le fichier de log
-    touch "$SCRIPT_LOG" 2>/dev/null || true
+    # Header dans le log
+    {
+        echo ""
+        echo "================================================================================"
+        echo "DÉMARRAGE: $SCRIPT_NAME"
+        [ -n "$script_description" ] && echo "Description: $script_description"
+        echo "Date: $(date)"
+        echo "Utilisateur: $(whoami)"
+        echo "Répertoire: $(pwd)"
+        echo "================================================================================"
+        echo ""
+    } >> "$SCRIPT_LOG"
     
-    # Header dans le log (toujours dans le fichier, pas sur la console en mode interface)
-    if [ "$INTERFACE_MODE" != "true" ] || [ "$LOG_TO_FILE" = true ]; then
-        {
-            echo ""
-            echo "================================================================================"
-            echo "DÉMARRAGE: $SCRIPT_NAME"
-            [ -n "$script_description" ] && echo "Description: $script_description"
-            echo "Date: $(date)"
-            echo "Utilisateur: $(whoami)"
-            echo "Répertoire: $(pwd)"
-            echo "Fichier de log: $SCRIPT_LOG"
-            echo "================================================================================"
-        } >> "$SCRIPT_LOG"
-    fi
-    
-    # Log initial
-    log_info "Initialisation du logging pour $SCRIPT_NAME"
-    [ -n "$script_description" ] && log_info "$script_description"
+    log_info "Script $SCRIPT_NAME initialisé"
 }
 
-# ===============================================================================
-# GESTION DES ERREURS
-# ===============================================================================
-
-# Définir un trap pour les erreurs
-setup_error_trap() {
-    trap 'log_error "Erreur détectée ligne $LINENO (code: $?)"' ERR
-}
-
-# Logger une sortie propre
-log_exit() {
+# Finaliser le logging
+finalize_logging() {
     local exit_code="${1:-0}"
-    local message="${2:-Script terminé}"
     
-    if [ $exit_code -eq 0 ]; then
-        log_success "$message"
-    else
-        log_error "$message (code: $exit_code)"
-    fi
+    log_info "Script $SCRIPT_NAME terminé avec le code $exit_code"
     
-    # Header de fin dans le fichier uniquement
-    if [ -n "$SCRIPT_LOG" ] && [ "$LOG_TO_FILE" = true ]; then
-        {
-            echo "================================================================================"
-            echo "FIN: $SCRIPT_NAME"
-            echo "Date: $(date)"
-            echo "Code de sortie: $exit_code"
-            echo "================================================================================"
-            echo ""
-        } >> "$SCRIPT_LOG"
-    fi
+    # Footer
+    {
+        echo ""
+        echo "================================================================================"
+        echo "FIN: $SCRIPT_NAME"
+        echo "Code de sortie: $exit_code"
+        echo "Durée: $SECONDS secondes"
+        echo "================================================================================"
+        echo ""
+    } >> "$SCRIPT_LOG"
 }
 
 # ===============================================================================
-# EXPORT DES FONCTIONS
+# FONCTIONS UTILITAIRES
 # ===============================================================================
 
-# Exporter toutes les fonctions pour les sous-shells
-export -f log
-export -f log_debug log_info log_warn log_warning log_error log_critical log_success
-export -f log_separator log_header log_command
-export -f get_timestamp format_log_message
-export -f init_logging setup_error_trap log_exit
+# Obtenir le chemin du log actuel
+get_current_log_path() {
+    echo "$SCRIPT_LOG"
+}
+
+# Lister tous les logs d'une catégorie
+list_logs() {
+    local category="${1:-all}"
+    
+    case "$category" in
+        install) ls -la "$LOG_INSTALL" 2>/dev/null ;;
+        widgets) ls -la "$LOG_WIDGETS" 2>/dev/null ;;
+        system)  ls -la "$LOG_SYSTEM" 2>/dev/null ;;
+        python)  ls -la "$LOG_PYTHON" 2>/dev/null ;;
+        all)     ls -la "$LOG_ROOT"/*/ 2>/dev/null ;;
+    esac
+}
+
+# Créer un fichier de log unifié pour Python
+create_python_logger_config() {
+    local module_name="$1"
+    local log_file="$LOG_PYTHON/${module_name}.log"
+    
+    cat > /tmp/maxlink_logger_config.py << EOF
+import logging
+import os
+
+# Configuration du logger pour $module_name
+log_file = "$log_file"
+os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+# Format identique aux scripts bash
+formatter = logging.Formatter(
+    '[%(asctime)s] [%(levelname)s] [$module_name] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Handler fichier
+file_handler = logging.FileHandler(log_file, mode='a')
+file_handler.setFormatter(formatter)
+
+# Handler console
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
+
+# Configuration du logger
+logger = logging.getLogger('$module_name')
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+EOF
+}
+
+# ===============================================================================
+# EXPORT DES VARIABLES ET FONCTIONS
+# ===============================================================================
+
+# Export des variables
+export LOG_ROOT LOG_INSTALL LOG_WIDGETS LOG_SYSTEM LOG_PYTHON
+
+# Export de TOUTES les fonctions pour qu'elles soient disponibles dans les scripts
+export -f log log_info log_warn log_error log_success log_debug
+export -f log_command
+export -f init_logging finalize_logging 
+export -f get_current_log_path list_logs create_python_logger_config
+
+# ===============================================================================
+# AUTO-FINALISATION
+# ===============================================================================
+
+# Trap pour capturer la fin du script automatiquement
+trap 'finalize_logging $?' EXIT
