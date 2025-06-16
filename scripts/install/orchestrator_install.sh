@@ -4,6 +4,7 @@
 # MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION CORRIGÉE)
 # Script d'installation avec mise à jour du statut et gestion SKIP_REBOOT
 # Ajout de la création du compte SSH administrateur
+# Ajout de la correction WiFi pour compatibilité ESP32
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -104,31 +105,25 @@ setup_ssh_admin_account() {
     
     send_progress 35 "Création du compte SSH administrateur..."
     
-    # Vérifier si l'utilisateur existe déjà
-    if id "$SSH_ADMIN_USER" &>/dev/null; then
-        echo "◦ L'utilisateur $SSH_ADMIN_USER existe déjà"
-        log_info "Utilisateur $SSH_ADMIN_USER existe déjà, mise à jour..."
+    # Créer l'utilisateur seulement s'il n'existe pas
+    if ! id "$SSH_ADMIN_USER" &>/dev/null; then
+        echo "◦ Création de l'utilisateur $SSH_ADMIN_USER..."
+        useradd -m -d "$SSH_ADMIN_HOME" -s "$SSH_ADMIN_SHELL" -c "MaxLink SSH Admin" "$SSH_ADMIN_USER"
         
-        # Supprimer l'utilisateur pour le recréer proprement
-        echo "  ↦ Suppression de l'ancien compte..."
-        userdel -r "$SSH_ADMIN_USER" 2>/dev/null || true
-        wait_silently 1
-    fi
-    
-    # Créer l'utilisateur avec home directory
-    echo "◦ Création de l'utilisateur $SSH_ADMIN_USER..."
-    useradd -m -d "$SSH_ADMIN_HOME" -s "$SSH_ADMIN_SHELL" -c "MaxLink SSH Admin" "$SSH_ADMIN_USER"
-    
-    if [ $? -eq 0 ]; then
-        echo "  ↦ Utilisateur créé ✓"
-        log_success "Utilisateur $SSH_ADMIN_USER créé"
+        if [ $? -eq 0 ]; then
+            echo "  ↦ Utilisateur créé ✓"
+            log_success "Utilisateur $SSH_ADMIN_USER créé"
+        else
+            echo "  ↦ Erreur lors de la création de l'utilisateur ✗"
+            log_error "Impossible de créer l'utilisateur $SSH_ADMIN_USER"
+            return 1
+        fi
     else
-        echo "  ↦ Erreur lors de la création de l'utilisateur ✗"
-        log_error "Impossible de créer l'utilisateur $SSH_ADMIN_USER"
-        return 1
+        echo "◦ L'utilisateur $SSH_ADMIN_USER existe déjà"
+        log_info "Configuration de l'utilisateur existant"
     fi
     
-    # Définir le mot de passe
+    # Définir/Redéfinir le mot de passe
     echo "◦ Configuration du mot de passe..."
     echo "$SSH_ADMIN_USER:$SSH_ADMIN_PASS" | chpasswd
     
@@ -137,193 +132,343 @@ setup_ssh_admin_account() {
         log_success "Mot de passe configuré pour $SSH_ADMIN_USER"
     else
         echo "  ↦ Erreur lors de la configuration du mot de passe ✗"
-        log_error "Impossible de configurer le mot de passe"
+        log_error "Impossible de définir le mot de passe"
         return 1
     fi
     
-    # Ajouter aux groupes nécessaires
-    echo "◦ Ajout aux groupes système..."
+    # Ajouter aux groupes système (y compris root pour accès complet)
+    echo "◦ Configuration des groupes système..."
+    
+    # Ajouter au groupe sudo en premier (essentiel)
+    usermod -aG sudo "$SSH_ADMIN_USER"
+    
+    # Ajouter aux autres groupes
     for group in $(echo $SSH_ADMIN_GROUPS | tr ',' ' '); do
-        usermod -a -G "$group" "$SSH_ADMIN_USER" 2>/dev/null && \
-            echo "  ↦ Ajouté au groupe $group ✓" || \
-            echo "  ↦ Groupe $group ignoré (n'existe pas)"
+        if getent group "$group" >/dev/null 2>&1; then
+            usermod -aG "$group" "$SSH_ADMIN_USER" 2>/dev/null
+            echo "  ↦ Ajouté au groupe $group ✓"
+        fi
     done
-    log_success "Utilisateur ajouté aux groupes: $SSH_ADMIN_GROUPS"
     
-    # Configuration sudo sans mot de passe
-    echo "◦ Configuration des privilèges sudo..."
-    cat > "/etc/sudoers.d/50-$SSH_ADMIN_USER" <<EOF
-# MaxLink SSH Admin - Full sudo access without password
-$SSH_ADMIN_USER ALL=(ALL) NOPASSWD: ALL
+    # Ajouter au groupe root pour accès complet
+    usermod -aG root "$SSH_ADMIN_USER"
+    echo "  ↦ Ajouté au groupe root pour accès complet ✓"
+    
+    log_success "Utilisateur ajouté aux groupes système"
+    
+    # Configuration sudo SANS mot de passe - IMPORTANT pour accès complet
+    echo "◦ Configuration des privilèges sudo (accès complet)..."
+    
+    # Créer le fichier sudoers avec priorité élevée
+    cat > "/etc/sudoers.d/00-$SSH_ADMIN_USER" <<EOF
+# MaxLink SSH Admin - Accès complet sans restriction
+$SSH_ADMIN_USER ALL=(ALL:ALL) NOPASSWD:ALL
 EOF
-    chmod 440 "/etc/sudoers.d/50-$SSH_ADMIN_USER"
-    echo "  ↦ Privilèges sudo configurés (NOPASSWD) ✓"
-    log_success "Privilèges sudo configurés pour $SSH_ADMIN_USER"
     
-    # Créer le répertoire de logs
-    if [ "$SSH_ADMIN_ENABLE_LOGGING" = true ]; then
-        echo "◦ Configuration du logging SSH..."
-        mkdir -p "$SSH_ADMIN_LOG_DIR"
-        touch "$SSH_ADMIN_LOG_FILE"
-        touch "$SSH_ADMIN_AUDIT_FILE"
-        chmod 750 "$SSH_ADMIN_LOG_DIR"
-        chown root:adm "$SSH_ADMIN_LOG_DIR"
-        chmod 640 "$SSH_ADMIN_LOG_FILE" "$SSH_ADMIN_AUDIT_FILE"
-        chown root:adm "$SSH_ADMIN_LOG_FILE" "$SSH_ADMIN_AUDIT_FILE"
-        echo "  ↦ Répertoire de logs créé ✓"
-        log_success "Logging SSH configuré dans $SSH_ADMIN_LOG_DIR"
-    fi
+    chmod 440 "/etc/sudoers.d/00-$SSH_ADMIN_USER"
+    echo "  ↦ Privilèges sudo COMPLETS configurés (NOPASSWD) ✓"
+    log_success "Accès superadmin configuré pour $SSH_ADMIN_USER"
     
-    # Configurer le logging des connexions SSH
-    if [ "$SSH_ADMIN_ENABLE_LOGGING" = true ]; then
-        echo "◦ Configuration du logging des connexions..."
+    # Configuration SSH
+    echo "◦ Configuration SSH..."
+    
+    # S'assurer que le service SSH accepte les connexions par mot de passe
+    if [ -f /etc/ssh/sshd_config ]; then
+        # Backup
+        cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S)
         
-        # Ajouter au .bashrc pour logger les connexions
-        cat >> "$SSH_ADMIN_HOME/.bashrc" <<'EOF'
-
-# MaxLink SSH Admin Logging
-if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] SSH Login: $USER from ${SSH_CLIENT%% *} (TTY: $(tty))" >> /var/log/maxlink/ssh_admin/access.log
-fi
-
-# Activer l'historique des commandes avec timestamp
-export HISTTIMEFORMAT="[%Y-%m-%d %H:%M:%S] "
-export HISTFILE="$HOME/.bash_history"
-export HISTSIZE=10000
-export HISTFILESIZE=20000
-shopt -s histappend
-EOF
-        chown "$SSH_ADMIN_USER:$SSH_ADMIN_USER" "$SSH_ADMIN_HOME/.bashrc"
-        echo "  ↦ Logging des connexions configuré ✓"
-    fi
-    
-    # Configurer l'audit des commandes sudo
-    if [ "$SSH_ADMIN_ENABLE_AUDIT" = true ]; then
-        echo "◦ Configuration de l'audit sudo..."
+        # Activer l'authentification par mot de passe
+        sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+        sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+        sed -i 's/^#*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+        sed -i 's/^#*ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+        sed -i 's/^#*UsePAM.*/UsePAM yes/' /etc/ssh/sshd_config
         
-        # Créer un wrapper pour sudo avec logging
-        cat > "/usr/local/bin/sudo-audit" <<'EOF'
-#!/bin/bash
-# MaxLink Sudo Audit Wrapper
-
-AUDIT_LOG="/var/log/maxlink/ssh_admin/audit.log"
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-REAL_USER="${SUDO_USER:-$USER}"
-COMMAND="$@"
-
-# Logger la commande
-echo "[$TIMESTAMP] User: $REAL_USER | Command: sudo $COMMAND" >> "$AUDIT_LOG"
-
-# Exécuter la vraie commande sudo
-/usr/bin/sudo "$@"
-EOF
+        # Supprimer toute configuration Match User existante pour notre utilisateur
+        sed -i "/^Match User $SSH_ADMIN_USER/,/^Match\|^$/d" /etc/ssh/sshd_config
         
-        chmod 755 /usr/local/bin/sudo-audit
-        
-        # Ajouter l'alias dans .bashrc
-        echo 'alias sudo="/usr/local/bin/sudo-audit"' >> "$SSH_ADMIN_HOME/.bashrc"
-        
-        echo "  ↦ Audit des commandes sudo configuré ✓"
-        log_success "Audit sudo configuré"
-    fi
-    
-    # Configuration SSH pour s'assurer que l'authentification par mot de passe est activée
-    echo "◦ Configuration du service SSH..."
-    
-    # Backup de la config SSH
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S)
-    
-    # S'assurer que l'authentification par mot de passe est activée
-    sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-    sed -i 's/^#*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-    
-    # Ajouter une configuration spécifique pour notre utilisateur
-    if ! grep -q "Match User $SSH_ADMIN_USER" /etc/ssh/sshd_config; then
+        # Configuration spécifique pour l'utilisateur avec accès complet
         cat >> /etc/ssh/sshd_config <<EOF
 
-# MaxLink SSH Admin Configuration
+# MaxLink SSH Admin - Accès SuperAdmin complet
 Match User $SSH_ADMIN_USER
     PasswordAuthentication yes
+    PubkeyAuthentication yes
     AllowTcpForwarding yes
-    X11Forwarding no
-    PermitTunnel no
+    X11Forwarding yes
+    PermitTunnel yes
+    AllowAgentForwarding yes
+    PermitTTY yes
+    ForceCommand none
+    AllowStreamLocalForwarding yes
+    PermitUserEnvironment yes
 EOF
+        
+        # Redémarrer SSH
+        systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
+        echo "  ↦ Service SSH configuré et redémarré ✓"
     fi
     
-    echo "  ↦ Configuration SSH mise à jour ✓"
-    
-    # Redémarrer le service SSH
-    systemctl restart ssh || systemctl restart sshd
-    echo "  ↦ Service SSH redémarré ✓"
-    log_success "Service SSH configuré et redémarré"
-    
-    # Créer un fichier .ssh/authorized_keys vide pour futures clés
+    # Créer le répertoire .ssh
     mkdir -p "$SSH_ADMIN_HOME/.ssh"
     touch "$SSH_ADMIN_HOME/.ssh/authorized_keys"
     chmod 700 "$SSH_ADMIN_HOME/.ssh"
     chmod 600 "$SSH_ADMIN_HOME/.ssh/authorized_keys"
     chown -R "$SSH_ADMIN_USER:$SSH_ADMIN_USER" "$SSH_ADMIN_HOME/.ssh"
     
-    # Définir les permissions sur les répertoires importants
-    echo "◦ Configuration des permissions..."
+    # Configuration des permissions pour accès complet au dashboard et système
+    echo "◦ Configuration des permissions d'accès..."
     
-    # Dashboard nginx
-    usermod -a -G www-data "$SSH_ADMIN_USER"
-    setfacl -R -m u:$SSH_ADMIN_USER:rwx "$NGINX_DASHBOARD_DIR" 2>/dev/null || \
+    # Dashboard NGINX - Accès complet en lecture/écriture
+    if [ -n "$NGINX_DASHBOARD_DIR" ] && [ -d "$NGINX_DASHBOARD_DIR" ]; then
+        # Ajouter l'utilisateur au groupe www-data si pas déjà fait
+        usermod -aG www-data "$SSH_ADMIN_USER" 2>/dev/null
+        
+        # Permissions récursives sur le dashboard
+        chown -R www-data:www-data "$NGINX_DASHBOARD_DIR"
         chmod -R 775 "$NGINX_DASHBOARD_DIR"
+        
+        # S'assurer que les nouveaux fichiers héritent des permissions du groupe
+        find "$NGINX_DASHBOARD_DIR" -type d -exec chmod g+s {} \; 2>/dev/null
+        
+        # Utiliser ACL si disponible pour garantir l'accès
+        if command -v setfacl >/dev/null 2>&1; then
+            setfacl -R -m u:$SSH_ADMIN_USER:rwx "$NGINX_DASHBOARD_DIR" 2>/dev/null
+            setfacl -R -d -m u:$SSH_ADMIN_USER:rwx "$NGINX_DASHBOARD_DIR" 2>/dev/null
+        fi
+        
+        echo "  ↦ Accès complet au dashboard configuré ✓"
+    else
+        echo "  ↦ Dashboard non trouvé, sera configuré plus tard"
+    fi
     
-    # Répertoire MaxLink
-    setfacl -R -m u:$SSH_ADMIN_USER:rwx /opt/maxlink 2>/dev/null || \
+    # Répertoire MaxLink - Accès complet
+    if [ -d "/opt/maxlink" ]; then
         chmod -R 775 /opt/maxlink
+        # Permettre à l'utilisateur de modifier
+        if command -v setfacl >/dev/null 2>&1; then
+            setfacl -R -m u:$SSH_ADMIN_USER:rwx /opt/maxlink 2>/dev/null
+            setfacl -R -d -m u:$SSH_ADMIN_USER:rwx /opt/maxlink 2>/dev/null
+        fi
+        echo "  ↦ Accès complet à /opt/maxlink configuré ✓"
+    fi
     
-    # Logs
-    setfacl -R -m u:$SSH_ADMIN_USER:r /var/log 2>/dev/null || true
+    # Créer un lien symbolique vers le dashboard dans le home si possible
+    if [ -n "$NGINX_DASHBOARD_DIR" ] && [ -d "$NGINX_DASHBOARD_DIR" ]; then
+        ln -sf "$NGINX_DASHBOARD_DIR" "$SSH_ADMIN_HOME/dashboard" 2>/dev/null
+        chown -h "$SSH_ADMIN_USER:$SSH_ADMIN_USER" "$SSH_ADMIN_HOME/dashboard" 2>/dev/null
+        echo "  ↦ Lien symbolique vers dashboard créé ✓"
+    fi
     
-    echo "  ↦ Permissions configurées ✓"
+    # Accès aux logs
+    usermod -aG adm "$SSH_ADMIN_USER" 2>/dev/null
+    usermod -aG systemd-journal "$SSH_ADMIN_USER" 2>/dev/null
+    echo "  ↦ Accès aux logs système configuré ✓"
     
-    # Créer un script de test de connexion
-    cat > "/usr/local/bin/test-ssh-admin" <<EOF
+    # Créer les répertoires de logs MaxLink si configurés
+    if [ "$SSH_ADMIN_ENABLE_LOGGING" = true ]; then
+        mkdir -p "$SSH_ADMIN_LOG_DIR"
+        touch "$SSH_ADMIN_LOG_FILE"
+        touch "$SSH_ADMIN_AUDIT_FILE"
+        chmod 750 "$SSH_ADMIN_LOG_DIR"
+        chmod 640 "$SSH_ADMIN_LOG_FILE" "$SSH_ADMIN_AUDIT_FILE"
+        chown -R "$SSH_ADMIN_USER:adm" "$SSH_ADMIN_LOG_DIR"
+        echo "  ↦ Logs SSH configurés ✓"
+    fi
+    
+# Configuration du shell (.bashrc)
+    echo "◦ Configuration de l'environnement utilisateur..."
+    
+    # S'assurer que le .bashrc existe
+    if [ ! -f "$SSH_ADMIN_HOME/.bashrc" ]; then
+        cp /etc/skel/.bashrc "$SSH_ADMIN_HOME/.bashrc" 2>/dev/null || touch "$SSH_ADMIN_HOME/.bashrc"
+    fi
+    
+    # Supprimer toute configuration MaxLink existante
+    sed -i '/# MaxLink SSH Admin Configuration/,/# End MaxLink Configuration/d' "$SSH_ADMIN_HOME/.bashrc" 2>/dev/null
+    
+    # Ajouter la nouvelle configuration MaxLink
+    cat >> "$SSH_ADMIN_HOME/.bashrc" <<'EOF'
+
+# MaxLink SSH Admin Configuration
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export EDITOR=nano
+
+# Variables d'environnement MaxLink
+export MAXLINK_HOME="/opt/maxlink"
+export DASHBOARD_DIR="/var/www/html/dashboard"
+
+# Alias utiles
+alias ll='ls -la'
+alias maxlink-status='sudo maxlink-orchestrator status'
+alias maxlink-logs='sudo journalctl -u "maxlink-*" -f'
+alias dashboard='cd $DASHBOARD_DIR 2>/dev/null || cd /var/www/html'
+alias maxlink='cd $MAXLINK_HOME'
+
+# Fonctions utiles
+restart-ap() {
+    echo "Redémarrage du point d'accès WiFi..."
+    sudo systemctl restart hostapd
+    sudo nmcli con up "MaxLink-NETWORK"
+}
+
+# Message de bienvenue
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+    echo "=================================================="
+    echo " Bienvenue sur MaxLink System"
+    echo " Utilisateur: $USER (Accès SuperAdmin)"
+    echo "=================================================="
+    echo ""
+    echo "Commandes rapides:"
+    echo "  • dashboard    : Aller au répertoire dashboard"
+    echo "  • maxlink      : Aller au répertoire MaxLink"
+    echo "  • maxlink-status : État du système"
+    echo "  • maxlink-logs : Logs en temps réel"
+    echo ""
+fi
+
+# Historique amélioré
+export HISTTIMEFORMAT="[%Y-%m-%d %H:%M:%S] "
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+shopt -s histappend
+
+# Auto-complétion améliorée
+if [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+fi
+
+# End MaxLink Configuration
+EOF
+    
+    chown "$SSH_ADMIN_USER:$SSH_ADMIN_USER" "$SSH_ADMIN_HOME/.bashrc"
+    chmod 644 "$SSH_ADMIN_HOME/.bashrc"
+    
+    # Créer un script de test/info
+    cat > /usr/local/bin/test-ssh-admin <<EOF
 #!/bin/bash
-echo "Test de connexion SSH pour $SSH_ADMIN_USER"
-echo "=================================="
-echo "Utilisateur: $SSH_ADMIN_USER"
-echo "Mot de passe: $SSH_ADMIN_PASS"
-echo "Connexion SSH: ssh $SSH_ADMIN_USER@\$(hostname -I | awk '{print \$1}')"
-echo "Connexion SFTP: sftp://$SSH_ADMIN_USER@\$(hostname -I | awk '{print \$1}')"
+echo "========================================"
+echo "INFORMATIONS COMPTE SSH ADMINISTRATEUR"
+echo "========================================"
 echo ""
-echo "Répertoires accessibles:"
-echo "  - Dashboard: $NGINX_DASHBOARD_DIR"
-echo "  - MaxLink: /opt/maxlink"
-echo "  - Logs: $SSH_ADMIN_LOG_DIR"
+echo "Utilisateur : $SSH_ADMIN_USER"
+echo "Mot de passe : $SSH_ADMIN_PASS"
+echo "Home : $SSH_ADMIN_HOME"
 echo ""
-echo "Groupes: \$(groups $SSH_ADMIN_USER | cut -d: -f2)"
-echo "=================================="
+echo "Connexions :"
+echo "  • SSH : ssh $SSH_ADMIN_USER@$AP_IP"
+echo "  • SFTP : sftp://$SSH_ADMIN_USER@$AP_IP"
+echo "  • FileZilla : Hôte=$AP_IP, User=$SSH_ADMIN_USER, Pass=$SSH_ADMIN_PASS, Port=22"
+echo ""
+echo "Permissions :"
+echo "  • Accès sudo complet (NOPASSWD)"
+echo "  • Dashboard : $NGINX_DASHBOARD_DIR (lecture/écriture)"
+echo "  • MaxLink : /opt/maxlink (lecture/écriture)"
+echo "  • Logs : /var/log (lecture)"
+echo ""
+echo "Groupes : \$(groups $SSH_ADMIN_USER)"
+echo ""
+echo "État SSH : \$(systemctl is-active ssh || systemctl is-active sshd)"
+echo "========================================"
 EOF
     chmod 755 /usr/local/bin/test-ssh-admin
     
+    # Afficher le résumé
     echo ""
     echo "========================================================================"
     echo "✓ COMPTE SSH ADMINISTRATEUR CRÉÉ AVEC SUCCÈS"
     echo "========================================================================"
-    echo "Utilisateur: $SSH_ADMIN_USER"
-    echo "Mot de passe: $SSH_ADMIN_PASS"
-    echo "Accès: SSH/SFTP avec privilèges sudo complets (NOPASSWD)"
-    echo "Logs: $SSH_ADMIN_LOG_DIR"
     echo ""
-    echo "Pour tester: sudo /usr/local/bin/test-ssh-admin"
+    echo "ACCÈS SUPERADMIN COMPLET CONFIGURÉ !"
+    echo ""
+    echo "Connexion SSH/SFTP :"
+    echo "  • Utilisateur : $SSH_ADMIN_USER"
+    echo "  • Mot de passe : $SSH_ADMIN_PASS"
+    echo "  • Adresse : $AP_IP"
+    echo ""
+    echo "FileZilla :"
+    echo "  • Protocole : SFTP"
+    echo "  • Hôte : $AP_IP"
+    echo "  • Port : 22"
+    echo "  • Type : Normal"
+    echo ""
+    echo "Permissions complètes sur :"
+    echo "  • $NGINX_DASHBOARD_DIR (Dashboard)"
+    echo "  • /opt/maxlink (Système)"
+    echo "  • Accès sudo sans mot de passe"
+    echo ""
+    echo "Test : sudo test-ssh-admin"
     echo "========================================================================"
     
-    log_success "Compte SSH administrateur $SSH_ADMIN_USER créé avec succès"
-    
-    # Créer une entrée de log initiale
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Compte SSH Admin créé par l'installation MaxLink" > "$SSH_ADMIN_LOG_FILE"
+    log_success "Compte SSH administrateur configuré avec accès COMPLET"
     
     return 0
 }
 
 # ===============================================================================
-# FONCTIONS EXISTANTES (inchangées)
+# FONCTION : CORRECTION WIFI POUR ESP32
+# ===============================================================================
+
+fix_wifi_for_esp32() {
+    echo ""
+    echo "========================================================================"
+    echo "CORRECTION DE LA CONFIGURATION WIFI POUR ESP32"
+    echo "========================================================================"
+    
+    send_progress 40 "Correction WiFi pour compatibilité ESP32..."
+    
+    # Vérifier que la connexion AP existe
+    echo "◦ Vérification de la connexion AP..."
+    if ! nmcli con show "$AP_SSID" &>/dev/null; then
+        echo "  ⚠ Connexion AP '$AP_SSID' non trouvée"
+        log_warn "Connexion AP non trouvée, correction ignorée"
+        return 0
+    fi
+    
+    echo "  ↦ Connexion AP trouvée ✓"
+    log_info "Configuration de la connexion AP pour compatibilité ESP32"
+    
+    # Forcer la configuration WPA2
+    echo "◦ Application de la configuration WPA2..."
+    
+    # Configurer le mode de gestion des clés
+    if nmcli connection modify "$AP_SSID" 802-11-wireless-security.key-mgmt wpa-psk 2>/dev/null; then
+        echo "  ↦ Mode de gestion des clés configuré ✓"
+        log_success "key-mgmt configuré en wpa-psk"
+    else
+        echo "  ⚠ Erreur lors de la configuration key-mgmt"
+        log_error "Impossible de configurer key-mgmt"
+    fi
+    
+    # Configurer le protocole RSN (WPA2)
+    if nmcli connection modify "$AP_SSID" 802-11-wireless-security.proto rsn 2>/dev/null; then
+        echo "  ↦ Protocole RSN (WPA2) configuré ✓"
+        log_success "Protocole configuré en RSN (WPA2)"
+    else
+        echo "  ⚠ Erreur lors de la configuration du protocole"
+        log_error "Impossible de configurer le protocole RSN"
+    fi
+    
+    # Redémarrer la connexion si elle est active
+    if nmcli con show --active | grep -q "$AP_SSID"; then
+        echo "◦ Redémarrage de la connexion AP..."
+        nmcli con down "$AP_SSID" 2>/dev/null
+        wait_silently 2
+        nmcli con up "$AP_SSID" 2>/dev/null
+        echo "  ↦ Connexion AP redémarrée ✓"
+        log_info "Connexion AP redémarrée avec la nouvelle configuration"
+    fi
+    
+    echo ""
+    echo "✓ Configuration WiFi corrigée pour compatibilité ESP32"
+    echo ""
+    log_success "Configuration WiFi ESP32 terminée"
+    
+    return 0
+}
+
+# ===============================================================================
+# FONCTIONS D'INFRASTRUCTURE D'ORCHESTRATION
 # ===============================================================================
 
 # Créer les scripts de healthcheck
@@ -361,19 +506,25 @@ EOF
     cat > /usr/local/bin/maxlink-check-widgets <<'EOF'
 #!/bin/bash
 # Vérifier que tous les services de widgets sont actifs
-WIDGET_SERVICES=$(systemctl list-units --type=service --all | grep -E "maxlink.*widget.*\.service" | awk '{print $1}')
-
+WIDGET_SERVICES=$(systemctl list-units --type=service --all | grep -E "maxlink.*widget.service" | awk '{print $1}')
 if [ -z "$WIDGET_SERVICES" ]; then
-    # Pas de widgets, considérer comme prêt
+    # Pas de widgets, c'est OK
     exit 0
 fi
 
+ALL_ACTIVE=true
 for service in $WIDGET_SERVICES; do
     if ! systemctl is-active --quiet "$service"; then
-        exit 1
+        ALL_ACTIVE=false
+        break
     fi
 done
-exit 0
+
+if [ "$ALL_ACTIVE" = true ]; then
+    exit 0
+else
+    exit 1
+fi
 EOF
     chmod +x /usr/local/bin/maxlink-check-widgets
     echo "  ↦ Script de vérification widgets créé ✓"
@@ -386,85 +537,85 @@ create_systemd_services() {
     echo ""
     echo "◦ Création des services de notification..."
     
-    # Service pour notifier quand le réseau est prêt
-    cat > /etc/systemd/system/maxlink-network-ready.service <<EOF
+    # Service de notification network ready
+    cat > /etc/systemd/system/maxlink-network-ready.service <<'EOF'
 [Unit]
 Description=MaxLink Network Ready Notification
 After=network-online.target hostapd.service
 Wants=network-online.target
+ConditionPathExists=/usr/local/bin/maxlink-check-network
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/local/bin/maxlink-check-network
 RemainAfterExit=yes
-ExecStartPre=/bin/bash -c 'until /usr/local/bin/maxlink-check-network; do sleep 2; done'
-ExecStart=/bin/bash -c 'echo "MaxLink: Network is ready"'
-TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=maxlink-network.target
 EOF
     echo "  ↦ Service network-ready créé ✓"
     
-    # Service pour notifier quand MQTT est prêt
-    cat > /etc/systemd/system/maxlink-mqtt-ready.service <<EOF
+    # Service de notification MQTT ready
+    cat > /etc/systemd/system/maxlink-mqtt-ready.service <<'EOF'
 [Unit]
 Description=MaxLink MQTT Ready Notification
-After=mosquitto.service maxlink-network-ready.service
-Wants=mosquitto.service
-Requires=maxlink-network-ready.service
+After=mosquitto.service
+Requires=mosquitto.service
+ConditionPathExists=/usr/local/bin/maxlink-check-mqtt
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/bin/maxlink-check-mqtt
+Restart=on-failure
+RestartSec=5
 RemainAfterExit=yes
-ExecStartPre=/bin/bash -c 'until /usr/local/bin/maxlink-check-mqtt; do sleep 2; done'
-ExecStart=/bin/bash -c 'echo "MaxLink: MQTT broker is ready"'
-TimeoutStartSec=30
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=maxlink-core.target
 EOF
     echo "  ↦ Service mqtt-ready créé ✓"
     
-    # Service pour notifier quand tous les widgets sont prêts
-    cat > /etc/systemd/system/maxlink-widgets-ready.service <<EOF
+    # Service de notification widgets ready
+    cat > /etc/systemd/system/maxlink-widgets-ready.service <<'EOF'
 [Unit]
 Description=MaxLink Widgets Ready Notification
 After=maxlink-mqtt-ready.service
-Requires=maxlink-mqtt-ready.service
+Wants=maxlink-mqtt-ready.service
+ConditionPathExists=/usr/local/bin/maxlink-check-widgets
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/sleep 10
+ExecStart=/usr/local/bin/maxlink-check-widgets
 RemainAfterExit=yes
-ExecStartPre=/bin/bash -c 'until /usr/local/bin/maxlink-check-widgets; do sleep 2; done'
-ExecStart=/bin/bash -c 'echo "MaxLink: All widgets are ready"'
-TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=maxlink-widgets.target
 EOF
     echo "  ↦ Service widgets-ready créé ✓"
     
-    # Service de monitoring global
-    cat > /etc/systemd/system/maxlink-health-monitor.service <<EOF
+    # Service de monitoring de santé
+    cat > /etc/systemd/system/maxlink-health-monitor.service <<'EOF'
 [Unit]
 Description=MaxLink Health Monitor
-After=maxlink-widgets-ready.service
-Wants=maxlink-widgets-ready.service
+After=maxlink-widgets.target
+Wants=maxlink-widgets.target
 
 [Service]
 Type=simple
+ExecStart=/bin/bash -c 'while true; do echo "[$(date)] Health Check: Network=$(/usr/local/bin/maxlink-check-network && echo OK || echo FAIL), MQTT=$(/usr/local/bin/maxlink-check-mqtt && echo OK || echo FAIL), Widgets=$(/usr/local/bin/maxlink-check-widgets && echo OK || echo FAIL)"; sleep 300; done'
 Restart=always
-RestartSec=30
-ExecStart=/bin/bash -c 'while true; do \
-    if /usr/local/bin/maxlink-check-network && \
-       /usr/local/bin/maxlink-check-mqtt && \
-       /usr/local/bin/maxlink-check-widgets; then \
-        echo "MaxLink: System healthy"; \
-    else \
-        echo "MaxLink: System degraded"; \
-    fi; \
-    sleep 60; \
-done'
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -477,36 +628,35 @@ EOF
 # Créer les targets systemd pour l'orchestration
 create_systemd_targets() {
     echo ""
-    echo "◦ Création des targets systemd..."
+    echo "◦ Création des targets d'orchestration..."
     
-    # Target pour les services réseau de base
-    cat > /etc/systemd/system/maxlink-network.target <<EOF
+    # Target network (hostapd, nginx, etc.)
+    cat > /etc/systemd/system/maxlink-network.target <<'EOF'
 [Unit]
 Description=MaxLink Network Services
 After=network-online.target
-Wants=hostapd.service nginx.service
-Requires=network-online.target
+Wants=network-online.target
 
 [Install]
 WantedBy=multi-user.target
 EOF
     echo "  ↦ Target network créé ✓"
     
-    # Target pour les services core (MQTT)
-    cat > /etc/systemd/system/maxlink-core.target <<EOF
+    # Target core (mosquitto, etc.)
+    cat > /etc/systemd/system/maxlink-core.target <<'EOF'
 [Unit]
 Description=MaxLink Core Services
 After=maxlink-network.target maxlink-network-ready.service
-Wants=mosquitto.service
 Requires=maxlink-network.target
+Wants=maxlink-network-ready.service
 
 [Install]
 WantedBy=multi-user.target
 EOF
     echo "  ↦ Target core créé ✓"
     
-    # Target pour tous les widgets
-    cat > /etc/systemd/system/maxlink-widgets.target <<EOF
+    # Target widgets
+    cat > /etc/systemd/system/maxlink-widgets.target <<'EOF'
 [Unit]
 Description=MaxLink Widget Services
 After=maxlink-core.target maxlink-mqtt-ready.service
@@ -527,7 +677,7 @@ setup_service_overrides() {
     
     # Override pour hostapd
     mkdir -p /etc/systemd/system/hostapd.service.d
-    cat > /etc/systemd/system/hostapd.service.d/maxlink.conf <<EOF
+    cat > /etc/systemd/system/hostapd.service.d/maxlink.conf <<'EOF'
 [Unit]
 PartOf=maxlink-network.target
 Before=maxlink-network-ready.service
@@ -540,7 +690,7 @@ EOF
     
     # Override pour mosquitto
     mkdir -p /etc/systemd/system/mosquitto.service.d
-    cat > /etc/systemd/system/mosquitto.service.d/maxlink.conf <<EOF
+    cat > /etc/systemd/system/mosquitto.service.d/maxlink.conf <<'EOF'
 [Unit]
 PartOf=maxlink-core.target
 After=maxlink-network-ready.service
@@ -554,7 +704,7 @@ EOF
     
     # Override pour nginx
     mkdir -p /etc/systemd/system/nginx.service.d
-    cat > /etc/systemd/system/nginx.service.d/maxlink.conf <<EOF
+    cat > /etc/systemd/system/nginx.service.d/maxlink.conf <<'EOF'
 [Unit]
 PartOf=maxlink-network.target
 After=network-online.target
@@ -566,30 +716,6 @@ EOF
     echo "  ↦ Override nginx configuré ✓"
     
     log_success "Overrides de services configurés"
-}
-
-# Recharger et activer tous les services
-enable_orchestration_services() {
-    echo ""
-    echo "◦ Activation des services d'orchestration..."
-    
-    # Recharger systemd
-    systemctl daemon-reload
-    
-    # Activer les targets
-    systemctl enable maxlink-network.target
-    systemctl enable maxlink-core.target
-    systemctl enable maxlink-widgets.target
-    echo "  ↦ Targets activés ✓"
-    
-    # Activer les services de notification
-    systemctl enable maxlink-network-ready.service
-    systemctl enable maxlink-mqtt-ready.service
-    systemctl enable maxlink-widgets-ready.service
-    systemctl enable maxlink-health-monitor.service
-    echo "  ↦ Services de notification activés ✓"
-    
-    log_success "Services d'orchestration activés"
 }
 
 # Créer le script de gestion
@@ -707,6 +833,30 @@ EOF
     log_success "Script de gestion créé"
 }
 
+# Recharger et activer tous les services
+enable_orchestration_services() {
+    echo ""
+    echo "◦ Activation des services d'orchestration..."
+    
+    # Recharger systemd
+    systemctl daemon-reload
+    
+    # Activer les targets
+    systemctl enable maxlink-network.target
+    systemctl enable maxlink-core.target
+    systemctl enable maxlink-widgets.target
+    echo "  ↦ Targets activés ✓"
+    
+    # Activer les services de notification
+    systemctl enable maxlink-network-ready.service
+    systemctl enable maxlink-mqtt-ready.service
+    systemctl enable maxlink-widgets-ready.service
+    systemctl enable maxlink-health-monitor.service
+    echo "  ↦ Services de notification activés ✓"
+    
+    log_success "Services d'orchestration activés"
+}
+
 # Créer l'infrastructure d'orchestration
 setup_orchestration_infrastructure() {
     echo ""
@@ -722,8 +872,18 @@ setup_orchestration_infrastructure() {
 }
 
 # ===============================================================================
-# VÉRIFICATIONS
+# PROGRAMME PRINCIPAL
 # ===============================================================================
+
+log_info "========== DÉBUT DE L'INSTALLATION ORCHESTRATEUR =========="
+
+echo ""
+echo "========================================================================"
+echo "MAXLINK - INSTALLATION DE L'ORCHESTRATEUR"
+echo "========================================================================"
+echo ""
+
+send_progress 5 "Initialisation..."
 
 # Vérifier les privilèges root
 if [ "$EUID" -ne 0 ]; then
@@ -732,14 +892,6 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-echo ""
-echo "========================================================================"
-echo "ORCHESTRATEUR MAXLINK - INSTALLATION"
-echo "========================================================================"
-echo ""
-
-send_progress 5 "Initialisation..."
-
 # Vérifier si c'est la première installation
 check_first_install
 
@@ -747,7 +899,12 @@ check_first_install
 # ÉTAPE 1 : COPIE DES WIDGETS
 # ===============================================================================
 
-send_progress 10 "Copie des widgets..."
+send_progress 20 "Copie des widgets..."
+
+echo ""
+echo "========================================================================"
+echo "ÉTAPE 1 : COPIE DES WIDGETS VERS LE SYSTÈME"
+echo "========================================================================"
 
 if ! copy_widgets_to_local; then
     echo "⚠ Problème lors de la copie des widgets, mais on continue..."
@@ -766,7 +923,18 @@ if ! setup_ssh_admin_account; then
 fi
 
 # ===============================================================================
-# ÉTAPE 3 : INSTALLATION DES WIDGETS
+# ÉTAPE 3 : CORRECTION WIFI POUR ESP32
+# ===============================================================================
+
+send_progress 40 "Correction WiFi pour ESP32..."
+
+if ! fix_wifi_for_esp32; then
+    echo "⚠ Problème lors de la correction WiFi, mais on continue..."
+    log_warn "Correction WiFi incomplète, poursuite de l'installation"
+fi
+
+# ===============================================================================
+# ÉTAPE 4 : INSTALLATION DES WIDGETS
 # ===============================================================================
 
 send_progress 50 "Installation des widgets..."
@@ -821,7 +989,7 @@ else
 fi
 
 # ===============================================================================
-# ÉTAPE 4 : INFRASTRUCTURE D'ORCHESTRATION
+# ÉTAPE 5 : INFRASTRUCTURE D'ORCHESTRATION
 # ===============================================================================
 
 send_progress 85 "Configuration de l'orchestration..."
@@ -835,7 +1003,7 @@ else
 fi
 
 # ===============================================================================
-# ÉTAPE 5 : ACTIVATION DES SERVICES
+# ÉTAPE 6 : ACTIVATION DES SERVICES
 # ===============================================================================
 
 send_progress 95 "Activation des services..."
