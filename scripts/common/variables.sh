@@ -97,7 +97,7 @@ NGINX_PORT="80"
 # ===============================================================================
 
 # Image de fond d'écran
-BG_IMAGE_SOURCE_DIR="assets/images"
+BG_IMAGE_SOURCE_DIR="assets/bg.jpg"
 BG_IMAGE_FILENAME="fond_ecran_logo.png"
 BG_IMAGE_DEST_DIR="/usr/share/backgrounds"
 

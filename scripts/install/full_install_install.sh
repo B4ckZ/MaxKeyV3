@@ -3,7 +3,7 @@
 # ===============================================================================
 # MAXLINK - INSTALLATION COMPLÈTE AUTOMATISÉE
 # Script unique pour l'interface - Installe tous les composants
-# Version corrigée - utilise uniquement services_status.json
+# Version avec propagation du mode interface pour logging propre
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -227,11 +227,17 @@ for script_info in "${INSTALL_SCRIPTS[@]}"; do
     echo ""
     log_info "Exécution de $script_name"
     
-    # Exécuter le script avec la variable pour ne pas reboot
+    # Exécuter le script avec les variables d'environnement
+    # Propager INTERFACE_MODE si défini
     export SKIP_REBOOT=true
     export SERVICE_ID="${script_name%.sh}"
     SERVICE_ID="${SERVICE_ID%_install}"
     export SERVICE_ID
+    
+    # Propager le mode interface pour un logging propre
+    if [ -n "$INTERFACE_MODE" ]; then
+        export INTERFACE_MODE
+    fi
     
     if bash "$script_path"; then
         echo ""
@@ -283,64 +289,51 @@ show_install_status
 if [ $FAILED_SCRIPTS -eq 0 ]; then
     echo "✓ Tous les composants ont été installés avec succès !"
     echo ""
-    echo "MaxLink est maintenant opérationnel. Les fonctionnalités suivantes sont disponibles :"
-    echo "  • Point d'accès WiFi : $AP_SSID"
-    echo "  • Dashboard Web : http://$AP_IP ou http://$NGINX_DASHBOARD_DOMAIN"
-    echo "  • Broker MQTT : $MQTT_USER@localhost:$MQTT_PORT"
-    echo "  • Widgets de monitoring actifs"
-    echo "  • Orchestrateur pour la gestion des services"
+    echo "MaxLink est maintenant opérationnel."
     echo ""
-    echo "Commandes utiles :"
-    echo "  • État du système : sudo /usr/local/bin/maxlink-orchestrator status"
-    echo "  • Vérification : sudo /usr/local/bin/maxlink-orchestrator check"
-    echo "  • Diagnostic : sudo $BASE_DIR/diag.sh"
+    echo "Accès au Dashboard :"
+    echo "  • http://$AP_IP"
+    echo "  • http://maxlink.local (avec l'AP actif)"
     echo ""
     
-    log_success "Installation complète réussie - 0 erreur"
-    
-    # Un seul redémarrage à la fin
-    echo "========================================================================"
-    echo "REDÉMARRAGE NÉCESSAIRE"
-    echo "========================================================================"
-    echo ""
-    echo "Un redémarrage est nécessaire pour finaliser l'installation."
-    echo ""
-    echo "  ↦ Redémarrage du système dans 30 secondes..."
-    echo ""
-    
-    sleep 30
-    log_info "Redémarrage du système pour finalisation"
-    reboot
+    log_success "Installation complète réussie - Tous les composants installés"
 else
     echo "⚠ Installation terminée avec $FAILED_SCRIPTS erreur(s)"
     echo ""
-    echo "Certains composants n'ont pas pu être installés correctement."
     echo "Consultez les logs pour plus de détails :"
-    echo "  • Logs système : $LOG_SYSTEM"
-    echo "  • Logs d'installation : $LOG_INSTALL"
-    echo ""
-    echo "Actions possibles :"
-    echo "  • Relancer ce script pour réessayer les installations échouées"
-    echo "  • Installer manuellement les composants manquants"
-    echo "  • Vérifier l'état avec : sudo $BASE_DIR/check.sh"
+    echo "  • $LOG_INSTALL"
     echo ""
     
-    log_error "Installation terminée avec $FAILED_SCRIPTS erreurs"
+    log_warning "Installation terminée avec $FAILED_SCRIPTS erreur(s)"
+fi
+
+# Mise à jour finale du statut global
+if [ $FAILED_SCRIPTS -eq 0 ]; then
+    update_install_status "full_install" "active" "Installation complète réussie"
+else
+    update_install_status "full_install" "inactive" "Installation avec erreurs ($FAILED_SCRIPTS)"
+fi
+
+# Vérifier si on doit faire un reboot
+if [ "$SKIP_REBOOT" != "true" ]; then
+    echo ""
+    echo "Un redémarrage est recommandé pour finaliser l'installation."
+    echo ""
     
-    # Si l'orchestrateur est installé, on peut quand même redémarrer
-    if [ "$(is_already_installed "orchestrator_install.sh")" = "yes" ]; then
-        echo "L'orchestrateur est installé, un redémarrage est recommandé."
-        echo ""
-        echo "  ↦ Redémarrage du système dans 30 secondes..."
-        echo ""
-        
-        sleep 30
-        log_info "Redémarrage du système malgré les erreurs"
+    read -p "Redémarrer maintenant ? (o/N) : " -n 1 -r
+    echo ""
+    
+    if [[ $REPLY =~ ^[OoYy]$ ]]; then
+        log_info "Redémarrage du système demandé par l'utilisateur"
+        echo "Redémarrage dans 5 secondes..."
+        sleep 5
         reboot
     else
-        echo "Le système ne sera pas redémarré automatiquement."
-        echo "Redémarrez manuellement après avoir résolu les problèmes."
+        echo "Redémarrage annulé. Pensez à redémarrer plus tard."
+        log_info "Redémarrage différé par l'utilisateur"
     fi
-    
-    exit 1
+else
+    log_info "Mode installation complète - Redémarrage géré par l'interface"
 fi
+
+exit $exit_code
