@@ -2,6 +2,7 @@
 
 # ===============================================================================
 # MAXLINK - INSTALLATION DE L'ORCHESTRATEUR
+# Version corrigée sans init_script.sh
 # ===============================================================================
 
 # Déterminer le répertoire de base du script
@@ -9,7 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Charger les configurations et fonctions communes
-source "$BASE_DIR/scripts/common/init_script.sh"
+source "$BASE_DIR/scripts/common/variables.sh"
+source "$BASE_DIR/scripts/common/logging.sh"
 
 # Initialiser le logging
 init_logging "Installation de l'orchestrateur MaxLink" "install"
@@ -23,6 +25,21 @@ LOCAL_WIDGETS_CONFIG="/opt/maxlink/widgets_config"
 ORCHESTRATOR_SERVICE="maxlink-orchestrator"
 FIRST_INSTALL_FLAG="/opt/maxlink/.first_install_completed"
 NEED_REBOOT=false
+
+# ===============================================================================
+# FONCTIONS
+# ===============================================================================
+
+# Envoyer la progression
+send_progress() {
+    echo "PROGRESS:$1:$2"
+    log_info "Progression: $1% - $2" false
+}
+
+# Attente simple
+wait_silently() {
+    sleep "$1"
+}
 
 # ===============================================================================
 # FONCTION : VÉRIFICATION DE LA PREMIÈRE INSTALLATION
@@ -53,140 +70,63 @@ copy_widgets_to_local() {
     mkdir -p "$LOCAL_WIDGETS_CONFIG"
     
     # Vérifier l'existence du répertoire source
-    if [ ! -d "$BASE_DIR/scripts/widgets" ]; then
-        echo "  ⚠ Répertoire des widgets introuvable"
-        log_error "Répertoire widgets introuvable: $BASE_DIR/scripts/widgets"
-        return 1
+    if [ ! -d "$BASE_DIR/widgets" ]; then
+        echo "  ⚠ Répertoire widgets source non trouvé : $BASE_DIR/widgets"
+        log_warn "Répertoire widgets non trouvé, installation sans widgets"
+        return 0
     fi
     
-    # Copier tous les widgets
-    cp -r "$BASE_DIR/scripts/widgets/"* "$LOCAL_WIDGETS_DIR/" 2>/dev/null || {
-        echo "  ⚠ Aucun widget à copier"
-        log_warn "Aucun widget trouvé dans $BASE_DIR/scripts/widgets"
-        return 0
-    }
+    # Copier le répertoire _core
+    if [ -d "$BASE_DIR/widgets/_core" ]; then
+        echo "  ↦ Copie du core des widgets..."
+        cp -r "$BASE_DIR/widgets/_core" "$LOCAL_WIDGETS_DIR/"
+        echo "  ↦ Core copié ✓"
+    fi
     
-    # Copier les configurations JSON spécifiquement
-    find "$LOCAL_WIDGETS_DIR" -name "*_widget.json" -exec cp {} "$LOCAL_WIDGETS_CONFIG/" \; 2>/dev/null
+    # Lister et copier tous les widgets
+    local widget_count=0
+    log_info "Découverte des widgets disponibles"
     
-    echo "  ↦ Widgets copiés avec succès ✓"
-    log_success "Widgets copiés vers /opt/maxlink"
+    for widget_dir in "$BASE_DIR/widgets"/*; do
+        if [ -d "$widget_dir" ] && [ "$(basename "$widget_dir")" != "_core" ]; then
+            local widget_name=$(basename "$widget_dir")
+            log_info "Widget trouvé: $widget_name"
+            
+            # Copier le widget
+            echo "  ↦ Copie du widget $widget_name..."
+            cp -r "$widget_dir" "$LOCAL_WIDGETS_DIR/"
+            
+            # Copier la configuration si elle existe
+            local config_file="$widget_dir/${widget_name}_widget.json"
+            if [ -f "$config_file" ]; then
+                cp "$config_file" "$LOCAL_WIDGETS_CONFIG/"
+            fi
+            
+            ((widget_count++))
+        fi
+    done
+    
+    echo "  ↦ $widget_count widgets copiés ✓"
+    log_info "$widget_count widgets installés dans $LOCAL_WIDGETS_DIR"
     
     # Définir les permissions
-    chown -R root:root /opt/maxlink
-    chmod -R 755 /opt/maxlink
+    chown -R root:root "$LOCAL_WIDGETS_DIR"
+    chmod -R 755 "$LOCAL_WIDGETS_DIR"
     
-    return 0
+    chown -R root:root "$LOCAL_WIDGETS_CONFIG"
+    chmod -R 755 "$LOCAL_WIDGETS_CONFIG"
 }
 
 # ===============================================================================
-# FONCTION : CORRECTION WIFI POUR ESP32
-# ===============================================================================
-
-fix_wifi_for_esp32() {
-    echo ""
-    echo "========================================================================"
-    echo "CORRECTION DE LA CONFIGURATION WIFI POUR ESP32"
-    echo "========================================================================"
-    
-    send_progress 40 "Correction WiFi pour compatibilité ESP32..."
-    
-    # Vérifier que la connexion AP existe
-    echo "◦ Vérification de la connexion AP..."
-    if ! nmcli connection show "AP-MaxLink" >/dev/null 2>&1; then
-        echo "  ⚠ Connexion AP-MaxLink non trouvée"
-        log_error "Connexion AP-MaxLink introuvable"
-        return 1
-    fi
-    
-    echo "◦ Application des paramètres ESP32..."
-    
-    # Désactiver WPA3 et forcer WPA2
-    nmcli connection modify "AP-MaxLink" \
-        802-11-wireless-security.key-mgmt wpa-psk \
-        802-11-wireless-security.proto rsn \
-        802-11-wireless-security.pairwise ccmp \
-        802-11-wireless-security.group ccmp
-    
-    # Configuration de la bande 2.4GHz
-    nmcli connection modify "AP-MaxLink" \
-        802-11-wireless.band bg \
-        802-11-wireless.channel 6
-    
-    # Désactiver les fonctionnalités 802.11n qui peuvent poser problème
-    nmcli connection modify "AP-MaxLink" \
-        802-11-wireless.powersave 2
-    
-    # Redémarrer la connexion
-    echo "◦ Redémarrage du point d'accès..."
-    nmcli connection down "AP-MaxLink" 2>/dev/null
-    sleep 2
-    nmcli connection up "AP-MaxLink"
-    
-    if [ $? -eq 0 ]; then
-        echo "  ↦ Configuration WiFi ESP32 appliquée ✓"
-        log_success "WiFi configuré pour compatibilité ESP32"
-    else
-        echo "  ↦ Erreur lors du redémarrage de l'AP ✗"
-        log_error "Impossible de redémarrer l'AP"
-        return 1
-    fi
-    
-    return 0
-}
-
-# ===============================================================================
-# FONCTION : INSTALLATION DES WIDGETS
-# ===============================================================================
-
-install_widgets() {
-    local widget_dir="$1"
-    local widget_name=$(basename "$widget_dir")
-    local install_script="$widget_dir/${widget_name}_install.sh"
-    
-    echo ""
-    echo "  ◦ Installation du widget : $widget_name"
-    
-    if [ -f "$install_script" ]; then
-        echo "    → Exécution du script d'installation..."
-        
-        # Rendre le script exécutable
-        chmod +x "$install_script"
-        
-        # Exécuter avec capture des erreurs
-        if bash "$install_script"; then
-            echo "    → Installation réussie ✓"
-            log_success "Widget $widget_name installé"
-            
-            # Marquer le widget comme installé
-            touch "$widget_dir/.installed"
-            
-            return 0
-        else
-            echo "    → Échec de l'installation ✗"
-            log_error "Échec installation widget $widget_name"
-            return 1
-        fi
-    else
-        echo "    → Pas de script d'installation"
-        log_info "Pas de script d'installation pour $widget_name"
-        return 0
-    fi
-}
-
-# ===============================================================================
-# MAIN : EXÉCUTION PRINCIPALE
+# PROGRAMME PRINCIPAL
 # ===============================================================================
 
 log_info "========== DÉBUT DE L'INSTALLATION ORCHESTRATEUR =========="
 
 echo ""
 echo "========================================================================"
-echo "MAXLINK - INSTALLATION DE L'ORCHESTRATEUR"
+echo "INSTALLATION DE L'ORCHESTRATEUR MAXLINK"
 echo "========================================================================"
-echo ""
-
-send_progress 5 "Initialisation..."
 
 # Vérifier les privilèges root
 if [ "$EUID" -ne 0 ]; then
@@ -194,8 +134,9 @@ if [ "$EUID" -ne 0 ]; then
     log_error "Privilèges root requis"
     exit 1
 fi
+log_info "Privilèges root confirmés"
 
-# Vérifier si c'est la première installation
+# Vérifier si c'est une première installation
 check_first_install
 
 # ===============================================================================
@@ -206,66 +147,61 @@ send_progress 20 "Copie des widgets..."
 
 echo ""
 echo "========================================================================"
-echo "ÉTAPE 1 : COPIE DES WIDGETS VERS LE SYSTÈME"
+echo "COPIE DES WIDGETS VERS LE SYSTÈME"
 echo "========================================================================"
 
-if ! copy_widgets_to_local; then
-    echo "⚠ Problème lors de la copie des widgets, mais on continue..."
-    log_warn "Copie des widgets incomplète, poursuite de l'installation"
-fi
+copy_widgets_to_local
 
 # ===============================================================================
-# ÉTAPE 2 : CORRECTION WIFI POUR ESP32
+# ÉTAPE 2 : INSTALLATION DES DÉPENDANCES WIDGETS
 # ===============================================================================
 
-send_progress 40 "Correction WiFi pour ESP32..."
-
-if ! fix_wifi_for_esp32; then
-    echo "⚠ Problème lors de la correction WiFi, mais on continue..."
-    log_warn "Correction WiFi incomplète, poursuite de l'installation"
-fi
-
-# ===============================================================================
-# ÉTAPE 3 : INSTALLATION DES WIDGETS
-# ===============================================================================
-
-send_progress 50 "Installation des widgets..."
+send_progress 40 "Installation des dépendances widgets..."
 
 echo ""
 echo "========================================================================"
-echo "INSTALLATION DES WIDGETS"
+echo "INSTALLATION DES DÉPENDANCES WIDGETS"
 echo "========================================================================"
 
-# Compter les widgets
-WIDGET_COUNT=$(find /opt/maxlink/widgets -maxdepth 1 -type d -name "*_widget" 2>/dev/null | wc -l)
+# Installer les dépendances Python spécifiques
+echo "◦ Installation des modules Python requis..."
 
-if [ "$WIDGET_COUNT" -eq 0 ]; then
-    echo "◦ Aucun widget à installer"
-    log_info "Aucun widget trouvé à installer"
-else
-    echo "◦ $WIDGET_COUNT widget(s) trouvé(s)"
-    log_info "$WIDGET_COUNT widgets à installer"
-    
-    # Installer chaque widget
-    CURRENT_WIDGET=0
-    for widget_dir in /opt/maxlink/widgets/*_widget; do
-        if [ -d "$widget_dir" ]; then
-            widget_name=$(basename "$widget_dir")
-            install_script="$widget_dir/${widget_name}_install.sh"
-            
-            ((CURRENT_WIDGET++))
-            WIDGET_PROGRESS=$((50 + (CURRENT_WIDGET * 30 / WIDGET_COUNT)))
-            
-            send_progress $WIDGET_PROGRESS "Installation widget $widget_name..."
-            
-            if install_widgets "$widget_dir"; then
-                update_service_status "widget_$widget_name" "active" "Widget installé avec succès"
-            else
-                update_service_status "widget_$widget_name" "inactive" "Échec de l'installation"
-            fi
-        fi
-    done
+# Vérifier si pip3 est installé
+if ! command -v pip3 &> /dev/null; then
+    echo "  ↦ Installation de pip3..."
+    apt-get update -qq && apt-get install -y python3-pip
 fi
+
+# Modules Python requis par les widgets
+PYTHON_MODULES="psutil paho-mqtt"
+
+for module in $PYTHON_MODULES; do
+    echo "  ↦ Vérification du module $module..."
+    if ! python3 -c "import $module" 2>/dev/null; then
+        echo "    • Installation de $module..."
+        pip3 install "$module" --quiet
+    else
+        echo "    • $module déjà installé ✓"
+    fi
+done
+
+# ===============================================================================
+# ÉTAPE 3 : CONFIGURATION DES WIDGETS
+# ===============================================================================
+
+send_progress 60 "Configuration des widgets..."
+
+echo ""
+echo "========================================================================"
+echo "CONFIGURATION DES WIDGETS"
+echo "========================================================================"
+
+# Créer le registre des widgets si nécessaire
+WIDGETS_REGISTRY_DIR="/var/lib/maxlink/widgets"
+mkdir -p "$WIDGETS_REGISTRY_DIR"
+
+echo "◦ Registre des widgets créé dans : $WIDGETS_REGISTRY_DIR"
+echo "  ↦ Les widgets s'enregistreront automatiquement lors de leur installation"
 
 # ===============================================================================
 # ÉTAPE 4 : INSTALLATION DES SCRIPTS SYSTÈME

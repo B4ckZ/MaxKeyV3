@@ -90,12 +90,19 @@ log() {
         # En mode interface, format simplifié sans couleurs
         if [ "$INTERFACE_MODE" = "true" ]; then
             # Format : [LEVEL] MESSAGE
-            echo "[$level] $message"
+            if [ "$level" = "ERROR" ] || [ "$level" = "CRITICAL" ]; then
+                echo "[$level] $message" >&2
+            else
+                echo "[$level] $message"
+            fi
         else
             # Mode normal avec format complet
-            echo "$formatted_message"
+            if [ "$level" = "ERROR" ] || [ "$level" = "CRITICAL" ]; then
+                echo "$formatted_message" >&2
+            else
+                echo "$formatted_message"
+            fi
         fi
-    fi
     fi
     
     # Écrire dans le fichier si activé et si le fichier est défini
