@@ -37,6 +37,22 @@ SYSTEM_USER="prod"
 SYSTEM_USER_HOME="/home/$SYSTEM_USER"
 
 # ===============================================================================
+# CONFIGURATION COMPTE SSH ADMIN
+# ===============================================================================
+
+# Compte SSH avec accès administrateur complet
+SSH_ADMIN_USER="max"
+SSH_ADMIN_PASS="localkwery"
+SSH_ADMIN_HOME="/home/$SSH_ADMIN_USER"
+SSH_ADMIN_SHELL="/bin/bash"
+SSH_ADMIN_GROUPS="sudo,adm,www-data,systemd-journal"
+SSH_ADMIN_LOG_DIR="/var/log/maxlink/ssh_admin"
+SSH_ADMIN_LOG_FILE="$SSH_ADMIN_LOG_DIR/access.log"
+SSH_ADMIN_AUDIT_FILE="$SSH_ADMIN_LOG_DIR/audit.log"
+SSH_ADMIN_ENABLE_LOGGING=true
+SSH_ADMIN_ENABLE_AUDIT=true
+
+# ===============================================================================
 # CONFIGURATION RÉSEAU WIFI
 # ===============================================================================
 
@@ -171,101 +187,88 @@ SERVICES_STATUS_DIR="$(dirname "$SERVICES_STATUS_FILE")"
 # FONCTIONS UTILITAIRES
 # ===============================================================================
 
-# Fonction pour obtenir l'utilisateur système effectif
+# Fonction pour mettre à jour le statut d'un service
+update_service_status() {
+    local service_id="$1"
+    local status="$2"  # "active" ou "inactive"
+    local message="${3:-}"
+    
+    python3 -c "
+import json
+from datetime import datetime
+
+try:
+    with open('$SERVICES_STATUS_FILE', 'r') as f:
+        data = json.load(f)
+except:
+    data = {}
+
+data['$service_id'] = {
+    'status': '$status',
+    'last_update': datetime.now().isoformat(),
+    'message': '$message'
+}
+
+with open('$SERVICES_STATUS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+"
+}
+
+# Détecter l'utilisateur effectif
 get_effective_user() {
-    if [ -d "$SYSTEM_USER_HOME" ]; then
-        echo "$SYSTEM_USER"
-    elif [ -n "$SUDO_USER" ] && [ -d "/home/$SUDO_USER" ]; then
+    if [ -n "$SUDO_USER" ]; then
         echo "$SUDO_USER"
     else
         echo "$SYSTEM_USER"
     fi
 }
 
-# Fonction pour obtenir le répertoire home effectif
+# Obtenir le home de l'utilisateur effectif
 get_effective_user_home() {
-    local effective_user=$(get_effective_user)
-    echo "/home/$effective_user"
+    local user=$(get_effective_user)
+    if [ "$user" = "root" ]; then
+        echo "/root"
+    else
+        echo "/home/$user"
+    fi
 }
 
-# Fonction pour construire les chemins d'assets
+# Chemins dynamiques pour l'image de fond
 get_bg_image_source() {
-    echo "${MAXLINK_BASE_DIR:-/media/prod/USBTOOL}/$BG_IMAGE_SOURCE_DIR/$BG_IMAGE_FILENAME"
+    echo "$BASE_DIR/$BG_IMAGE_SOURCE_DIR/$BG_IMAGE_FILENAME"
 }
 
 get_bg_image_dest() {
     echo "$BG_IMAGE_DEST_DIR/$BG_IMAGE_FILENAME"
 }
 
-# Fonction pour mettre à jour le statut d'un service
-update_service_status() {
-    local service_id="$1"
-    local status="$2"  # "active" ou "inactive"
-    
-    # S'assurer que le répertoire existe
-    mkdir -p "$(dirname "$SERVICES_STATUS_FILE")"
-    
-    # Créer le fichier de statut s'il n'existe pas
-    if [ ! -f "$SERVICES_STATUS_FILE" ]; then
-        echo "{}" > "$SERVICES_STATUS_FILE"
-    fi
-    
-    # Mettre à jour le statut via Python pour gérer le JSON proprement
-    python3 -c "
-import json
-import sys
-from datetime import datetime
-
-service_id = '$service_id'
-status = '$status'
-
-try:
-    # Charger les données existantes
-    with open('$SERVICES_STATUS_FILE', 'r') as f:
-        data = json.load(f)
-except Exception as e:
-    print(f'Erreur lecture: {e}', file=sys.stderr)
-    data = {}
-
-# Mettre à jour
-data[service_id] = {
-    'status': status,
-    'last_update': datetime.now().isoformat()
-}
-
-# Sauvegarder
-try:
-    with open('$SERVICES_STATUS_FILE', 'w') as f:
-        json.dump(data, f, indent=2)
-    print(f'Statut {service_id} mis à jour: {status}')
-except Exception as e:
-    print(f'Erreur sauvegarde: {e}', file=sys.stderr)
-    sys.exit(1)
-"
-    
-    # Vérifier que la mise à jour a réussi
-    if [ $? -eq 0 ]; then
-        echo "  ↦ Statut du service $service_id mis à jour: $status"
-        return 0
-    else
-        echo "  ↦ Erreur lors de la mise à jour du statut"
-        return 1
-    fi
-}
-
-# ===============================================================================
-# VALIDATION DE LA CONFIGURATION
-# ===============================================================================
-
-# Fonction pour valider la configuration
+# Validation de la configuration
 validate_config() {
     local errors=0
     
-    [ -z "$WIFI_SSID" ] && echo "ERREUR: WIFI_SSID non défini" && ((errors++))
-    [ -z "$AP_SSID" ] && echo "ERREUR: AP_SSID non défini" && ((errors++))
-    [ -z "$SYSTEM_USER" ] && echo "ERREUR: SYSTEM_USER non défini" && ((errors++))
+    # Vérifier les variables critiques
+    if [ -z "$SYSTEM_USER" ]; then
+        echo "ERREUR: SYSTEM_USER non défini"
+        ((errors++))
+    fi
     
-    if [[ ! "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    if [ -z "$AP_SSID" ]; then
+        echo "ERREUR: AP_SSID non défini"
+        ((errors++))
+    fi
+    
+    if [ -z "$SSH_ADMIN_USER" ]; then
+        echo "ERREUR: SSH_ADMIN_USER non défini"
+        ((errors++))
+    fi
+    
+    if [ -z "$SSH_ADMIN_PASS" ]; then
+        echo "ERREUR: SSH_ADMIN_PASS non défini"
+        ((errors++))
+    fi
+    
+    # Vérifier format IP
+    if ! [[ "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         echo "ERREUR: AP_IP ($AP_IP) n'est pas une adresse IP valide"
         ((errors++))
     fi
@@ -295,6 +298,9 @@ export VERSION_OVERLAY_MARGIN_RIGHT VERSION_OVERLAY_MARGIN_BOTTOM
 export VERSION_OVERLAY_FONT_BOLD VERSION_OVERLAY_PREFIX
 export SYSTEM_USER SYSTEM_USER_HOME
 export EFFECTIVE_USER EFFECTIVE_USER_HOME
+export SSH_ADMIN_USER SSH_ADMIN_PASS SSH_ADMIN_HOME SSH_ADMIN_SHELL
+export SSH_ADMIN_GROUPS SSH_ADMIN_LOG_DIR SSH_ADMIN_LOG_FILE SSH_ADMIN_AUDIT_FILE
+export SSH_ADMIN_ENABLE_LOGGING SSH_ADMIN_ENABLE_AUDIT
 export WIFI_SSID WIFI_PASSWORD
 export AP_SSID AP_PASSWORD AP_IP AP_NETMASK AP_DHCP_START AP_DHCP_END
 export GITHUB_REPO_URL GITHUB_BRANCH GITHUB_DASHBOARD_DIR GITHUB_TOKEN
