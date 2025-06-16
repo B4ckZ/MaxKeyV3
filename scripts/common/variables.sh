@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - CONFIGURATION CENTRALE (VERSION CORRIGÉE)
-# Toutes les variables sans les delays de démarrage
+# MAXLINK - CONFIGURATION CENTRALE (VERSION NETTOYÉE)
+# Toutes les variables sans SSH/FileZilla
 # ===============================================================================
 
 # ===============================================================================
@@ -35,22 +35,6 @@ VERSION_OVERLAY_PREFIX="MaxLink "            # Préfixe avant la version
 # Utilisateur principal du Raspberry Pi
 SYSTEM_USER="prod"
 SYSTEM_USER_HOME="/home/$SYSTEM_USER"
-
-# ===============================================================================
-# CONFIGURATION COMPTE SSH ADMIN
-# ===============================================================================
-
-# Compte SSH avec accès administrateur complet
-SSH_ADMIN_USER="max"
-SSH_ADMIN_PASS="localkwery"
-SSH_ADMIN_HOME="/home/$SSH_ADMIN_USER"
-SSH_ADMIN_SHELL="/bin/bash"
-SSH_ADMIN_GROUPS="sudo,adm,www-data,systemd-journal"
-SSH_ADMIN_LOG_DIR="/var/log/maxlink/ssh_admin"
-SSH_ADMIN_LOG_FILE="$SSH_ADMIN_LOG_DIR/access.log"
-SSH_ADMIN_AUDIT_FILE="$SSH_ADMIN_LOG_DIR/audit.log"
-SSH_ADMIN_ENABLE_LOGGING=true
-SSH_ADMIN_ENABLE_AUDIT=true
 
 # ===============================================================================
 # CONFIGURATION RÉSEAU WIFI
@@ -88,97 +72,98 @@ MQTT_PASS="mqtt"
 MQTT_PORT="1883"
 MQTT_WEBSOCKET_PORT="9001"
 
-# Topics MQTT à ignorer (CORRIGÉ - ajout de la variable manquante)
+# Topics MQTT à ignorer
 MQTT_IGNORED_TOPICS=(
-    "test/+"
-    "debug/+"
-    "\$SYS/broker/load/+"
-    "\$SYS/broker/subscriptions/+"
-    "\$SYS/broker/heap/+"
+    "\$SYS/#"
+    "homeassistant/#"
+    "zigbee2mqtt/bridge/#"
+    "frigate/#"
 )
 
-# Convertir en string pour l'export (séparateur |)
-MQTT_IGNORED_TOPICS_STRING=$(IFS='|'; echo "${MQTT_IGNORED_TOPICS[*]}")
+# Convertir en string pour utilisation dans les configurations
+MQTT_IGNORED_TOPICS_STRING=$(IFS=','; echo "${MQTT_IGNORED_TOPICS[*]}")
 
 # ===============================================================================
-# CONFIGURATION NGINX
+# CONFIGURATION NGINX ET DASHBOARD
 # ===============================================================================
 
-# Configuration du serveur web
-NGINX_DASHBOARD_DIR="/var/www/maxlink-dashboard"
-NGINX_DASHBOARD_DOMAIN="maxlink-dashboard.local"
+# Configuration du serveur web NGINX
+NGINX_DASHBOARD_DIR="/var/www/dashboard"
+NGINX_DASHBOARD_DOMAIN="maxlink.local"
 NGINX_PORT="80"
 
 # ===============================================================================
-# CONFIGURATION FICHIERS SYSTÈME
+# CONFIGURATION BUREAU ET AFFICHAGE
 # ===============================================================================
 
-# Fichiers de configuration système
-CONFIG_FILE="/boot/firmware/config.txt"
+# Image de fond d'écran
+BG_IMAGE_SOURCE_DIR="assets/images"
+BG_IMAGE_FILENAME="fond_ecran_logo.png"
+BG_IMAGE_DEST_DIR="/usr/share/backgrounds"
 
-# Répertoires pour les assets
-BG_IMAGE_SOURCE_DIR="assets"
-BG_IMAGE_FILENAME="bg.jpg"
-BG_IMAGE_DEST_DIR="/usr/share/backgrounds/maxlink"
-
-# ===============================================================================
-# CONFIGURATION INTERFACE GRAPHIQUE
-# ===============================================================================
-
-# Configuration de l'environnement de bureau
-DESKTOP_FONT="Inter 12"
-DESKTOP_BG_COLOR="#000000"
-DESKTOP_FG_COLOR="#ECEFF4"
+# Configuration du bureau LXDE
+DESKTOP_FONT="Roboto 11"
+DESKTOP_BG_COLOR="#2E3440"
+DESKTOP_FG_COLOR="#D8DEE9"
 DESKTOP_SHADOW_COLOR="#000000"
 
-# Services disponibles dans l'interface - CORRIGÉ: tous inactifs par défaut
-SERVICES_LIST=(
-    "update:Update RPI:inactive"
-    "ap:Network AP:inactive" 
-    "nginx:NginX Web:inactive"
-    "mqtt:MQTT BKR:inactive"
-    "mqtt_wgs:MQTT WGS:inactive"
-    "orchestrator:Orchestrateur:inactive"
-)
+# ===============================================================================
+# CONFIGURATION SYSTÈME
+# ===============================================================================
 
-# ===============================================================================
-# CONFIGURATION DU LOGGING
-# ===============================================================================
+# Fichier de configuration système
+CONFIG_FILE="/boot/config.txt"
 
 # Configuration des logs
-LOG_TO_CONSOLE_DEFAULT=false
+LOG_BASE="/var/log/maxlink"
+LOG_SYSTEM="$LOG_BASE/system"
+LOG_INSTALL="$LOG_BASE/install"
+LOG_WIDGETS="$LOG_BASE/widgets"
+LOG_PYTHON="$LOG_BASE/python"
+LOG_SSH="$LOG_BASE/ssh"
+
+# Configuration des logs par défaut
+LOG_TO_CONSOLE_DEFAULT=true
 LOG_TO_FILE_DEFAULT=true
 
 # ===============================================================================
-# CONFIGURATION RÉSEAU ET SÉCURITÉ
+# CONFIGURATION RÉSEAU ET TIMEOUTS
 # ===============================================================================
 
-# Timeouts réseau (en secondes)
-NETWORK_TIMEOUT=5
+# Timeouts et tentatives réseau
+NETWORK_TIMEOUT=30
 PING_COUNT=3
 APT_RETRY_MAX_ATTEMPTS=3
-APT_RETRY_DELAY=3
+APT_RETRY_DELAY=5
 
 # ===============================================================================
-# CONFIGURATION AVANCÉE
+# CONFIGURATION MATÉRIEL
 # ===============================================================================
 
-# Délais d'affichage pour l'interface (en secondes)
-DISPLAY_DELAY_STARTUP=2
-DISPLAY_DELAY_BETWEEN_STEPS=2
-
-# Configuration ventilateur
-FAN_TEMP_MIN=0
+# Gestion du ventilateur (températures en Celsius)
+FAN_TEMP_MIN=45
 FAN_TEMP_ACTIVATE=60
-FAN_TEMP_MAX=60
+FAN_TEMP_MAX=80
 
 # ===============================================================================
-# CONFIGURATION DES STATUTS DES SERVICES
+# CONFIGURATION DES SERVICES
 # ===============================================================================
 
-# Fichier de statut pour communication avec l'interface
+# Liste des services gérés par MaxLink
+SERVICES_LIST=(
+    "mosquitto"          # Broker MQTT
+    "nginx"              # Serveur web
+    "hostapd"            # Point d'accès WiFi
+    "dnsmasq"            # Serveur DNS/DHCP
+    "maxlink-mqtt"       # Service MQTT MaxLink
+    "maxlink-fan"        # Contrôle du ventilateur
+    "maxlink-gpio"       # Gestion des GPIO
+    "maxlink-orchestrator" # Orchestrateur principal
+)
+
+# Fichier de statut des services
 SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
-SERVICES_STATUS_DIR="$(dirname "$SERVICES_STATUS_FILE")"
+SERVICES_STATUS_DIR="/var/lib/maxlink"
 
 # Créer le répertoire si nécessaire
 [ ! -d "$SERVICES_STATUS_DIR" ] && mkdir -p "$SERVICES_STATUS_DIR"
@@ -257,16 +242,6 @@ validate_config() {
         ((errors++))
     fi
     
-    if [ -z "$SSH_ADMIN_USER" ]; then
-        echo "ERREUR: SSH_ADMIN_USER non défini"
-        ((errors++))
-    fi
-    
-    if [ -z "$SSH_ADMIN_PASS" ]; then
-        echo "ERREUR: SSH_ADMIN_PASS non défini"
-        ((errors++))
-    fi
-    
     # Vérifier format IP
     if ! [[ "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         echo "ERREUR: AP_IP ($AP_IP) n'est pas une adresse IP valide"
@@ -298,9 +273,6 @@ export VERSION_OVERLAY_MARGIN_RIGHT VERSION_OVERLAY_MARGIN_BOTTOM
 export VERSION_OVERLAY_FONT_BOLD VERSION_OVERLAY_PREFIX
 export SYSTEM_USER SYSTEM_USER_HOME
 export EFFECTIVE_USER EFFECTIVE_USER_HOME
-export SSH_ADMIN_USER SSH_ADMIN_PASS SSH_ADMIN_HOME SSH_ADMIN_SHELL
-export SSH_ADMIN_GROUPS SSH_ADMIN_LOG_DIR SSH_ADMIN_LOG_FILE SSH_ADMIN_AUDIT_FILE
-export SSH_ADMIN_ENABLE_LOGGING SSH_ADMIN_ENABLE_AUDIT
 export WIFI_SSID WIFI_PASSWORD
 export AP_SSID AP_PASSWORD AP_IP AP_NETMASK AP_DHCP_START AP_DHCP_END
 export GITHUB_REPO_URL GITHUB_BRANCH GITHUB_DASHBOARD_DIR GITHUB_TOKEN
@@ -311,7 +283,6 @@ export BG_IMAGE_SOURCE BG_IMAGE_DEST
 export DESKTOP_FONT DESKTOP_BG_COLOR DESKTOP_FG_COLOR DESKTOP_SHADOW_COLOR
 export LOG_TO_CONSOLE_DEFAULT LOG_TO_FILE_DEFAULT
 export NETWORK_TIMEOUT PING_COUNT APT_RETRY_MAX_ATTEMPTS APT_RETRY_DELAY
-export DISPLAY_DELAY_STARTUP DISPLAY_DELAY_BETWEEN_STEPS
 export FAN_TEMP_MIN FAN_TEMP_ACTIVATE FAN_TEMP_MAX
 export MQTT_USER MQTT_PASS MQTT_PORT MQTT_WEBSOCKET_PORT
 export MQTT_IGNORED_TOPICS MQTT_IGNORED_TOPICS_STRING
