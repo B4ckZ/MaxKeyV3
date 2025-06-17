@@ -2,7 +2,7 @@
 
 # ===============================================================================
 # MAXLINK - SCRIPT DE MISE À JOUR DU SYSTÈME LINUX
-# Version corrigée avec mise à jour du statut
+# Version corrigée avec mise à jour du statut et retry dashboard
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -210,6 +210,116 @@ safe_apt_update() {
     echo "  ↦ Impossible de mettre à jour les listes après $max_attempts tentatives ✗"
     log_error "Échec définitif d'APT update après $max_attempts tentatives"
     return 1
+}
+
+# Télécharger le dashboard avec retry
+download_dashboard_with_retry() {
+    local max_attempts=3
+    local attempt=1
+    local success=false
+    
+    DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
+    DASHBOARD_ARCHIVE="$DASHBOARD_CACHE_DIR/dashboard.tar.gz"
+    
+    # Créer le répertoire de cache pour le dashboard
+    mkdir -p "$DASHBOARD_CACHE_DIR"
+    
+    # Construire l'URL de téléchargement
+    GITHUB_ARCHIVE_URL="${GITHUB_REPO_URL}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz"
+    
+    echo "◦ Téléchargement du dashboard MaxLink V3..."
+    log_info "Début du téléchargement du dashboard V3"
+    
+    while [ $attempt -le $max_attempts ] && [ "$success" = false ]; do
+        echo "  ↦ Tentative $attempt/$max_attempts..."
+        log_info "Tentative téléchargement dashboard $attempt/$max_attempts"
+        
+        # Supprimer l'ancienne archive si elle existe
+        rm -f "$DASHBOARD_ARCHIVE"
+        
+        # Télécharger avec curl ou wget
+        if command -v curl >/dev/null 2>&1; then
+            if curl -L -o "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" 2>/tmp/dashboard_download.log; then
+                echo "    • Téléchargement terminé (curl)"
+                log_info "Téléchargement curl terminé"
+            else
+                echo "    • Erreur lors du téléchargement (curl) ⚠"
+                log_warn "Erreur téléchargement curl: $(cat /tmp/dashboard_download.log 2>/dev/null)"
+            fi
+        elif command -v wget >/dev/null 2>&1; then
+            if wget -O "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" 2>/tmp/dashboard_download.log; then
+                echo "    • Téléchargement terminé (wget)"
+                log_info "Téléchargement wget terminé"
+            else
+                echo "    • Erreur lors du téléchargement (wget) ⚠"
+                log_warn "Erreur téléchargement wget: $(cat /tmp/dashboard_download.log 2>/dev/null)"
+            fi
+        else
+            echo "  ↦ Ni curl ni wget disponibles ✗"
+            log_error "Aucun outil de téléchargement disponible"
+            return 1
+        fi
+        
+        # Vérifier que l'archive existe et a une taille raisonnable
+        if [ -f "$DASHBOARD_ARCHIVE" ]; then
+            local file_size=$(stat -c%s "$DASHBOARD_ARCHIVE" 2>/dev/null || echo "0")
+            echo "    • Taille du fichier: $(( file_size / 1024 )) KB"
+            
+            if [ $file_size -lt 1000 ]; then
+                echo "    • Fichier trop petit, probablement corrompu ⚠"
+                log_warn "Fichier dashboard trop petit: $file_size octets"
+            else
+                # Vérifier que l'archive est valide
+                echo "    • Vérification de l'archive..."
+                if tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
+                    echo "  ↦ Archive dashboard valide ✓"
+                    log_success "Archive dashboard valide"
+                    success=true
+                    
+                    # Créer les métadonnées
+                    cat > "$DASHBOARD_CACHE_DIR/metadata.json" << EOF
+{
+    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "version": "$MAXLINK_VERSION",
+    "branch": "$GITHUB_BRANCH",
+    "url": "$GITHUB_ARCHIVE_URL",
+    "size": $file_size,
+    "attempts": $attempt
+}
+EOF
+                else
+                    echo "    • Archive corrompue ⚠"
+                    log_warn "Archive dashboard corrompue"
+                    rm -f "$DASHBOARD_ARCHIVE"
+                fi
+            fi
+        else
+            echo "    • Fichier non créé ⚠"
+            log_warn "Fichier dashboard non créé"
+        fi
+        
+        # Si échec et pas la dernière tentative
+        if [ "$success" = false ] && [ $attempt -lt $max_attempts ]; then
+            echo "  ↦ Nouvelle tentative dans 15 secondes..."
+            log_info "Attente avant nouvelle tentative dashboard"
+            wait_silently 15
+        fi
+        
+        ((attempt++))
+    done
+    
+    # Nettoyer les fichiers temporaires
+    rm -f /tmp/dashboard_download.log
+    
+    if [ "$success" = true ]; then
+        echo "  ↦ Dashboard téléchargé avec succès ✓"
+        log_success "Dashboard téléchargé après $((attempt-1)) tentative(s)"
+        return 0
+    else
+        echo "  ↦ Impossible de télécharger le dashboard après $max_attempts tentatives ✗"
+        log_error "Échec définitif du téléchargement dashboard"
+        return 1
+    fi
 }
 
 # Ajouter la version sur l'image de fond avec configuration avancée
@@ -573,64 +683,11 @@ else
     log_warn "Cache créé partiellement"
 fi
 
-# TÉLÉCHARGEMENT DU DASHBOARD V3
+# TÉLÉCHARGEMENT DU DASHBOARD V3 AVEC RETRY
 echo ""
-echo "◦ Téléchargement du dashboard MaxLink V3..."
-DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
-DASHBOARD_ARCHIVE="$DASHBOARD_CACHE_DIR/dashboard.tar.gz"
-
-# Créer le répertoire de cache pour le dashboard
-mkdir -p "$DASHBOARD_CACHE_DIR"
-
-echo "  ↦ Téléchargement depuis GitHub..."
-log_info "Téléchargement du dashboard V3 depuis GitHub"
-
-# Supprimer l'ancienne archive si elle existe
-rm -f "$DASHBOARD_ARCHIVE"
-
-# Construire l'URL de téléchargement
-GITHUB_ARCHIVE_URL="${GITHUB_REPO_URL}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz"
-
-# Télécharger avec curl ou wget
-if command -v curl >/dev/null 2>&1; then
-    if log_command "curl -L -o '$DASHBOARD_ARCHIVE' '$GITHUB_ARCHIVE_URL'" "Téléchargement dashboard (curl)"; then
-        echo "  ↦ Dashboard téléchargé ✓"
-        log_success "Dashboard téléchargé avec curl"
-    else
-        echo "  ↦ Erreur lors du téléchargement ✗"
-        log_error "Échec du téléchargement du dashboard"
-    fi
-elif command -v wget >/dev/null 2>&1; then
-    if log_command "wget -O '$DASHBOARD_ARCHIVE' '$GITHUB_ARCHIVE_URL'" "Téléchargement dashboard (wget)"; then
-        echo "  ↦ Dashboard téléchargé ✓"
-        log_success "Dashboard téléchargé avec wget"
-    else
-        echo "  ↦ Erreur lors du téléchargement ✗"
-        log_error "Échec du téléchargement du dashboard"
-    fi
-else
-    echo "  ↦ Ni curl ni wget disponibles ✗"
-    log_error "Aucun outil de téléchargement disponible"
-fi
-
-# Vérifier que l'archive est valide
-if [ -f "$DASHBOARD_ARCHIVE" ] && tar -tzf "$DASHBOARD_ARCHIVE" >/dev/null 2>&1; then
-    echo "  ↦ Archive dashboard valide ✓"
-    log_success "Archive dashboard valide"
-    
-    # Créer aussi les métadonnées pour le dashboard
-    cat > "$DASHBOARD_CACHE_DIR/metadata.json" << EOF
-{
-    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-    "version": "$MAXLINK_VERSION",
-    "branch": "$GITHUB_BRANCH",
-    "url": "$GITHUB_ARCHIVE_URL"
-}
-EOF
-else
-    echo "  ↦ Archive dashboard corrompue ✗"
-    log_error "Archive dashboard corrompue"
-    rm -f "$DASHBOARD_ARCHIVE"
+if ! download_dashboard_with_retry; then
+    echo "  ↦ Le dashboard devra être téléchargé ultérieurement ⚠"
+    log_warn "Dashboard non disponible dans le cache"
 fi
 
 # Nettoyage APT
@@ -764,7 +821,11 @@ echo "◦ Mise à jour terminée avec succès !"
 echo "  ↦ Version: v$MAXLINK_VERSION"
 echo "  ↦ Système à jour et configuré"
 echo "  ↦ Cache de paquets créé pour installation offline"
-echo "  ↦ Dashboard V3 téléchargé"
+if [ -f "$DASHBOARD_CACHE_DIR/dashboard.tar.gz" ]; then
+    echo "  ↦ Dashboard V3 téléchargé"
+else
+    echo "  ↦ Dashboard V3 non disponible (téléchargement manuel requis)"
+fi
 log_success "Mise à jour système terminée - Version: v$MAXLINK_VERSION"
 
 # Afficher le résumé du cache
