@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - CONFIGURATION CENTRALE (VERSION NETTOYÉE)
-# Toutes les variables utilisées dans le système
+# MAXLINK - CONFIGURATION CENTRALE (VERSION CORRIGÉE)
+# Toutes les variables sans les delays de démarrage
 # ===============================================================================
 
 # ===============================================================================
@@ -21,8 +21,11 @@ MAXLINK_COPYRIGHT="© 2025 WERIT. Tous droits réservés."
 VERSION_OVERLAY_ENABLED=true                 # Activer/désactiver l'overlay
 VERSION_OVERLAY_FONT_SIZE=48                 # Taille de la police (pixels)
 VERSION_OVERLAY_FONT_COLOR="#FFFFFF"         # Couleur du texte (hex)
+VERSION_OVERLAY_SHADOW_COLOR="#000000"       # Couleur de l'ombre (hex)
+VERSION_OVERLAY_SHADOW_OPACITY=128           # Opacité de l'ombre (0-255)
 VERSION_OVERLAY_MARGIN_RIGHT=50              # Marge depuis le bord droit
 VERSION_OVERLAY_MARGIN_BOTTOM=50             # Marge depuis le bas
+VERSION_OVERLAY_FONT_BOLD=true               # Police en gras
 VERSION_OVERLAY_PREFIX="MaxLink "            # Préfixe avant la version
 
 # ===============================================================================
@@ -53,233 +56,216 @@ AP_DHCP_END="192.168.4.100"
 # CONFIGURATION GITHUB
 # ===============================================================================
 
-# Configuration du repository GitHub pour le dashboard
-GITHUB_REPO_URL="https://github.com/patrickelectronique/maxlink-dashboard"
-GITHUB_BRANCH="V3"
-GITHUB_DASHBOARD_DIR=""  # Vide = racine de l'archive
-GITHUB_TOKEN=""  # Token optionnel pour les repos privés
-
-# ===============================================================================
-# CONFIGURATION NGINX
-# ===============================================================================
-
-# Dashboard web
-NGINX_DASHBOARD_DIR="/var/www/maxlink"
-NGINX_DASHBOARD_DOMAIN="maxlink.local"
-NGINX_PORT="80"
-
-# ===============================================================================
-# CONFIGURATION SYSTÈME
-# ===============================================================================
-
-# Fichier de configuration système
-CONFIG_FILE="/boot/config.txt"
-
-# Configuration du fond d'écran et bureau
-BG_IMAGE_SOURCE_DIR="/media/prod/USBTOOL/assets/images"
-BG_IMAGE_FILENAME="wallpaper.jpg"
-BG_IMAGE_DEST_DIR="/usr/share/backgrounds"
-
-# Apparence du bureau
-DESKTOP_FONT="DejaVu Sans 10"
-DESKTOP_BG_COLOR="#2E3440"  # Couleur de fond (Nord0)
-DESKTOP_FG_COLOR="#ECEFF4"  # Couleur du texte (Nord6)
-DESKTOP_SHADOW_COLOR="#000000"  # Couleur de l'ombre
-
-# ===============================================================================
-# CONFIGURATION LOGGING
-# ===============================================================================
-
-# Configuration du système de logs
-LOG_TO_CONSOLE_DEFAULT=true   # Afficher les logs dans la console
-LOG_TO_FILE_DEFAULT=true      # Écrire les logs dans les fichiers
-
-# ===============================================================================
-# PARAMÈTRES RÉSEAU
-# ===============================================================================
-
-# Timeouts et paramètres de connexion
-NETWORK_TIMEOUT=10            # Timeout pour les tests de connexion (secondes)
-PING_COUNT=3                  # Nombre de pings pour tester la connexion
-APT_RETRY_MAX_ATTEMPTS=3      # Nombre de tentatives pour APT update
-APT_RETRY_DELAY=10            # Délai entre les tentatives APT (secondes)
-
-# ===============================================================================
-# CONFIGURATION D'AFFICHAGE
-# ===============================================================================
-
-# Délais d'affichage (pour les scripts d'installation)
-DISPLAY_DELAY_STARTUP=2       # Délai au démarrage (secondes)
-DISPLAY_DELAY_BETWEEN_STEPS=3 # Délai entre les étapes (secondes)
-
-# ===============================================================================
-# CONFIGURATION MATÉRIEL
-# ===============================================================================
-
-# Configuration du ventilateur (températures en degrés Celsius)
-FAN_TEMP_MIN=40              # Température minimale pour démarrer le ventilateur
-FAN_TEMP_ACTIVATE=45         # Température d'activation normale
-FAN_TEMP_MAX=50              # Température maximale (vitesse max)
+# Configuration du dépôt GitHub pour le dashboard
+GITHUB_REPO_URL="https://github.com/B4ckZ/DashboardV3"
+GITHUB_BRANCH="main"
+GITHUB_DASHBOARD_DIR=""
+GITHUB_TOKEN=""
 
 # ===============================================================================
 # CONFIGURATION MQTT
 # ===============================================================================
 
-# Paramètres du broker MQTT
-MQTT_USER="prod"
-MQTT_PASS="1234567890"
-MQTT_PORT=1883
-MQTT_WEBSOCKET_PORT=9001
+# Configuration du broker MQTT
+MQTT_USER="mosquitto"
+MQTT_PASS="mqtt"
+MQTT_PORT="1883"
+MQTT_WEBSOCKET_PORT="9001"
 
-# Topics système à ignorer dans le monitoring
+# Topics MQTT à ignorer (CORRIGÉ - ajout de la variable manquante)
 MQTT_IGNORED_TOPICS=(
-    '$SYS/broker/version'
-    '$SYS/broker/timestamp'
-    '$SYS/broker/uptime'
-    '$SYS/broker/load/bytes/received'
-    '$SYS/broker/load/bytes/sent'
-    '$SYS/broker/clients/connected'
-    '$SYS/broker/clients/total'
-    '$SYS/broker/messages/stored'
-    '$SYS/broker/messages/received'
-    '$SYS/broker/messages/sent'
-    '$SYS/broker/subscriptions/count'
-    '$SYS/broker/retained messages/count'
-    '$SYS/broker/heap/current'
-    '$SYS/broker/heap/maximum'
-    '$SYS/broker/publish/messages/received'
-    '$SYS/broker/publish/messages/sent'
-    '$SYS/broker/publish/bytes/received'
-    '$SYS/broker/publish/bytes/sent'
-    '$SYS/broker/messages/received/1min'
-    '$SYS/broker/messages/sent/1min'
-    '$SYS/broker/publish/messages/received/1min'
-    '$SYS/broker/publish/messages/sent/1min'
-    '$SYS/broker/load/messages/received/1min'
-    '$SYS/broker/load/messages/sent/1min'
-    '$SYS/broker/load/publish/received/1min'
-    '$SYS/broker/load/publish/sent/1min'
-    '$SYS/broker/load/bytes/received/1min'
-    '$SYS/broker/load/bytes/sent/1min'
-    '$SYS/broker/load/connections/1min'
-    '$SYS/broker/messages/received/5min'
-    '$SYS/broker/messages/sent/5min'
-    '$SYS/broker/publish/messages/received/5min'
-    '$SYS/broker/publish/messages/sent/5min'
-    '$SYS/broker/load/messages/received/5min'
-    '$SYS/broker/load/messages/sent/5min'
-    '$SYS/broker/load/publish/received/5min'
-    '$SYS/broker/load/publish/sent/5min'
-    '$SYS/broker/load/bytes/received/5min'
-    '$SYS/broker/load/bytes/sent/5min'
-    '$SYS/broker/load/connections/5min'
-    '$SYS/broker/messages/received/15min'
-    '$SYS/broker/messages/sent/15min'
-    '$SYS/broker/publish/messages/received/15min'
-    '$SYS/broker/publish/messages/sent/15min'
-    '$SYS/broker/load/messages/received/15min'
-    '$SYS/broker/load/messages/sent/15min'
-    '$SYS/broker/load/publish/received/15min'
-    '$SYS/broker/load/publish/sent/15min'
-    '$SYS/broker/load/bytes/received/15min'
-    '$SYS/broker/load/bytes/sent/15min'
-    '$SYS/broker/load/connections/15min'
+    "test/+"
+    "debug/+"
+    "\$SYS/broker/load/+"
+    "\$SYS/broker/subscriptions/+"
+    "\$SYS/broker/heap/+"
 )
 
-# Conversion en chaîne pour mosquitto_sub
-MQTT_IGNORED_TOPICS_STRING=""
-for topic in "${MQTT_IGNORED_TOPICS[@]}"; do
-    MQTT_IGNORED_TOPICS_STRING+=" -T \"$topic\""
-done
+# Convertir en string pour l'export (séparateur |)
+MQTT_IGNORED_TOPICS_STRING=$(IFS='|'; echo "${MQTT_IGNORED_TOPICS[*]}")
 
 # ===============================================================================
-# LISTES DE SERVICES
+# CONFIGURATION NGINX
 # ===============================================================================
 
-# Services à monitorer
-SERVICES_LIST="mosquitto nginx NetworkManager systemd-networkd wpa_supplicant"
+# Configuration du serveur web
+NGINX_DASHBOARD_DIR="/var/www/maxlink-dashboard"
+NGINX_DASHBOARD_DOMAIN="maxlink-dashboard.local"
+NGINX_PORT="80"
 
 # ===============================================================================
-# FICHIERS DE STATUT
+# CONFIGURATION FICHIERS SYSTÈME
 # ===============================================================================
 
-# Fichier de statut d'installation des services
+# Fichiers de configuration système
+CONFIG_FILE="/boot/firmware/config.txt"
+
+# Répertoires pour les assets
+BG_IMAGE_SOURCE_DIR="assets"
+BG_IMAGE_FILENAME="bg.jpg"
+BG_IMAGE_DEST_DIR="/usr/share/backgrounds/maxlink"
+
+# ===============================================================================
+# CONFIGURATION INTERFACE GRAPHIQUE
+# ===============================================================================
+
+# Configuration de l'environnement de bureau
+DESKTOP_FONT="Inter 12"
+DESKTOP_BG_COLOR="#000000"
+DESKTOP_FG_COLOR="#ECEFF4"
+DESKTOP_SHADOW_COLOR="#000000"
+
+# Services disponibles dans l'interface - CORRIGÉ: tous inactifs par défaut
+SERVICES_LIST=(
+    "update:Update RPI:inactive"
+    "ap:Network AP:inactive" 
+    "nginx:NginX Web:inactive"
+    "mqtt:MQTT BKR:inactive"
+    "mqtt_wgs:MQTT WGS:inactive"
+    "orchestrator:Orchestrateur:inactive"
+)
+
+# ===============================================================================
+# CONFIGURATION DU LOGGING
+# ===============================================================================
+
+# Configuration des logs
+LOG_TO_CONSOLE_DEFAULT=false
+LOG_TO_FILE_DEFAULT=true
+
+# ===============================================================================
+# CONFIGURATION RÉSEAU ET SÉCURITÉ
+# ===============================================================================
+
+# Timeouts réseau (en secondes)
+NETWORK_TIMEOUT=5
+PING_COUNT=3
+APT_RETRY_MAX_ATTEMPTS=3
+APT_RETRY_DELAY=3
+
+# ===============================================================================
+# CONFIGURATION AVANCÉE
+# ===============================================================================
+
+# Délais d'affichage pour l'interface (en secondes)
+DISPLAY_DELAY_STARTUP=2
+DISPLAY_DELAY_BETWEEN_STEPS=2
+
+# Configuration ventilateur
+FAN_TEMP_MIN=0
+FAN_TEMP_ACTIVATE=60
+FAN_TEMP_MAX=60
+
+# ===============================================================================
+# CONFIGURATION DES STATUTS DES SERVICES
+# ===============================================================================
+
+# Fichier de statut pour communication avec l'interface
 SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
 SERVICES_STATUS_DIR="$(dirname "$SERVICES_STATUS_FILE")"
+
+# Créer le répertoire si nécessaire
+[ ! -d "$SERVICES_STATUS_DIR" ] && mkdir -p "$SERVICES_STATUS_DIR"
 
 # ===============================================================================
 # FONCTIONS UTILITAIRES
 # ===============================================================================
 
-# Obtenir l'utilisateur effectif (prod ou $SUDO_USER)
+# Fonction pour obtenir l'utilisateur système effectif
 get_effective_user() {
-    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    if [ -d "$SYSTEM_USER_HOME" ]; then
+        echo "$SYSTEM_USER"
+    elif [ -n "$SUDO_USER" ] && [ -d "/home/$SUDO_USER" ]; then
         echo "$SUDO_USER"
     else
         echo "$SYSTEM_USER"
     fi
 }
 
-# Obtenir le home de l'utilisateur effectif
+# Fonction pour obtenir le répertoire home effectif
 get_effective_user_home() {
-    local user=$(get_effective_user)
-    echo "/home/$user"
+    local effective_user=$(get_effective_user)
+    echo "/home/$effective_user"
 }
 
-# Construire le chemin complet de l'image source
+# Fonction pour construire les chemins d'assets
 get_bg_image_source() {
-    echo "$BG_IMAGE_SOURCE_DIR/$BG_IMAGE_FILENAME"
+    echo "${MAXLINK_BASE_DIR:-/media/prod/USBTOOL}/$BG_IMAGE_SOURCE_DIR/$BG_IMAGE_FILENAME"
 }
 
-# Construire le chemin complet de l'image destination
 get_bg_image_dest() {
     echo "$BG_IMAGE_DEST_DIR/$BG_IMAGE_FILENAME"
 }
 
-# Fonction de mise à jour du statut (utilisée dans les scripts d'installation)
+# Fonction pour mettre à jour le statut d'un service
 update_service_status() {
     local service_id="$1"
-    local status="$2"
-    local message="${3:-}"
+    local status="$2"  # "active" ou "inactive"
     
+    # S'assurer que le répertoire existe
+    mkdir -p "$(dirname "$SERVICES_STATUS_FILE")"
+    
+    # Créer le fichier de statut s'il n'existe pas
+    if [ ! -f "$SERVICES_STATUS_FILE" ]; then
+        echo "{}" > "$SERVICES_STATUS_FILE"
+    fi
+    
+    # Mettre à jour le statut via Python pour gérer le JSON proprement
     python3 -c "
 import json
+import sys
 from datetime import datetime
 
+service_id = '$service_id'
+status = '$status'
+
 try:
+    # Charger les données existantes
     with open('$SERVICES_STATUS_FILE', 'r') as f:
         data = json.load(f)
-except:
+except Exception as e:
+    print(f'Erreur lecture: {e}', file=sys.stderr)
     data = {}
 
-data['$service_id'] = {
-    'status': '$status',
-    'last_update': datetime.now().isoformat(),
-    'message': '$message'
+# Mettre à jour
+data[service_id] = {
+    'status': status,
+    'last_update': datetime.now().isoformat()
 }
 
-with open('$SERVICES_STATUS_FILE', 'w') as f:
-    json.dump(data, f, indent=2)
+# Sauvegarder
+try:
+    with open('$SERVICES_STATUS_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+    print(f'Statut {service_id} mis à jour: {status}')
+except Exception as e:
+    print(f'Erreur sauvegarde: {e}', file=sys.stderr)
+    sys.exit(1)
 "
+    
+    # Vérifier que la mise à jour a réussi
+    if [ $? -eq 0 ]; then
+        echo "  ↦ Statut du service $service_id mis à jour: $status"
+        return 0
+    else
+        echo "  ↦ Erreur lors de la mise à jour du statut"
+        return 1
+    fi
 }
 
-# Valider la configuration
+# ===============================================================================
+# VALIDATION DE LA CONFIGURATION
+# ===============================================================================
+
+# Fonction pour valider la configuration
 validate_config() {
     local errors=0
     
-    # Vérifier que les variables essentielles sont définies
-    if [ -z "$WIFI_SSID" ]; then
-        echo "ERREUR: WIFI_SSID n'est pas défini"
-        ((errors++))
-    fi
+    [ -z "$WIFI_SSID" ] && echo "ERREUR: WIFI_SSID non défini" && ((errors++))
+    [ -z "$AP_SSID" ] && echo "ERREUR: AP_SSID non défini" && ((errors++))
+    [ -z "$SYSTEM_USER" ] && echo "ERREUR: SYSTEM_USER non défini" && ((errors++))
     
-    if [ -z "$AP_SSID" ]; then
-        echo "ERREUR: AP_SSID n'est pas défini"
-        ((errors++))
-    fi
-    
-    # Vérifier que l'IP du point d'accès est valide
-    if ! [[ "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    if [[ ! "$AP_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         echo "ERREUR: AP_IP ($AP_IP) n'est pas une adresse IP valide"
         ((errors++))
     fi
@@ -304,8 +290,9 @@ BG_IMAGE_DEST=$(get_bg_image_dest)
 # Exporter toutes les variables nécessaires
 export MAXLINK_VERSION MAXLINK_COPYRIGHT
 export VERSION_OVERLAY_ENABLED VERSION_OVERLAY_FONT_SIZE
-export VERSION_OVERLAY_FONT_COLOR VERSION_OVERLAY_MARGIN_RIGHT VERSION_OVERLAY_MARGIN_BOTTOM
-export VERSION_OVERLAY_PREFIX
+export VERSION_OVERLAY_FONT_COLOR VERSION_OVERLAY_SHADOW_COLOR VERSION_OVERLAY_SHADOW_OPACITY
+export VERSION_OVERLAY_MARGIN_RIGHT VERSION_OVERLAY_MARGIN_BOTTOM
+export VERSION_OVERLAY_FONT_BOLD VERSION_OVERLAY_PREFIX
 export SYSTEM_USER SYSTEM_USER_HOME
 export EFFECTIVE_USER EFFECTIVE_USER_HOME
 export WIFI_SSID WIFI_PASSWORD
