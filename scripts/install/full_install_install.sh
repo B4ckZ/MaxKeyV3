@@ -295,9 +295,6 @@ if [ $FAILED_SCRIPTS -eq 0 ]; then
     log_success "Installation complète réussie - 0 erreur"
     
     # Un seul redémarrage à la fin
-    echo "========================================================================"
-    echo "REDÉMARRAGE NÉCESSAIRE"
-    echo "========================================================================"
     echo ""
     echo "Un redémarrage est nécessaire pour finaliser l'installation."
     echo ""

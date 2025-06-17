@@ -179,7 +179,7 @@ class MaxLinkApp:
         
         # Configuration de la fenêtre
         self.root.title(self.variables.get_window_title())
-        self.root.geometry("1450x750")
+        self.root.geometry("1350x750")
         self.root.configure(bg=COLORS["nord0"])
         
         self.center_window()
@@ -492,10 +492,10 @@ class MaxLinkApp:
         # Confirmation
         response = messagebox.askyesno(
             "Confirmation",
-            "Lancer l'installation complète de MaxLink?\n\n"
-            "Cette opération installera tous les composants\n"
-            "et prendra environ 10-15 minutes.\n\n"
-            "Continuer?"
+            "Lancement de l'installation complète du système MaxLink.\n\n"
+            "Cette opération est autonome et permet d'installer tous les composants et services du projet.\n\n"
+            "Durée de l'installation : environ 5-10 minutes.\n\n"
+            "Voulez-vous continuer ?"
         )
         
         if not response:

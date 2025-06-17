@@ -69,7 +69,7 @@ if [ -n "$DISPLAY" ] && [ -n "$SUDO_USER" ]; then
 fi
 
 # Petit délai avant le lancement
-sleep 5
+sleep 10
 
 # Lancer l'interface Python
 cd "$SCRIPT_DIR"

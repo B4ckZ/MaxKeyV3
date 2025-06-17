@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - SCRIPT DE MISE À JOUR DU SYSTÈME LINUX
-# Version corrigée avec mise à jour du statut
+# MAXLINK - MISE À JOUR SYSTÈME ET PRÉPARATION CACHE V11
+# Installation optimisée avec cache local et gestion réseau améliorée
+# Version corrigée avec wallpaper simplifié
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -10,21 +11,41 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Source des modules
-source "$SCRIPT_DIR/../common/variables.sh"
-source "$SCRIPT_DIR/../common/logging.sh"
-source "$SCRIPT_DIR/../common/packages.sh"
-source "$SCRIPT_DIR/../common/wifi_helper.sh"
+source "$BASE_DIR/scripts/common/variables.sh"
+source "$BASE_DIR/scripts/common/logging.sh"
+source "$BASE_DIR/scripts/common/packages.sh"
+
+# ===============================================================================
+# CONFIGURATION
+# ===============================================================================
+
+# Cache des paquets
+CACHE_DIR="/var/cache/maxlink/apt"
+CACHE_ARCHIVE_DIR="/var/cache/maxlink/archives"
+CACHE_STATUS_FILE="/var/cache/maxlink/cache_status.json"
+
+# Dashboard GitHub
+GITHUB_API_URL="https://api.github.com/repos/patrickelectronique/maxlink-dashboard/tarball/$GITHUB_BRANCH"
+GITHUB_ARCHIVE_URL="https://github.com/patrickelectronique/maxlink-dashboard/archive/refs/heads/$GITHUB_BRANCH.tar.gz"
+DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
+DASHBOARD_ARCHIVE="$DASHBOARD_CACHE_DIR/dashboard.tar.gz"
+
+# ID du service pour la mise à jour du statut
+SERVICE_ID="${BASH_SOURCE[0]##*/}"
+SERVICE_ID="${SERVICE_ID%.sh}"
+
+# Variables de connexion
+SKIP_REBOOT="${SKIP_REBOOT:-false}"  # Par défaut, on fait le reboot
+
+# État du nettoyage APT
+APT_CLEANUP_DONE=false
 
 # ===============================================================================
 # INITIALISATION
 # ===============================================================================
 
 # Initialiser le logging
-init_logging "Mise à jour système MaxLink"
-
-# Variables pour le contrôle du processus
-AP_WAS_ACTIVE=false
-APT_CLEANUP_DONE=false
+init_logging "Mise à jour système et préparation cache V11" "install"
 
 # ===============================================================================
 # FONCTIONS
@@ -36,150 +57,195 @@ send_progress() {
     log_info "Progression: $1% - $2" false
 }
 
-# Attente simple avec message
-wait_with_message() {
-    local seconds=$1
-    local message=$2
-    echo "  ↦ $message (${seconds}s)..."
-    log_info "$message - attente ${seconds}s"
-    sleep "$seconds"
-}
-
-# Attente simple silencieuse
+# Attente simple
 wait_silently() {
     sleep "$1"
 }
 
-# Fonction pour attendre qu'APT soit libre
-wait_for_apt() {
-    local max_wait=300  # Maximum 5 minutes d'attente
-    local waited=0
+# Mise à jour du statut du service
+update_service_status() {
+    local service_id="$1"
+    local status="$2"
+    local message="${3:-}"
     
-    echo "◦ Vérification de l'état d'APT..."
-    log_info "Vérification de l'état d'APT"
-    
-    # Vérifier tous les verrous possibles
-    while [ $waited -lt $max_wait ]; do
-        # Vérifier si APT ou DPKG sont actifs
-        if fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
-           fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
-           fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
-           fuser /var/cache/apt/archives/lock >/dev/null 2>&1; then
-            
-            if [ $waited -eq 0 ]; then
-                echo "  ↦ APT est occupé, attente qu'il termine..."
-                log_info "APT occupé détecté, attente"
-            fi
-            
-            # Afficher un point toutes les 10 secondes
-            if [ $((waited % 10)) -eq 0 ] && [ $waited -gt 0 ]; then
-                echo -n "."
-            fi
-            
-            sleep 1
-            ((waited++))
-        else
-            if [ $waited -gt 0 ]; then
-                echo ""  # Nouvelle ligne après les points
-                echo "  ↦ APT est maintenant libre ✓"
-                log_info "APT libre après ${waited}s d'attente"
-            else
-                echo "  ↦ APT est libre ✓"
-                log_info "APT libre immédiatement"
-            fi
-            return 0
-        fi
-    done
-    
-    echo ""
-    echo "  ↦ Timeout: APT toujours occupé après ${max_wait}s ⚠"
-    log_warn "Timeout APT après ${max_wait}s"
-    return 1
+    python3 -c "
+import json
+from datetime import datetime
+
+try:
+    with open('$SERVICES_STATUS_FILE', 'r') as f:
+        data = json.load(f)
+except:
+    data = {}
+
+data['$service_id'] = {
+    'status': '$status',
+    'last_update': datetime.now().isoformat(),
+    'message': '$message'
 }
 
-# Nettoyer proprement APT
-clean_apt_properly() {
-    echo "◦ Nettoyage sécurisé du système de paquets..."
-    log_info "Début du nettoyage APT sécurisé"
+with open('$SERVICES_STATUS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+"
+}
+
+# Sauvegarder l'état réseau actuel
+save_network_state() {
+    log_info "Sauvegarde de l'état réseau actuel"
+    nmcli connection show --active > /tmp/maxlink_network_state_before 2>/dev/null || true
+}
+
+# Restaurer l'état réseau précédent
+restore_network_state() {
+    log_info "Restauration de l'état réseau précédent"
     
-    # 1. D'abord, attendre qu'APT soit libre
-    if ! wait_for_apt; then
-        echo "  ↦ Forçage du nettoyage APT..."
-        log_warn "Forçage du nettoyage APT nécessaire"
+    # Si une connexion MaxLink était active, la déconnecter proprement
+    if nmcli connection show --active | grep -q "MaxLink"; then
+        log_info "Déconnexion de la connexion MaxLink temporaire"
+        nmcli connection down "MaxLink" 2>/dev/null || true
+        nmcli connection delete "MaxLink" 2>/dev/null || true
+    fi
+    
+    # Réactiver les connexions qui étaient actives avant
+    if [ -f /tmp/maxlink_network_state_before ]; then
+        while read -r line; do
+            if [[ "$line" =~ ^([^ ]+) ]]; then
+                conn_name="${BASH_REMATCH[1]}"
+                if [ "$conn_name" != "NAME" ] && [ "$conn_name" != "MaxLink" ]; then
+                    log_info "Tentative de réactivation de: $conn_name"
+                    nmcli connection up "$conn_name" 2>/dev/null || true
+                fi
+            fi
+        done < /tmp/maxlink_network_state_before
+        rm -f /tmp/maxlink_network_state_before
+    fi
+}
+
+# Établir la connexion au réseau WiFi
+establish_network_connection() {
+    log_info "Établissement de la connexion réseau"
+    
+    # Fonction interne de test de connexion
+    test_connection() {
+        local attempt=0
+        while [ $attempt -lt 3 ]; do
+            if ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
+                return 0
+            fi
+            ((attempt++))
+            wait_silently 2
+        done
+        return 1
+    }
+    
+    # Test initial
+    echo "◦ Test de la connexion internet existante..."
+    if test_connection; then
+        echo "  ↦ Connexion internet déjà active ✓"
+        log_info "Connexion internet déjà établie"
+        return 0
+    fi
+    
+    echo "  ↦ Pas de connexion active, tentative de connexion au WiFi..."
+    
+    # Scanner les réseaux disponibles
+    echo ""
+    echo "◦ Scan des réseaux WiFi disponibles..."
+    log_info "Scan des réseaux WiFi"
+    
+    nmcli device wifi rescan 2>/dev/null || true
+    wait_silently 3
+    
+    # Vérifier si le réseau cible est disponible
+    if nmcli device wifi list | grep -q "$WIFI_SSID"; then
+        echo "  ↦ Réseau '$WIFI_SSID' détecté ✓"
+        log_info "Réseau $WIFI_SSID trouvé"
+    else
+        echo "  ↦ Réseau '$WIFI_SSID' non trouvé ✗"
+        log_error "Réseau $WIFI_SSID non trouvé"
+        return 1
+    fi
+    
+    # Supprimer une éventuelle connexion MaxLink existante
+    if nmcli connection show | grep -q "MaxLink"; then
+        echo "  ↦ Suppression de l'ancienne connexion MaxLink..."
+        nmcli connection delete "MaxLink" 2>/dev/null || true
+    fi
+    
+    # Créer la connexion
+    echo ""
+    echo "◦ Connexion au réseau WiFi '$WIFI_SSID'..."
+    log_info "Tentative de connexion à $WIFI_SSID"
+    
+    if nmcli device wifi connect "$WIFI_SSID" password "$WIFI_PASSWORD" name "MaxLink" 2>/dev/null; then
+        echo "  ↦ Connexion établie, vérification..."
+        wait_silently 5
         
-        # Arrêter les services qui pourraient utiliser APT
-        systemctl stop unattended-upgrades.service 2>/dev/null || true
-        systemctl stop apt-daily.service 2>/dev/null || true
-        systemctl stop apt-daily-upgrade.service 2>/dev/null || true
-        
+        if test_connection; then
+            echo "  ↦ Connexion internet confirmée ✓"
+            log_success "Connexion établie avec succès"
+            return 0
+        else
+            echo "  ↦ Connexion établie mais pas d'accès internet ✗"
+            log_error "Pas d'accès internet malgré la connexion WiFi"
+            return 1
+        fi
+    else
+        echo "  ↦ Échec de la connexion ✗"
+        log_error "Impossible de se connecter à $WIFI_SSID"
+        return 1
+    fi
+}
+
+# Nettoyer et préparer APT de manière sécurisée
+safe_apt_cleanup() {
+    if [ "$APT_CLEANUP_DONE" = true ]; then
+        log_info "Nettoyage APT déjà effectué, skip"
+        return 0
+    fi
+    
+    echo "◦ Préparation du système de paquets..."
+    log_info "Nettoyage sécurisé d'APT"
+    
+    # Arrêter les processus APT en cours
+    local apt_pids=$(pgrep -f "apt-get|dpkg|apt" || true)
+    if [ -n "$apt_pids" ]; then
+        echo "  ↦ Arrêt des processus APT en cours..."
+        for pid in $apt_pids; do
+            kill -TERM "$pid" 2>/dev/null || true
+        done
         wait_silently 3
     fi
     
-    # 2. Nettoyer les processus zombies s'il y en a
-    echo "  ↦ Nettoyage des processus zombies..."
-    log_info "Nettoyage des processus zombies"
+    # Nettoyer les verrous
+    rm -f /var/lib/apt/lists/lock 2>/dev/null || true
+    rm -f /var/cache/apt/archives/lock 2>/dev/null || true
+    rm -f /var/lib/dpkg/lock* 2>/dev/null || true
     
-    # Terminer proprement (SIGTERM) au lieu de tuer brutalement (SIGKILL)
-    pkill -15 apt 2>/dev/null || true
-    pkill -15 dpkg 2>/dev/null || true
+    # Reconfigurer dpkg si nécessaire
+    dpkg --configure -a 2>/dev/null || true
     
-    # Attendre un peu pour la terminaison propre
-    wait_silently 2
-    
-    # 3. Supprimer les verrous uniquement s'ils sont orphelins
-    echo "  ↦ Vérification des verrous orphelins..."
-    log_info "Vérification des verrous orphelins"
-    
-    for lock in /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock; do
-        if [ -f "$lock" ] && ! fuser "$lock" >/dev/null 2>&1; then
-            echo "    • Suppression du verrou orphelin: $lock"
-            log_info "Suppression verrou orphelin: $lock"
-            rm -f "$lock"
-        fi
-    done
-    
-    # 4. Reconfigurer dpkg si nécessaire
-    echo "  ↦ Reconfiguration de dpkg..."
-    log_command "dpkg --configure -a" "Configuration dpkg"
-    
-    # 5. Nettoyer le cache APT si corrompu
-    if [ -d "/var/lib/apt/lists/partial" ]; then
-        local partial_files=$(ls -1 /var/lib/apt/lists/partial 2>/dev/null | wc -l)
-        if [ $partial_files -gt 0 ]; then
-            echo "  ↦ Nettoyage des fichiers partiels corrompus ($partial_files fichiers)..."
-            log_info "Nettoyage de $partial_files fichiers partiels"
-            rm -rf /var/lib/apt/lists/*
-            APT_CLEANUP_DONE=true
-        fi
-    fi
-    
-    echo "  ↦ Système de paquets nettoyé ✓"
-    log_success "Nettoyage APT terminé"
-    
-    # Pause de sécurité
-    wait_silently 2
+    echo "  ↦ Système de paquets prêt ✓"
+    APT_CLEANUP_DONE=true
+    return 0
 }
 
-# Mise à jour APT sécurisée avec retry
-safe_apt_update() {
-    local max_attempts=3
+# Mise à jour APT avec retry intelligent
+update_apt_lists() {
+    log_info "Mise à jour des listes de paquets"
+    
+    local max_attempts=${APT_RETRY_MAX_ATTEMPTS:-3}
     local attempt=1
     
-    echo "◦ Mise à jour de la liste des paquets..."
-    log_info "Début de la mise à jour APT"
+    # Nettoyage initial si nécessaire
+    safe_apt_cleanup
     
     while [ $attempt -le $max_attempts ]; do
-        echo "  ↦ Tentative $attempt/$max_attempts..."
-        log_info "Tentative APT update $attempt/$max_attempts"
+        echo "◦ Mise à jour des listes de paquets (tentative $attempt/$max_attempts)..."
         
-        # Si on a nettoyé les listes, on doit tout retélécharger
-        if [ "$APT_CLEANUP_DONE" = true ]; then
-            echo "    • Reconstruction complète du cache APT..."
-            log_info "Reconstruction complète du cache APT"
-        fi
-        
-        if apt-get update -y 2>&1 | tee /tmp/apt_update.log; then
-            # Vérifier qu'il n'y a pas d'erreurs dans la sortie
+        # Utiliser un timeout pour éviter les blocages
+        if timeout 300 apt-get update -o Acquire::http::Timeout=30 -o Acquire::ftp::Timeout=30 > /tmp/apt_update.log 2>&1; then
+            # Vérifier s'il y a eu des erreurs
             if ! grep -E "(^Err:|^E:|Failed)" /tmp/apt_update.log >/dev/null 2>&1; then
                 echo "  ↦ Liste des paquets mise à jour ✓"
                 log_success "APT update réussi"
@@ -212,7 +278,7 @@ safe_apt_update() {
     return 1
 }
 
-# Ajouter la version sur l'image de fond avec configuration avancée
+# Ajouter la version sur l'image de fond (version simplifiée)
 add_version_to_image() {
     local source_image=$1
     local dest_image=$2
@@ -234,11 +300,20 @@ add_version_to_image() {
         return 0
     fi
     
-    # Script Python avec configuration avancée
-    python3 << EOF
+    # Script Python simplifié avec indentation correcte
+    python3 << 'EOF'
 import sys
 import os
 from PIL import Image, ImageDraw, ImageFont
+
+# Variables depuis l'environnement
+source_image = os.environ.get('SOURCE_IMAGE', sys.argv[1] if len(sys.argv) > 1 else '')
+dest_image = os.environ.get('DEST_IMAGE', sys.argv[2] if len(sys.argv) > 2 else '')
+version_text = os.environ.get('VERSION_TEXT', sys.argv[3] if len(sys.argv) > 3 else '')
+font_size = int(os.environ.get('VERSION_OVERLAY_FONT_SIZE', '24'))
+font_color = os.environ.get('VERSION_OVERLAY_FONT_COLOR', '#FFFFFF')
+margin_right = int(os.environ.get('VERSION_OVERLAY_MARGIN_RIGHT', '10'))
+margin_bottom = int(os.environ.get('VERSION_OVERLAY_MARGIN_BOTTOM', '10'))
 
 def hex_to_rgb(hex_color):
     """Convertir une couleur hex en RGB"""
@@ -247,34 +322,13 @@ def hex_to_rgb(hex_color):
 
 try:
     # Charger l'image
-    img = Image.open("$source_image")
+    img = Image.open(source_image)
+    draw = ImageDraw.Draw(img)
     
-    # Si l'image n'a pas de canal alpha, la convertir en RGBA
-    if img.mode != 'RGBA':
-        img = img.convert('RGBA')
-    
-    # Créer un overlay transparent pour le texte
-    txt_layer = Image.new('RGBA', img.size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(txt_layer)
-    
-    # Configuration
-    font_size = $VERSION_OVERLAY_FONT_SIZE
-    margin_right = $VERSION_OVERLAY_MARGIN_RIGHT
-    margin_bottom = $VERSION_OVERLAY_MARGIN_BOTTOM
-    text_color = hex_to_rgb("$VERSION_OVERLAY_FONT_COLOR")
-    shadow_color = hex_to_rgb("$VERSION_OVERLAY_SHADOW_COLOR")
-    shadow_opacity = $VERSION_OVERLAY_SHADOW_OPACITY
-    is_bold = "$VERSION_OVERLAY_FONT_BOLD" == "true"
-    
-    # Essayer de charger une police système
+    # Essayer de charger une police
     font = None
-    font_paths = [
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if is_bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if is_bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf" if is_bold else "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    ]
-    
-    for font_path in font_paths:
+    for font_path in ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+                      '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf']:
         if os.path.exists(font_path):
             try:
                 font = ImageFont.truetype(font_path, font_size)
@@ -285,61 +339,139 @@ try:
     # Si aucune police trouvée, utiliser la police par défaut
     if font is None:
         font = ImageFont.load_default()
-        print("Utilisation de la police par défaut")
     
-    # Obtenir la taille du texte
-    if font != ImageFont.load_default():
-        bbox = draw.textbbox((0, 0), "$version_text", font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-    else:
-        # Pour la police par défaut, estimation
-        text_width = len("$version_text") * 10
-        text_height = 15
+    # Calculer la position du texte
+    bbox = draw.textbbox((0, 0), version_text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     
-    # Calculer la position (ancrage coin bas-droit)
-    x = img.width - margin_right - text_width
-    y = img.height - margin_bottom - text_height
+    x = img.width - text_width - margin_right
+    y = img.height - text_height - margin_bottom
     
-    # Dessiner l'ombre avec opacité
-    shadow_offset = max(2, int(font_size / 20))
-    if font != ImageFont.load_default():
-        # Ombre avec transparence
-        for offset_x in range(-shadow_offset, shadow_offset + 1):
-            for offset_y in range(-shadow_offset, shadow_offset + 1):
-                if offset_x != 0 or offset_y != 0:
-                    draw.text(
-                        (x + offset_x, y + offset_y), 
-                        "$version_text", 
-                        font=font, 
-                        fill=shadow_color + (shadow_opacity,)
-                    )
+    # Dessiner l'ombre (optionnel)
+    shadow_offset = 2
+    draw.text((x + shadow_offset, y + shadow_offset), version_text, 
+              font=font, fill=(0, 0, 0, 128))
     
-    # Dessiner le texte principal
-    draw.text((x, y), "$version_text", font=font, fill=text_color + (255,))
+    # Dessiner le texte
+    draw.text((x, y), version_text, font=font, fill=hex_to_rgb(font_color))
     
-    # Composer l'image finale
-    out = Image.alpha_composite(img, txt_layer)
-    
-    # Sauvegarder (convertir en RGB si nécessaire pour JPEG)
-    if dest_image.lower().endswith('.jpg') or dest_image.lower().endswith('.jpeg'):
-        out = out.convert('RGB')
-    
-    out.save("$dest_image", quality=95)
+    # Sauvegarder l'image
+    img.save(dest_image)
     print("Version ajoutée avec succès")
+    sys.exit(0)
     
 except Exception as e:
-    print(f"Erreur: {e}")
+    print(f"Erreur: {str(e)}")
+    # En cas d'erreur, copier simplement l'image source
     import shutil
-    shutil.copy2("$source_image", "$dest_image")
+    shutil.copy2(source_image, dest_image)
+    sys.exit(1)
 EOF
+    
+    # Passer les variables d'environnement au script Python
+    export SOURCE_IMAGE="$source_image"
+    export DEST_IMAGE="$dest_image"
+    export VERSION_TEXT="$version_text"
     
     if [ $? -eq 0 ]; then
         log_success "Version ajoutée sur l'image"
     else
         cp "$source_image" "$dest_image"
-        log_info "Image copiée sans modification"
+        log_info "Image copiée sans modification (erreur lors de l'ajout)"
     fi
+}
+
+# Désactiver le splash screen au démarrage
+disable_splash_screen() {
+    echo ""
+    echo "◦ Désactivation du splash screen..."
+    log_info "Désactivation du splash screen"
+    
+    # Modifier cmdline.txt pour un boot silencieux
+    if [ -f "/boot/cmdline.txt" ]; then
+        # Sauvegarder l'original
+        cp /boot/cmdline.txt /boot/cmdline.txt.backup_$(date +%Y%m%d_%H%M%S)
+        
+        # Ajouter quiet et supprimer les options de splash si pas déjà présent
+        if ! grep -q "quiet" /boot/cmdline.txt; then
+            # Lire le contenu actuel et ajouter quiet à la fin
+            CMDLINE=$(cat /boot/cmdline.txt | tr -d '\n')
+            echo "$CMDLINE quiet" > /boot/cmdline.txt
+            echo "  ↦ Mode quiet ajouté ✓"
+        else
+            echo "  ↦ Mode quiet déjà actif ✓"
+        fi
+        
+        # Supprimer les options de splash screen si présentes
+        sed -i 's/splash//g' /boot/cmdline.txt
+        sed -i 's/plymouth.ignore-serial-consoles//g' /boot/cmdline.txt
+        log_success "cmdline.txt modifié"
+    else
+        echo "  ↦ Fichier cmdline.txt non trouvé ⚠"
+        log_warn "Fichier /boot/cmdline.txt non trouvé"
+    fi
+    
+    # Désactiver le rainbow splash dans config.txt
+    if [ -f "$CONFIG_FILE" ]; then
+        # Ajouter ou modifier disable_splash
+        if grep -q "^disable_splash=" "$CONFIG_FILE"; then
+            sed -i 's/^disable_splash=.*/disable_splash=1/' "$CONFIG_FILE"
+            echo "  ↦ Rainbow splash déjà configuré, mis à jour ✓"
+        else
+            echo "disable_splash=1" >> "$CONFIG_FILE"
+            echo "  ↦ Rainbow splash désactivé ✓"
+        fi
+        log_success "Rainbow splash désactivé dans config.txt"
+    fi
+    
+    # Désactiver plymouth si installé
+    if systemctl list-unit-files | grep -q plymouth; then
+        systemctl mask plymouth-start.service 2>/dev/null || true
+        systemctl mask plymouth-read-write.service 2>/dev/null || true
+        systemctl mask plymouth-quit-wait.service 2>/dev/null || true
+        systemctl mask plymouth-quit.service 2>/dev/null || true
+        echo "  ↦ Services Plymouth désactivés ✓"
+        log_success "Services Plymouth masqués"
+    fi
+    
+    echo "  ↦ Splash screen désactivé ✓"
+    log_info "Configuration splash screen terminée"
+}
+
+# Désactiver le Bluetooth
+disable_bluetooth() {
+    echo ""
+    echo "◦ Désactivation du Bluetooth..."
+    log_info "Désactivation du Bluetooth"
+    
+    # Méthode 1: Via rfkill (réversible facilement)
+    if command -v rfkill &>/dev/null; then
+        rfkill block bluetooth 2>/dev/null || true
+        echo "  ↦ Bluetooth désactivé via rfkill ✓"
+        log_success "Bluetooth désactivé avec rfkill"
+    fi
+    
+    # Méthode 2: Désactiver les services Bluetooth
+    if systemctl list-unit-files | grep -q bluetooth; then
+        systemctl stop bluetooth.service 2>/dev/null || true
+        systemctl disable bluetooth.service 2>/dev/null || true
+        echo "  ↦ Service Bluetooth désactivé ✓"
+        log_success "Service Bluetooth désactivé"
+    fi
+    
+    # Méthode 3: Désactiver hciuart si présent (Raspberry Pi)
+    if systemctl list-unit-files | grep -q hciuart; then
+        systemctl stop hciuart.service 2>/dev/null || true
+        systemctl disable hciuart.service 2>/dev/null || true
+        echo "  ↦ Service hciuart désactivé ✓"
+        log_success "Service hciuart désactivé"
+    fi
+    
+    echo "  ↦ Bluetooth désactivé (réversible) ✓"
+    echo "    • Pour réactiver: sudo rfkill unblock bluetooth"
+    echo "    • Et: sudo systemctl enable --now bluetooth"
+    log_info "Bluetooth désactivé de manière réversible"
 }
 
 # ===============================================================================
@@ -417,191 +549,176 @@ echo ""
 send_progress 15 "Connexion au réseau..."
 
 # Établir la connexion internet
-if ! ensure_internet_connection; then
-    echo "  ↦ Impossible d'établir la connexion ✗"
-    log_error "Échec de la connexion réseau"
+if ! establish_network_connection; then
+    echo ""
+    echo "⚠ ERREUR : Impossible d'établir une connexion internet"
+    echo ""
+    echo "Vérifiez :"
+    echo "  • Le SSID du réseau : $WIFI_SSID"
+    echo "  • Le mot de passe configuré"
+    echo "  • La disponibilité du réseau"
+    echo ""
+    log_error "Échec de connexion réseau - Arrêt du script"
     exit 1
 fi
 
-# Attendre que la connexion soit stable
-wait_with_message 5 "Stabilisation de la connexion"
-
-send_progress 30 "Connexion établie"
+send_progress 25 "Connecté au réseau"
 echo ""
 sleep 2
 
 # ===============================================================================
-# ÉTAPE 3 : SYNCHRONISATION DE L'HORLOGE
+# ÉTAPE 3 : MISE À JOUR DU SYSTÈME
 # ===============================================================================
 
 echo "========================================================================"
-echo "ÉTAPE 3 : SYNCHRONISATION HORLOGE"
+echo "ÉTAPE 3 : MISE À JOUR DU SYSTÈME"
 echo "========================================================================"
 echo ""
 
-send_progress 35 "Synchronisation de l'horloge..."
+send_progress 30 "Mise à jour du système..."
 
-echo "◦ Synchronisation de l'horloge système..."
-log_info "Synchronisation NTP"
+# Mise à jour des listes
+if ! update_apt_lists; then
+    echo "⚠ Impossible de mettre à jour les listes de paquets"
+    echo "  Le script continue avec les listes existantes..."
+    log_warn "Continuation avec les listes de paquets existantes"
+fi
 
-if command -v timedatectl >/dev/null 2>&1; then
-    log_command "timedatectl set-ntp true" "Activation NTP"
-    
-    echo "  ↦ Attente de la synchronisation NTP..."
-    log_info "Attente synchronisation NTP - 15s"
-    wait_silently 15  # Plus de temps pour la synchro
-    
-    # Vérifier plusieurs fois
-    local sync_attempts=0
-    while [ $sync_attempts -lt 3 ]; do
-        if timedatectl status | grep -q "synchronized: yes"; then
-            echo "  ↦ Horloge synchronisée ✓"
-            log_success "Synchronisation NTP confirmée"
-            break
+# Installation/Mise à jour des paquets essentiels
+echo ""
+echo "◦ Installation des paquets essentiels..."
+log_info "Installation des paquets système de base"
+
+# Installer les paquets un par un pour mieux gérer les erreurs
+for package in python3-pip git curl wget; do
+    if ! dpkg -l | grep -q "^ii  $package "; then
+        echo "  ↦ Installation de $package..."
+        if apt-get install -y $package >/dev/null 2>&1; then
+            echo "    ✓ $package installé"
+            log_success "$package installé"
         else
-            echo "  ↦ Synchronisation en cours... (tentative $((sync_attempts+1))/3)"
-            log_info "Attente supplémentaire pour NTP"
-            wait_silently 5
-            ((sync_attempts++))
+            echo "    ⚠ Échec de l'installation de $package"
+            log_warn "Échec installation $package"
         fi
-    done
-    
-    echo "  ↦ Date/Heure: $(date '+%d/%m/%Y %H:%M:%S')"
-    log_info "Heure synchronisée: $(date)"
+    else
+        echo "  ↦ $package déjà installé ✓"
+    fi
+done
+
+# Installation de Pillow pour l'overlay de version
+echo ""
+echo "◦ Installation de Pillow pour l'affichage de version..."
+if pip3 install --no-cache-dir Pillow >/dev/null 2>&1; then
+    echo "  ↦ Pillow installé ✓"
+    log_success "Pillow installé"
 else
-    echo "  ↦ timedatectl non disponible ⚠"
-    log_warn "timedatectl non disponible"
+    echo "  ↦ Pillow non installé (overlay indisponible) ⚠"
+    log_warn "Installation Pillow échouée"
 fi
 
-send_progress 40 "Horloge synchronisée"
+send_progress 50 "Paquets installés"
 echo ""
 sleep 2
 
 # ===============================================================================
-# ÉTAPE 4 : MISE À JOUR DE SÉCURITÉ
+# ÉTAPE 4 : CRÉATION DU CACHE
 # ===============================================================================
 
 echo "========================================================================"
-echo "ÉTAPE 4 : MISE À JOUR DE SÉCURITÉ"
+echo "ÉTAPE 4 : CRÉATION DU CACHE DE PAQUETS"
 echo "========================================================================"
 echo ""
 
-send_progress 45 "Préparation des mises à jour..."
+send_progress 55 "Création du cache..."
 
-# Nettoyer APT proprement
-clean_apt_properly
-
-# Attendre un peu après le nettoyage
-wait_with_message 3 "Stabilisation après nettoyage"
-
-# Mise à jour des dépôts avec retry
-if ! safe_apt_update; then
-    echo "  ↦ Impossible de mettre à jour les dépôts ✗"
-    echo "  ↦ Continuation sans mises à jour de sécurité ⚠"
-    log_error "APT update impossible, continuation sans mises à jour"
-fi
-
-send_progress 55 "Installation des mises à jour critiques..."
-
-# Installation des mises à jour de sécurité critiques uniquement
-echo ""
-echo "◦ Installation des mises à jour de sécurité critiques..."
-log_info "Installation des paquets critiques uniquement"
-
-# Liste des paquets critiques
-CRITICAL_PACKAGES="openssl libssl* sudo systemd apt dpkg libc6 libpam* ca-certificates tzdata"
-
-# Installer uniquement les mises à jour critiques avec gestion d'erreur
-if log_command "DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --allow-unauthenticated $CRITICAL_PACKAGES" "Mise à jour sécurité"; then
-    echo "  ↦ Mises à jour de sécurité installées ✓"
-    log_success "Mises à jour de sécurité installées"
-else
-    echo "  ↦ Certaines mises à jour ont échoué ⚠"
-    log_warn "Certaines mises à jour ont échoué"
-    
-    # Essayer de réparer
-    echo "  ↦ Tentative de réparation..."
-    dpkg --configure -a
-    apt-get install -f -y
-fi
-
-# Pause après les mises à jour
-wait_with_message 5 "Stabilisation après mises à jour"
-
-send_progress 65 "Création du cache de paquets..."
-
-# ===============================================================================
-# ÉTAPE 5 : CRÉATION DU CACHE COMPLET
-# ===============================================================================
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 5 : CRÉATION DU CACHE DE PAQUETS"
-echo "========================================================================"
-echo ""
-
-echo "◦ Initialisation du système de cache..."
-log_info "Initialisation du cache de paquets"
-
-# Initialiser le cache
-if init_package_cache; then
-    echo "  ↦ Cache initialisé ✓"
-    log_success "Cache initialisé avec succès"
-else
-    echo "  ↦ Erreur d'initialisation du cache ✗"
-    log_error "Échec de l'initialisation du cache"
-fi
-
-# Attendre avant de télécharger
-wait_with_message 3 "Préparation du téléchargement"
-
-# Télécharger tous les paquets définis dans packages.list
-echo ""
-echo "◦ Téléchargement de tous les paquets MaxLink..."
-echo "  ↦ Cette opération peut prendre quelques minutes..."
-
-if download_all_packages; then
-    echo ""
-    echo "  ↦ Cache de paquets créé avec succès ✓"
-    log_success "Tous les paquets ont été téléchargés"
-    
-    # Afficher les statistiques
-    get_cache_stats
-else
-    echo ""
-    echo "  ↦ Certains paquets n'ont pas pu être téléchargés ⚠"
-    log_warn "Cache créé partiellement"
-fi
-
-# TÉLÉCHARGEMENT DU DASHBOARD V3
-echo ""
-echo "◦ Téléchargement du dashboard MaxLink V3..."
-DASHBOARD_CACHE_DIR="/var/cache/maxlink/dashboard"
-DASHBOARD_ARCHIVE="$DASHBOARD_CACHE_DIR/dashboard.tar.gz"
-
-# Créer le répertoire de cache pour le dashboard
+# Créer les répertoires de cache
+echo "◦ Création de la structure du cache..."
+mkdir -p "$CACHE_DIR"
+mkdir -p "$CACHE_ARCHIVE_DIR"
 mkdir -p "$DASHBOARD_CACHE_DIR"
+echo "  ↦ Structure créée ✓"
+log_info "Structure de cache créée"
 
-echo "  ↦ Téléchargement depuis GitHub..."
-log_info "Téléchargement du dashboard V3 depuis GitHub"
+# Télécharger les paquets nécessaires
+echo ""
+echo "◦ Téléchargement des paquets pour le cache..."
+log_info "Téléchargement des paquets dans le cache"
 
-# Supprimer l'ancienne archive si elle existe
-rm -f "$DASHBOARD_ARCHIVE"
+# Nettoyer le cache APT avant
+apt-get clean
 
-# Construire l'URL de téléchargement
-GITHUB_ARCHIVE_URL="${GITHUB_REPO_URL}/archive/refs/heads/${GITHUB_BRANCH}.tar.gz"
+# Télécharger tous les paquets définis dans packages.sh
+if download_all_packages "$CACHE_ARCHIVE_DIR"; then
+    echo "  ↦ Paquets téléchargés dans le cache ✓"
+    log_success "Cache de paquets créé avec succès"
+else
+    echo "  ↦ Certains paquets n'ont pas pu être téléchargés ⚠"
+    log_warn "Cache de paquets partiellement créé"
+fi
 
-# Télécharger avec curl ou wget
-if command -v curl >/dev/null 2>&1; then
-    if log_command "curl -L -o '$DASHBOARD_ARCHIVE' '$GITHUB_ARCHIVE_URL'" "Téléchargement dashboard (curl)"; then
+# Créer l'index du cache
+echo ""
+echo "◦ Création de l'index du cache..."
+(cd "$CACHE_ARCHIVE_DIR" && dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz)
+echo "  ↦ Index créé ✓"
+log_info "Index Packages.gz créé"
+
+# Créer les métadonnées du cache
+create_cache_metadata() {
+    local total_size=$(du -sh "$CACHE_ARCHIVE_DIR" 2>/dev/null | cut -f1)
+    local package_count=$(ls -1 "$CACHE_ARCHIVE_DIR"/*.deb 2>/dev/null | wc -l)
+    
+    cat > "$CACHE_STATUS_FILE" << EOF
+{
+    "created": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "version": "$MAXLINK_VERSION",
+    "total_size": "$total_size",
+    "package_count": $package_count,
+    "packages": {
+        "system": $(echo "${SYSTEM_PACKAGES[@]}" | jq -R -s -c 'split(" ")'),
+        "network": $(echo "${NETWORK_PACKAGES[@]}" | jq -R -s -c 'split(" ")'),
+        "web": $(echo "${WEB_PACKAGES[@]}" | jq -R -s -c 'split(" ")'),
+        "mqtt": $(echo "${MQTT_PACKAGES[@]}" | jq -R -s -c 'split(" ")'),
+        "monitoring": $(echo "${MONITORING_PACKAGES[@]}" | jq -R -s -c 'split(" ")'),
+        "python": $(echo "${PYTHON_PACKAGES[@]}" | jq -R -s -c 'split(" ")')
+    }
+}
+EOF
+}
+
+create_cache_metadata
+echo "  ↦ Métadonnées créées ✓"
+log_info "Métadonnées du cache créées"
+
+send_progress 65 "Cache créé"
+
+# ===============================================================================
+# ÉTAPE 5 : TÉLÉCHARGEMENT DU DASHBOARD
+# ===============================================================================
+
+echo ""
+echo "========================================================================"
+echo "ÉTAPE 5 : TÉLÉCHARGEMENT DU DASHBOARD V3"
+echo "========================================================================"
+echo ""
+
+send_progress 70 "Téléchargement du dashboard..."
+
+echo "◦ Téléchargement du dashboard depuis GitHub..."
+echo "  ↦ Branche: $GITHUB_BRANCH"
+log_info "Téléchargement dashboard depuis GitHub - branche: $GITHUB_BRANCH"
+
+# Utiliser curl ou wget selon disponibilité
+if command -v curl &>/dev/null; then
+    if curl -L -o "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL" 2>/dev/null; then
         echo "  ↦ Dashboard téléchargé ✓"
         log_success "Dashboard téléchargé avec curl"
     else
         echo "  ↦ Erreur lors du téléchargement ✗"
         log_error "Échec du téléchargement du dashboard"
     fi
-elif command -v wget >/dev/null 2>&1; then
-    if log_command "wget -O '$DASHBOARD_ARCHIVE' '$GITHUB_ARCHIVE_URL'" "Téléchargement dashboard (wget)"; then
+elif command -v wget &>/dev/null; then
+    if wget -q -O "$DASHBOARD_ARCHIVE" "$GITHUB_ARCHIVE_URL"; then
         echo "  ↦ Dashboard téléchargé ✓"
         log_success "Dashboard téléchargé avec wget"
     else
@@ -679,6 +796,12 @@ else
     log_warn "Fichier $CONFIG_FILE non trouvé"
 fi
 
+# Désactivation du splash screen
+disable_splash_screen
+
+# Désactivation du Bluetooth
+disable_bluetooth
+
 # Personnalisation de l'interface
 echo ""
 echo "◦ Personnalisation de l'interface..."
@@ -748,6 +871,17 @@ echo "◦ Restauration de l'état réseau..."
 restore_network_state
 echo "  ↦ État réseau restauré ✓"
 
+# Fonction pour obtenir les statistiques du cache
+get_cache_stats() {
+    if [ -f "$CACHE_STATUS_FILE" ]; then
+        local total_size=$(jq -r '.total_size' "$CACHE_STATUS_FILE" 2>/dev/null || echo "N/A")
+        local package_count=$(jq -r '.package_count' "$CACHE_STATUS_FILE" 2>/dev/null || echo "0")
+        echo "  • Taille totale : $total_size"
+        echo "  • Nombre de paquets : $package_count"
+        echo "  • Dashboard : $([ -f "$DASHBOARD_ARCHIVE" ] && echo "Téléchargé ✓" || echo "Non disponible ✗")"
+    fi
+}
+
 # MISE À JOUR DU STATUT DU SERVICE
 if [ -n "$SERVICE_ID" ]; then
     echo ""
@@ -765,6 +899,8 @@ echo "  ↦ Version: v$MAXLINK_VERSION"
 echo "  ↦ Système à jour et configuré"
 echo "  ↦ Cache de paquets créé pour installation offline"
 echo "  ↦ Dashboard V3 téléchargé"
+echo "  ↦ Splash screen désactivé"
+echo "  ↦ Bluetooth désactivé (réversible)"
 log_success "Mise à jour système terminée - Version: v$MAXLINK_VERSION"
 
 # Afficher le résumé du cache

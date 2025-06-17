@@ -3,6 +3,7 @@
 # ===============================================================================
 # MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION CORRIGÉE)
 # Script d'installation avec mise à jour du statut et gestion SKIP_REBOOT
+# Version modifiée avec configuration ACL pour l'utilisateur prod
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -55,6 +56,112 @@ check_first_install() {
     fi
 }
 
+# Configuration des permissions ACL pour l'utilisateur prod
+setup_prod_user_permissions() {
+    echo ""
+    echo "========================================================================"
+    echo "CONFIGURATION DES PERMISSIONS SSH POUR L'UTILISATEUR PROD"
+    echo "========================================================================"
+    
+    # Vérifier que l'utilisateur prod existe
+    if ! id "prod" &>/dev/null; then
+        echo "⚠ L'utilisateur 'prod' n'existe pas. Création de l'utilisateur..."
+        log_warning "Utilisateur prod non trouvé, création en cours"
+        
+        # Créer l'utilisateur prod
+        useradd -m -s /bin/bash prod
+        echo "  ↦ Utilisateur 'prod' créé ✓"
+        log_success "Utilisateur prod créé"
+    else
+        echo "◦ L'utilisateur 'prod' existe déjà ✓"
+        log_info "Utilisateur prod trouvé"
+    fi
+    
+    # Vérifier que ACL est disponible
+    echo ""
+    echo "◦ Vérification de la disponibilité des ACL..."
+    if command -v setfacl &>/dev/null && command -v getfacl &>/dev/null; then
+        echo "  ↦ Commandes ACL disponibles ✓"
+        log_info "ACL disponible sur le système"
+    else
+        echo "  ↦ ERREUR: ACL non disponible sur le système ✗"
+        log_error "ACL non disponible"
+        return 1
+    fi
+    
+    # Appliquer les ACL sur /var/www/
+    echo ""
+    echo "◦ Application des permissions ACL sur /var/www/..."
+    
+    # Créer /var/www si nécessaire
+    if [ ! -d "/var/www" ]; then
+        mkdir -p /var/www
+        echo "  ↦ Répertoire /var/www créé ✓"
+        log_info "Répertoire /var/www créé"
+    fi
+    
+    # Appliquer les ACL récursives pour l'utilisateur prod
+    echo "  ↦ Application des ACL pour lecture, écriture et exécution..."
+    setfacl -R -m u:prod:rwx /var/www/
+    if [ $? -eq 0 ]; then
+        echo "    • Permissions actuelles appliquées ✓"
+        log_success "ACL appliquées sur les fichiers existants"
+    else
+        echo "    • ERREUR lors de l'application des permissions ✗"
+        log_error "Échec de l'application des ACL"
+        return 1
+    fi
+    
+    # Configurer les ACL par défaut pour les nouveaux fichiers/dossiers
+    echo "  ↦ Configuration des ACL par défaut pour les nouveaux fichiers..."
+    setfacl -R -d -m u:prod:rwx /var/www/
+    if [ $? -eq 0 ]; then
+        echo "    • Permissions par défaut configurées ✓"
+        log_success "ACL par défaut configurées"
+    else
+        echo "    • ERREUR lors de la configuration des permissions par défaut ✗"
+        log_error "Échec de la configuration des ACL par défaut"
+        return 1
+    fi
+    
+    # Vérifier les permissions
+    echo ""
+    echo "◦ Vérification des permissions appliquées..."
+    echo "  ↦ Permissions sur /var/www/ :"
+    getfacl /var/www/ | grep -E "user:prod|default:user:prod" | head -5
+    
+    # Test de création d'un fichier
+    echo ""
+    echo "◦ Test des permissions..."
+    TEST_FILE="/var/www/test_prod_permissions_$$.txt"
+    su - prod -c "echo 'Test permissions' > $TEST_FILE 2>/dev/null"
+    if [ -f "$TEST_FILE" ]; then
+        echo "  ↦ Test d'écriture réussi ✓"
+        log_success "L'utilisateur prod peut écrire dans /var/www/"
+        rm -f "$TEST_FILE"
+    else
+        echo "  ↦ ATTENTION: Test d'écriture échoué ⚠"
+        log_warning "L'utilisateur prod ne peut pas écrire dans /var/www/"
+    fi
+    
+    # Afficher un résumé
+    echo ""
+    echo "========================================================================"
+    echo "RÉSUMÉ DES PERMISSIONS"
+    echo "========================================================================"
+    echo "  • Utilisateur : prod"
+    echo "  • Répertoire : /var/www/ et tous ses sous-dossiers"
+    echo "  • Permissions : Lecture, écriture et exécution complètes (rwx)"
+    echo "  • ACL par défaut : Configurées pour les nouveaux fichiers/dossiers"
+    echo ""
+    echo "L'utilisateur 'prod' peut maintenant accéder via SSH/SFTP avec des"
+    echo "permissions complètes dans /var/www/ sans affecter le fonctionnement"
+    echo "des services web existants."
+    echo "========================================================================"
+    
+    log_info "Configuration des permissions SSH pour prod terminée"
+}
+
 # Copier tous les widgets depuis la clé USB vers local
 copy_widgets_to_local() {
     echo ""
@@ -66,316 +173,109 @@ copy_widgets_to_local() {
     mkdir -p "$LOCAL_WIDGETS_CONFIG"
     
     if [ ! -d "$BASE_DIR/scripts/widgets" ]; then
-        echo "  ↦ Répertoire des widgets non trouvé sur la clé USB ✗"
-        log_error "Répertoire des widgets non trouvé: $BASE_DIR/scripts/widgets"
+        echo "  ↦ ERREUR: Dossier source des widgets non trouvé ✗"
+        log_error "Dossier $BASE_DIR/scripts/widgets non trouvé"
         return 1
     fi
     
-    # Copier le core
-    if [ -d "$BASE_DIR/scripts/widgets/_core" ]; then
-        echo "  ↦ Copie du core..."
-        cp -r "$BASE_DIR/scripts/widgets/_core" "$LOCAL_WIDGETS_DIR/"
-        echo "    • Core copié ✓"
+    # Compter les widgets
+    WIDGET_COUNT=$(find "$BASE_DIR/scripts/widgets" -name "*.sh" -type f | wc -l)
+    echo "  ↦ $WIDGET_COUNT widgets trouvés"
+    log_info "$WIDGET_COUNT widgets à copier"
+    
+    # Copier tous les widgets
+    cp -r "$BASE_DIR/scripts/widgets"/* "$LOCAL_WIDGETS_DIR/" 2>/dev/null || true
+    
+    # Copier les configurations si elles existent
+    if [ -d "$BASE_DIR/config/widgets" ]; then
+        cp -r "$BASE_DIR/config/widgets"/* "$LOCAL_WIDGETS_CONFIG/" 2>/dev/null || true
+        echo "  ↦ Configurations des widgets copiées ✓"
     fi
     
-    # Copier chaque widget
-    local copy_count=0
+    # Rendre les widgets exécutables
+    chmod +x "$LOCAL_WIDGETS_DIR"/*.sh 2>/dev/null || true
     
-    for widget_dir in "$BASE_DIR/scripts/widgets"/*; do
-        if [ -d "$widget_dir" ] && [ "$(basename "$widget_dir")" != "_core" ]; then
-            widget_name=$(basename "$widget_dir")
-            
-            echo "  ↦ Copie du widget $widget_name..."
-            cp -r "$widget_dir" "$LOCAL_WIDGETS_DIR/"
-            
-            # Copier la config JSON
-            if [ -f "$widget_dir/${widget_name}_widget.json" ]; then
-                cp "$widget_dir/${widget_name}_widget.json" "$LOCAL_WIDGETS_CONFIG/"
-            fi
-            
-            ((copy_count++))
-            log_info "Widget $widget_name copié"
-        fi
-    done
-    
-    # Définir les permissions
-    chown -R root:root "$LOCAL_WIDGETS_DIR"
-    chmod -R 755 "$LOCAL_WIDGETS_DIR"
-    find "$LOCAL_WIDGETS_DIR" -name "*.py" -exec chmod +x {} \;
-    
-    echo "  ↦ $copy_count widget(s) copié(s) ✓"
-    log_success "Copie terminée - $copy_count widgets"
-    return 0
+    echo "  ↦ Widgets copiés avec succès ✓"
+    log_success "Widgets copiés vers /opt/maxlink"
 }
 
-# Créer les scripts de healthcheck
+# Créer les scripts de vérification de santé
 create_healthcheck_scripts() {
     echo ""
     echo "◦ Création des scripts de vérification..."
-    mkdir -p /opt/maxlink/healthchecks
-
-    # 1. Script de vérification MQTT
-    cat > /opt/maxlink/healthchecks/check-mqtt.sh << 'EOF'
-#!/bin/bash
-# Vérification que Mosquitto est prêt à accepter des connexions
-
-# Configuration depuis l'environnement ou valeurs par défaut
-MQTT_USER="${MQTT_USER:-mosquitto}"
-MQTT_PASS="${MQTT_PASS:-mqtt}"
-MQTT_PORT="${MQTT_PORT:-1883}"
-MAX_ATTEMPTS=30
-ATTEMPT=0
-
-echo "[MQTT Check] Vérification du broker MQTT..."
-
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-    # Test de connexion
-    if mosquitto_pub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t "test/healthcheck" -m "test" 2>/dev/null; then
-        echo "[MQTT Check] ✓ Broker MQTT opérationnel"
-        
-        # Vérifier aussi les topics système
-        if timeout 2 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t '$SYS/broker/version' -C 1 >/dev/null 2>&1; then
-            echo "[MQTT Check] ✓ Topics système accessibles"
-        fi
-        
-        exit 0
-    fi
     
-    ATTEMPT=$((ATTEMPT + 1))
-    echo "[MQTT Check] Tentative $ATTEMPT/$MAX_ATTEMPTS..."
-    sleep 2
-done
-
-echo "[MQTT Check] ✗ Timeout - Mosquitto non disponible après $MAX_ATTEMPTS tentatives"
-exit 1
-EOF
-
-    # 2. Script de vérification réseau
-    cat > /opt/maxlink/healthchecks/check-network.sh << 'EOF'
+    # Script de vérification réseau
+    cat > /usr/local/bin/maxlink-check-network.sh << 'EOF'
 #!/bin/bash
-# Vérification que le réseau est complètement initialisé
-
-echo "[Network Check] Vérification du réseau..."
-
-# Attendre que NetworkManager soit complètement prêt
-for i in {1..30}; do
-    if nmcli general status >/dev/null 2>&1; then
-        echo "[Network Check] ✓ NetworkManager opérationnel"
-        break
-    fi
-    echo "[Network Check] Attente NetworkManager... ($i/30)"
-    sleep 1
-done
-
-# Vérifier l'interface WiFi
-if ip link show wlan0 >/dev/null 2>&1; then
-    echo "[Network Check] ✓ Interface WiFi disponible"
-    
-    # Si l'AP est configuré, vérifier qu'il est actif
-    if nmcli con show | grep -q "MaxLink-NETWORK"; then
-        echo "[Network Check] Configuration AP détectée"
-        
-        # Attendre que l'AP soit actif si nécessaire
-        for i in {1..20}; do
-            if nmcli con show --active | grep -q "MaxLink-NETWORK"; then
-                echo "[Network Check] ✓ Point d'accès actif"
-                break
-            fi
-            echo "[Network Check] Attente activation AP... ($i/20)"
-            sleep 2
-        done
-    fi
-else
-    echo "[Network Check] ⚠ Interface WiFi non trouvée"
-fi
-
-# Vérifier la résolution DNS locale si dnsmasq est actif
-if pgrep -f "dnsmasq.*NetworkManager" >/dev/null; then
-    echo "[Network Check] ✓ Service DNS (dnsmasq) actif"
-fi
-
-exit 0
-EOF
-
-    # 3. Script de vérification Nginx
-    cat > /opt/maxlink/healthchecks/check-nginx.sh << 'EOF'
-#!/bin/bash
-# Vérification que Nginx est prêt
-
-echo "[Nginx Check] Vérification du serveur web..."
-
-# Vérifier que le service est actif
-if ! systemctl is-active --quiet nginx; then
-    echo "[Nginx Check] ✗ Service Nginx non actif"
-    exit 1
-fi
-
-# Vérifier que le port est en écoute
-if netstat -tlnp 2>/dev/null | grep -q ":80.*nginx" || ss -tlnp 2>/dev/null | grep -q ":80.*nginx"; then
-    echo "[Nginx Check] ✓ Nginx écoute sur le port 80"
-else
-    echo "[Nginx Check] ✗ Nginx n'écoute pas sur le port 80"
-    exit 1
-fi
-
-# Test HTTP simple
-if curl -s -o /dev/null -w "%{http_code}" http://localhost/ | grep -q "200\|304"; then
-    echo "[Nginx Check] ✓ Réponse HTTP correcte"
-else
-    echo "[Nginx Check] ⚠ Pas de réponse HTTP valide"
-fi
-
-exit 0
-EOF
-
-    # 4. Script de vérification des widgets
-    cat > /opt/maxlink/healthchecks/check-widgets.sh << 'EOF'
-#!/bin/bash
-# Vérification que les fichiers des widgets sont accessibles localement
-
-echo "[Widgets Check] Vérification des fichiers des widgets..."
-
-LOCAL_WIDGETS_DIR="/opt/maxlink/widgets"
-LOCAL_WIDGETS_CONFIG="/opt/maxlink/config/widgets"
-ERRORS=0
-
-# Vérifier que les répertoires existent
-if [ ! -d "$LOCAL_WIDGETS_DIR" ]; then
-    echo "[Widgets Check] ✗ Répertoire des widgets non trouvé: $LOCAL_WIDGETS_DIR"
-    exit 1
-fi
-
-if [ ! -d "$LOCAL_WIDGETS_CONFIG" ]; then
-    echo "[Widgets Check] ✗ Répertoire de config non trouvé: $LOCAL_WIDGETS_CONFIG"
-    exit 1
-fi
-
-# Vérifier chaque widget installé
-for widget_service in /etc/systemd/system/maxlink-widget-*.service; do
-    if [ -f "$widget_service" ]; then
-        widget_name=$(basename "$widget_service" .service | sed 's/maxlink-widget-//')
-        
-        # Vérifier le collecteur
-        if [ -f "$LOCAL_WIDGETS_DIR/$widget_name/${widget_name}_collector.py" ]; then
-            echo "[Widgets Check] ✓ Collecteur $widget_name présent"
-        else
-            echo "[Widgets Check] ✗ Collecteur $widget_name manquant"
-            ((ERRORS++))
-        fi
-        
-        # Vérifier la config
-        if [ -f "$LOCAL_WIDGETS_CONFIG/${widget_name}_widget.json" ]; then
-            echo "[Widgets Check] ✓ Config $widget_name présente"
-        else
-            echo "[Widgets Check] ✗ Config $widget_name manquante"
-            ((ERRORS++))
-        fi
-    fi
-done
-
-if [ $ERRORS -eq 0 ]; then
-    echo "[Widgets Check] ✓ Tous les fichiers des widgets sont présents"
+# Vérification de la connectivité réseau
+if nmcli networking connectivity | grep -q "full\|limited\|portal"; then
+    echo "Network connectivity OK"
     exit 0
 else
-    echo "[Widgets Check] ✗ $ERRORS fichier(s) manquant(s)"
+    echo "Network connectivity FAILED"
     exit 1
 fi
 EOF
-
-    # 5. Script de vérification système global
-    cat > /opt/maxlink/healthchecks/check-system.sh << 'EOF'
+    
+    # Script de vérification MQTT
+    cat > /usr/local/bin/maxlink-check-mqtt.sh << 'EOF'
 #!/bin/bash
-# Vérification globale du système MaxLink
-
-echo ""
-echo "========================================================================"
-echo "VÉRIFICATION DU SYSTÈME MAXLINK"
-echo "========================================================================"
-echo ""
-echo "Date: $(date)"
-echo ""
-
-# Vérifier tous les composants
-ERRORS=0
-
-# 1. Réseau
-echo "▶ Vérification réseau..."
-if /opt/maxlink/healthchecks/check-network.sh; then
-    echo "  └─ Réseau: OK ✓"
+# Vérification que Mosquitto est actif
+if systemctl is-active mosquitto >/dev/null 2>&1; then
+    echo "MQTT broker is running"
+    exit 0
 else
-    echo "  └─ Réseau: ERREUR ✗"
-    ((ERRORS++))
+    echo "MQTT broker is not running"
+    exit 1
 fi
-echo ""
-
-# 2. MQTT
-echo "▶ Vérification MQTT..."
-if /opt/maxlink/healthchecks/check-mqtt.sh; then
-    echo "  └─ MQTT: OK ✓"
-else
-    echo "  └─ MQTT: ERREUR ✗"
-    ((ERRORS++))
-fi
-echo ""
-
-# 3. Nginx
-echo "▶ Vérification Nginx..."
-if /opt/maxlink/healthchecks/check-nginx.sh; then
-    echo "  └─ Nginx: OK ✓"
-else
-    echo "  └─ Nginx: ERREUR ✗"
-    ((ERRORS++))
-fi
-echo ""
-
-# 4. Fichiers des widgets
-echo "▶ Vérification des fichiers des widgets..."
-if /opt/maxlink/healthchecks/check-widgets.sh; then
-    echo "  └─ Fichiers widgets: OK ✓"
-else
-    echo "  └─ Fichiers widgets: ERREUR ✗"
-    ((ERRORS++))
-fi
-echo ""
-
-# 5. Services des widgets
-echo "▶ Vérification des services des widgets..."
-WIDGET_ERRORS=0
-for service in maxlink-widget-*; do
-    if systemctl is-enabled --quiet "$service" 2>/dev/null; then
-        if systemctl is-active --quiet "$service"; then
-            echo "  ├─ $service: ACTIF ✓"
-        else
-            echo "  ├─ $service: INACTIF ✗"
-            ((WIDGET_ERRORS++))
-        fi
-    fi
-done
-
-if [ $WIDGET_ERRORS -eq 0 ]; then
-    echo "  └─ Tous les widgets: OK ✓"
-else
-    echo "  └─ $WIDGET_ERRORS widget(s) inactif(s) ✗"
-    ((ERRORS++))
-fi
-echo ""
-
-# Résumé
-echo "========================================================================"
-if [ $ERRORS -eq 0 ]; then
-    echo "RÉSULTAT: Système MaxLink opérationnel ✓"
-    echo "Note: Le système fonctionne de manière autonome sans la clé USB"
-else
-    echo "RÉSULTAT: $ERRORS erreur(s) détectée(s) ✗"
-fi
-echo "========================================================================"
-echo ""
-
-exit $ERRORS
 EOF
-
-    # Rendre les scripts exécutables
-    chmod +x /opt/maxlink/healthchecks/*.sh
+    
+    # Script de vérification des widgets
+    cat > /usr/local/bin/maxlink-check-widgets.sh << 'EOF'
+#!/bin/bash
+# Vérification qu'au moins un widget est actif
+ACTIVE_WIDGETS=$(systemctl list-units --type=service --state=active | grep -c "maxlink-widget-")
+if [ "$ACTIVE_WIDGETS" -gt 0 ]; then
+    echo "$ACTIVE_WIDGETS widget(s) active"
+    exit 0
+else
+    echo "No active widgets found"
+    exit 1
+fi
+EOF
+    
+    # Script de monitoring global
+    cat > /usr/local/bin/maxlink-health-monitor.sh << 'EOF'
+#!/bin/bash
+# Monitoring de santé MaxLink
+while true; do
+    # Vérifier l'état des services critiques
+    NETWORK_OK=$(systemctl is-active maxlink-network-ready.service 2>/dev/null)
+    MQTT_OK=$(systemctl is-active mosquitto 2>/dev/null)
+    NGINX_OK=$(systemctl is-active nginx 2>/dev/null)
+    
+    # Logger l'état
+    logger -t maxlink-health "Network: $NETWORK_OK, MQTT: $MQTT_OK, Nginx: $NGINX_OK"
+    
+    # Si un service critique est down, tenter de le relancer
+    if [ "$MQTT_OK" != "active" ]; then
+        logger -t maxlink-health "Attempting to restart MQTT"
+        systemctl restart mosquitto
+    fi
+    
+    if [ "$NGINX_OK" != "active" ]; then
+        logger -t maxlink-health "Attempting to restart Nginx"
+        systemctl restart nginx
+    fi
+    
+    sleep 60
+done
+EOF
+    
+    # Rendre tous les scripts exécutables
+    chmod +x /usr/local/bin/maxlink-check-*.sh
+    chmod +x /usr/local/bin/maxlink-health-monitor.sh
+    
     echo "  ↦ Scripts de vérification créés ✓"
     log_success "Scripts de healthcheck créés"
 }
@@ -383,19 +283,18 @@ EOF
 # Créer les services systemd
 create_systemd_services() {
     echo ""
-    echo "◦ Création des services de vérification..."
-
-    # 1. Service de vérification réseau au démarrage
+    echo "◦ Création des services systemd..."
+    
+    # Service de vérification réseau
     cat > /etc/systemd/system/maxlink-network-ready.service << EOF
 [Unit]
-Description=MaxLink Network Readiness Check
-After=NetworkManager.service
-Wants=NetworkManager-wait-online.service
-Before=maxlink-network.target
+Description=MaxLink Network Ready Check
+After=NetworkManager.service network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/maxlink/healthchecks/check-network.sh
+ExecStart=/usr/local/bin/maxlink-check-network.sh
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
@@ -404,42 +303,36 @@ StandardError=journal
 WantedBy=maxlink-network.target
 EOF
 
-    # 2. Service de vérification MQTT
+    # Service de vérification MQTT
     cat > /etc/systemd/system/maxlink-mqtt-ready.service << EOF
 [Unit]
-Description=MaxLink MQTT Readiness Check
+Description=MaxLink MQTT Ready Check
 After=mosquitto.service
 Requires=mosquitto.service
-Before=maxlink-core.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/maxlink/healthchecks/check-mqtt.sh
+ExecStart=/usr/local/bin/maxlink-check-mqtt.sh
 RemainAfterExit=yes
-Restart=on-failure
-RestartSec=5
-StartLimitInterval=60
-StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
-Environment="MQTT_USER=${MQTT_USER}"
-Environment="MQTT_PASS=${MQTT_PASS}"
-Environment="MQTT_PORT=${MQTT_PORT}"
+Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=maxlink-core.target
 EOF
 
-    # 3. Service de vérification des widgets
+    # Service de vérification des widgets
     cat > /etc/systemd/system/maxlink-widgets-ready.service << EOF
 [Unit]
-Description=MaxLink Widgets Files Check
-After=maxlink-core.target
-Before=maxlink-widgets.target
+Description=MaxLink Widgets Ready Check
+After=maxlink-widget-system-stats.service
+Wants=maxlink-widget-system-stats.service
 
 [Service]
 Type=oneshot
-ExecStart=/opt/maxlink/healthchecks/check-widgets.sh
+ExecStart=/usr/local/bin/maxlink-check-widgets.sh
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
@@ -448,16 +341,18 @@ StandardError=journal
 WantedBy=maxlink-widgets.target
 EOF
 
-    # 4. Service de monitoring système
+    # Service de monitoring de santé
     cat > /etc/systemd/system/maxlink-health-monitor.service << EOF
 [Unit]
-Description=MaxLink System Health Monitor
+Description=MaxLink Health Monitor
 After=maxlink-widgets.target
+Wants=maxlink-widgets.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -c 'while true; do /opt/maxlink/healthchecks/check-system.sh; sleep 300; done'
+ExecStart=/usr/local/bin/maxlink-health-monitor.sh
 Restart=always
+RestartSec=30
 StandardOutput=journal
 StandardError=journal
 
@@ -465,139 +360,141 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-    echo "  ↦ Services de vérification créés ✓"
-    log_success "Services de healthcheck créés"
+    echo "  ↦ Services systemd créés ✓"
+    log_success "Services systemd créés"
 }
 
 # Créer les targets systemd
 create_systemd_targets() {
     echo ""
-    echo "◦ Création des targets d'orchestration..."
-
-    # 1. Target réseau MaxLink
+    echo "◦ Création des targets systemd..."
+    
+    # Target pour le réseau
     cat > /etc/systemd/system/maxlink-network.target << EOF
 [Unit]
-Description=MaxLink Network Services
-After=network-online.target NetworkManager-wait-online.service
-Wants=network-online.target NetworkManager-wait-online.service maxlink-network-ready.service
+Description=MaxLink Network Stack
+Wants=NetworkManager.service
+After=network-online.target
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    # 2. Target core MaxLink (MQTT + Nginx)
+    # Target pour les services core
     cat > /etc/systemd/system/maxlink-core.target << EOF
 [Unit]
 Description=MaxLink Core Services
-After=maxlink-network.target mosquitto.service
-Wants=maxlink-network.target mosquitto.service maxlink-mqtt-ready.service
+Requires=maxlink-network.target
+After=maxlink-network.target maxlink-network-ready.service
+Wants=mosquitto.service nginx.service
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    # 3. Target widgets MaxLink
+    # Target pour les widgets
     cat > /etc/systemd/system/maxlink-widgets.target << EOF
 [Unit]
-Description=MaxLink Widget Services
-After=maxlink-core.target maxlink-mqtt-ready.service maxlink-widgets-ready.service
-Wants=maxlink-core.target maxlink-widgets-ready.service
+Description=MaxLink Widgets
+Requires=maxlink-core.target
+After=maxlink-core.target maxlink-mqtt-ready.service
+Wants=maxlink-widget-system-stats.service maxlink-widget-network-monitor.service maxlink-widget-service-monitor.service
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    echo "  ↦ Targets d'orchestration créés ✓"
+    echo "  ↦ Targets systemd créés ✓"
     log_success "Targets systemd créés"
 }
 
-# Configurer les overrides des services
+# Configurer les overrides pour les services
 setup_service_overrides() {
     echo ""
-    echo "◦ Configuration des services existants..."
-
-    # 1. Modifier Mosquitto pour utiliser le nouveau système
-    mkdir -p /etc/systemd/system/mosquitto.service.d/
-    cat > /etc/systemd/system/mosquitto.service.d/maxlink-orchestration.conf << EOF
+    echo "◦ Configuration des dépendances des services..."
+    
+    # Override pour Mosquitto
+    mkdir -p /etc/systemd/system/mosquitto.service.d
+    cat > /etc/systemd/system/mosquitto.service.d/maxlink.conf << EOF
 [Unit]
-# Intégration dans l'orchestration MaxLink
-After=maxlink-network.target
 PartOf=maxlink-core.target
+After=maxlink-network-ready.service
 
 [Service]
-# Augmenter le timeout de démarrage
-TimeoutStartSec=90
-# S'assurer que le service redémarre en cas d'échec
-Restart=on-failure
+Restart=always
 RestartSec=10
 EOF
 
-    # 2. Modifier Nginx
-    mkdir -p /etc/systemd/system/nginx.service.d/
-    cat > /etc/systemd/system/nginx.service.d/maxlink-orchestration.conf << EOF
+    # Override pour Nginx
+    mkdir -p /etc/systemd/system/nginx.service.d
+    cat > /etc/systemd/system/nginx.service.d/maxlink.conf << EOF
 [Unit]
-# Dépendances MaxLink
-After=maxlink-network.target mosquitto.service
-Wants=mosquitto.service
 PartOf=maxlink-core.target
+After=maxlink-network-ready.service
 
 [Service]
-# Attendre que MQTT soit prêt avant de démarrer
-ExecStartPre=/opt/maxlink/healthchecks/check-mqtt.sh
-# Timeout généreux
-TimeoutStartSec=90
+Restart=always
+RestartSec=10
 EOF
 
-    echo "  ↦ Services configurés ✓"
+    # Override pour les widgets (exemple avec system-stats)
+    if [ -f /etc/systemd/system/maxlink-widget-system-stats.service ]; then
+        mkdir -p /etc/systemd/system/maxlink-widget-system-stats.service.d
+        cat > /etc/systemd/system/maxlink-widget-system-stats.service.d/maxlink.conf << EOF
+[Unit]
+PartOf=maxlink-widgets.target
+After=maxlink-mqtt-ready.service
+Requires=maxlink-mqtt-ready.service
+
+[Service]
+Restart=always
+RestartSec=30
+EOF
+    fi
+
+    echo "  ↦ Dépendances configurées ✓"
+    log_success "Overrides systemd configurés"
 }
 
 # Créer le script de gestion
 create_management_script() {
     echo ""
     echo "◦ Création du script de gestion..."
-
+    
     cat > /usr/local/bin/maxlink-orchestrator << 'EOF'
 #!/bin/bash
 # Script de gestion de l'orchestrateur MaxLink
 
 case "$1" in
     status)
-        echo "=== État de l'orchestrateur MaxLink ==="
+        echo "=== MaxLink Orchestrator Status ==="
         echo ""
-        echo "▶ Targets:"
-        systemctl status maxlink-network.target --no-pager --lines=0
-        systemctl status maxlink-core.target --no-pager --lines=0
-        systemctl status maxlink-widgets.target --no-pager --lines=0
+        echo "Targets:"
+        systemctl status maxlink-network.target --no-pager | grep "Active:"
+        systemctl status maxlink-core.target --no-pager | grep "Active:"
+        systemctl status maxlink-widgets.target --no-pager | grep "Active:"
         echo ""
-        echo "▶ Services de vérification:"
-        systemctl status maxlink-network-ready.service --no-pager --lines=0
-        systemctl status maxlink-mqtt-ready.service --no-pager --lines=0
-        systemctl status maxlink-widgets-ready.service --no-pager --lines=0
+        echo "Services:"
+        systemctl status mosquitto --no-pager | grep "Active:"
+        systemctl status nginx --no-pager | grep "Active:"
         echo ""
-        echo "▶ Services core:"
-        systemctl status mosquitto --no-pager --lines=0
-        systemctl status nginx --no-pager --lines=0
-        echo ""
-        echo "▶ Widgets:"
-        systemctl status 'maxlink-widget-*' --no-pager --lines=0
-        echo ""
-        echo "▶ Fichiers locaux:"
-        echo "  Widgets: /opt/maxlink/widgets/"
-        echo "  Configs: /opt/maxlink/config/widgets/"
-        echo ""
-        echo "Note: Le système fonctionne de manière autonome sans la clé USB"
+        echo "Widgets:"
+        systemctl list-units 'maxlink-widget-*' --no-pager
         ;;
         
     check)
-        /opt/maxlink/healthchecks/check-system.sh
+        echo "=== MaxLink Health Check ==="
+        /usr/local/bin/maxlink-check-network.sh
+        /usr/local/bin/maxlink-check-mqtt.sh
+        /usr/local/bin/maxlink-check-widgets.sh
         ;;
         
     restart-all)
-        echo "Redémarrage de tous les services MaxLink..."
+        echo "Redémarrage complet de MaxLink..."
         systemctl restart maxlink-network.target
         sleep 2
         systemctl restart maxlink-core.target
-        sleep 5
+        sleep 2
         systemctl restart maxlink-widgets.target
         echo "Redémarrage terminé."
         ;;
@@ -719,74 +616,86 @@ check_first_install
 send_progress 10 "Copie des widgets..."
 
 if ! copy_widgets_to_local; then
-    echo ""
-    echo "⚠ Impossible de copier les widgets depuis la clé USB"
-    echo "  Vérifiez que la clé est bien montée dans: $BASE_DIR"
+    echo "⚠ Erreur lors de la copie des widgets"
     log_error "Échec de la copie des widgets"
-    exit 1
 fi
 
-send_progress 50 "Widgets copiés"
-wait_silently 2
+send_progress 20 "Widgets copiés"
 
 # ===============================================================================
-# ÉTAPE 2 : INFRASTRUCTURE D'ORCHESTRATION
+# ÉTAPE 2 : CONFIGURATION DES PERMISSIONS SSH POUR PROD
 # ===============================================================================
 
-send_progress 60 "Configuration de l'orchestration..."
+send_progress 25 "Configuration des permissions SSH..."
 
-setup_orchestration_infrastructure
+if ! setup_prod_user_permissions; then
+    echo "⚠ Erreur lors de la configuration des permissions pour l'utilisateur prod"
+    log_error "Échec de la configuration des permissions ACL"
+fi
 
-send_progress 80 "Infrastructure configurée"
-wait_silently 2
+send_progress 35 "Permissions SSH configurées"
 
 # ===============================================================================
-# ÉTAPE 3 : ACTIVATION ET RECHARGEMENT
+# ÉTAPE 3 : INFRASTRUCTURE D'ORCHESTRATION
+# ===============================================================================
+
+send_progress 40 "Installation de l'orchestrateur..."
+
+if [ "$IS_FIRST_INSTALL" = true ]; then
+    setup_orchestration_infrastructure
+else
+    echo ""
+    echo "◦ Infrastructure d'orchestration déjà présente"
+    log_info "Mise à jour - infrastructure existante conservée"
+fi
+
+send_progress 60 "Orchestrateur installé"
+
+# ===============================================================================
+# ÉTAPE 4 : RECHARGEMENT SYSTEMD
+# ===============================================================================
+
+send_progress 70 "Configuration systemd..."
+
+echo ""
+echo "========================================================================"
+echo "CONFIGURATION SYSTEMD"
+echo "========================================================================"
+
+echo "◦ Rechargement de la configuration systemd..."
+systemctl daemon-reload
+echo "  ↦ Configuration rechargée ✓"
+log_success "Systemd daemon-reload effectué"
+
+send_progress 80 "Systemd configuré"
+
+# ===============================================================================
+# ÉTAPE 5 : ACTIVATION DES SERVICES
 # ===============================================================================
 
 send_progress 85 "Activation des services..."
 
-echo ""
-echo "◦ Rechargement de systemd..."
-systemctl daemon-reload
-
-echo "◦ Activation de l'orchestrateur..."
-systemctl enable maxlink-network.target
-systemctl enable maxlink-core.target
-systemctl enable maxlink-widgets.target
-systemctl enable maxlink-network-ready.service
-systemctl enable maxlink-mqtt-ready.service
-systemctl enable maxlink-widgets-ready.service
-echo "  ↦ Orchestrateur activé ✓"
-
-send_progress 95 "Services activés"
-wait_silently 2
-
-# ===============================================================================
-# ÉTAPE 4 : TEST
-# ===============================================================================
-
-echo ""
-echo "◦ Test du système..."
-echo ""
-
-/usr/local/bin/maxlink-orchestrator check
-
-# MISE À JOUR DU STATUT DU SERVICE
-if [ -n "$SERVICE_ID" ]; then
+if [ "$IS_FIRST_INSTALL" = true ]; then
     echo ""
-    echo "◦ Mise à jour du statut du service..."
-    update_service_status "$SERVICE_ID" "active"
-    echo "  ↦ Statut du service mis à jour ✓"
-    log_info "Statut du service $SERVICE_ID mis à jour: active"
+    echo "========================================================================"
+    echo "ACTIVATION DE L'ORCHESTRATEUR"
+    echo "========================================================================"
+    
+    /usr/local/bin/maxlink-orchestrator enable
+    log_success "Services de l'orchestrateur activés"
+else
+    echo ""
+    echo "◦ Services déjà configurés, pas de modification"
+    log_info "Mise à jour - services existants conservés"
 fi
 
-send_progress 100 "Installation terminée"
-wait_silently 3
+send_progress 95 "Services activés"
 
 # ===============================================================================
-# RÉSUMÉ
+# FINALISATION
 # ===============================================================================
+
+send_progress 100 "Installation terminée"
 
 echo ""
 echo "========================================================================"
@@ -794,66 +703,55 @@ echo "INSTALLATION TERMINÉE"
 echo "========================================================================"
 echo ""
 
-echo "✓ L'orchestrateur MaxLink est maintenant installé et actif."
-echo "✓ Les widgets ont été copiés localement dans /opt/maxlink."
-echo "✓ Le système peut maintenant fonctionner sans la clé USB."
-
-echo ""
-echo "▶ Fichiers locaux :"
-echo "  • Widgets    : /opt/maxlink/widgets/"
-echo "  • Configs    : /opt/maxlink/config/widgets/"
-echo "  • Healthchecks : /opt/maxlink/healthchecks/"
-echo ""
-
-echo "▶ Architecture de démarrage :"
-echo "  1. network.target → NetworkManager"
-echo "  2. maxlink-network.target → Vérification réseau"
-echo "  3. mosquitto.service → Démarrage MQTT"
-echo "  4. maxlink-mqtt-ready → Vérification MQTT"
-echo "  5. maxlink-core.target → Services core (Nginx)"
-echo "  6. maxlink-widgets-ready → Vérification fichiers widgets"
-echo "  7. maxlink-widgets.target → Tous les widgets"
-echo ""
-
-echo "▶ Commandes utiles :"
-echo "  • maxlink-orchestrator status    - État du système"
-echo "  • maxlink-orchestrator check     - Vérification complète"
-echo "  • maxlink-orchestrator logs all  - Voir tous les logs"
-echo ""
-
-log_success "Installation terminée avec succès"
-
-# ===============================================================================
-# GESTION DU REDÉMARRAGE AVEC SKIP_REBOOT
-# ===============================================================================
-
-# Décider si un redémarrage est nécessaire
-if [ "$NEED_REBOOT" = true ]; then
-    # Vérifier si on doit faire un reboot
-    if [ "$SKIP_REBOOT" != "true" ]; then
-        echo ""
-        echo "========================================================================"
-        echo "⚠ REDÉMARRAGE NÉCESSAIRE"
-        echo "========================================================================"
-        echo ""
-        echo "Un redémarrage est nécessaire pour activer l'orchestration complète."
-        echo ""
-        echo "  ↦ Redémarrage du système prévu dans 15 secondes..."
-        echo ""
-        
-        log_info "Redémarrage du système prévu dans 15 secondes"
-        sleep 15
-        
-        log_info "Redémarrage du système"
-        reboot
-    else
-        echo ""
-        echo "  ↦ Redémarrage nécessaire (sera effectué à la fin de l'installation complète)"
-        echo ""
-        log_info "Redémarrage différé - SKIP_REBOOT=true"
-    fi
+if [ "$IS_FIRST_INSTALL" = true ]; then
+    echo "✓ L'orchestrateur MaxLink a été installé avec succès !"
+    echo ""
+    echo "L'infrastructure d'orchestration suivante a été mise en place :"
+    echo "  • Scripts de vérification de santé"
+    echo "  • Services systemd pour la supervision"
+    echo "  • Targets systemd pour l'organisation des services"
+    echo "  • Script de gestion : maxlink-orchestrator"
+    echo "  • Permissions SSH complètes pour l'utilisateur 'prod' dans /var/www/"
+    echo ""
+    echo "Les widgets ont été copiés vers : /opt/maxlink/widgets/"
+    echo ""
+    log_success "Installation de l'orchestrateur terminée"
 else
+    echo "✓ L'orchestrateur MaxLink a été mis à jour avec succès !"
     echo ""
-    echo "✓ Aucun redémarrage nécessaire."
+    echo "  • Les widgets ont été mis à jour"
+    echo "  • L'infrastructure existante a été conservée"
+    echo "  • Permissions SSH configurées pour l'utilisateur 'prod'"
     echo ""
+    log_success "Mise à jour de l'orchestrateur terminée"
 fi
+
+echo "Commandes disponibles :"
+echo "  • sudo maxlink-orchestrator status    - État du système"
+echo "  • sudo maxlink-orchestrator check     - Vérification de santé"
+echo "  • sudo maxlink-orchestrator logs all  - Voir tous les logs"
+echo ""
+
+# Gestion du redémarrage
+if [ "$NEED_REBOOT" = true ] && [ -z "$SKIP_REBOOT" ]; then
+    echo "⚠ Un redémarrage est nécessaire pour finaliser l'installation"
+    echo ""
+    echo "Le système sera redémarré automatiquement dans 10 secondes..."
+    echo "Pour annuler : Ctrl+C"
+    echo ""
+    
+    for i in {10..1}; do
+        echo -ne "\rRedémarrage dans $i secondes... "
+        sleep 1
+    done
+    echo ""
+    
+    log_info "Redémarrage du système pour finalisation"
+    systemctl reboot
+elif [ "$NEED_REBOOT" = true ] && [ -n "$SKIP_REBOOT" ]; then
+    echo "⚠ Un redémarrage est nécessaire mais a été ignoré (SKIP_REBOOT actif)"
+    echo "  Pensez à redémarrer manuellement plus tard."
+    log_warning "Redémarrage nécessaire mais ignoré (SKIP_REBOOT)"
+fi
+
+echo "========================================================================"

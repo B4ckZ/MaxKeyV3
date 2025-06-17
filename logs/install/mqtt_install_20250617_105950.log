@@ -1,0 +1,79 @@
+
+================================================================================
+DÉMARRAGE: mqtt_install
+Description: Installation MQTT Broker
+Date: Tue 17 Jun 10:59:50 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-17 10:59:50] [INFO] [mqtt_install] Script mqtt_install initialisé
+[2025-06-17 10:59:51] [INFO] [mqtt_install] ========== DÉBUT DE L'INSTALLATION MQTT BROKER ==========
+[2025-06-17 10:59:51] [INFO] [mqtt_install] Progression: 5% - Initialisation...
+[2025-06-17 10:59:51] [INFO] [mqtt_install] Privilèges root confirmés
+[2025-06-17 10:59:51] [INFO] [mqtt_install] Progression: 10% - Préparation du système...
+[2025-06-17 10:59:51] [INFO] [mqtt_install] Système de paquets nettoyé
+[2025-06-17 10:59:51] [INFO] [mqtt_install] Progression: 20% - Système préparé
+[2025-06-17 10:59:53] [INFO] [mqtt_install] Progression: 30% - Installation de Mosquitto...
+[2025-06-17 10:59:53] [INFO] [mqtt_install] Installation hybride de Mosquitto et dépendances
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Téléchargement des paquets:  libmosquitto1 libdlt2 mosquitto mosquitto-clients
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Vérification et établissement de la connexion internet
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Sauvegarde de l'état réseau actuel
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Mode AP actif détecté
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Déjà connecté au WiFi Max
+[2025-06-17 10:59:54] [DEBUG] [mqtt_install] Vérification de la connectivité internet
+[2025-06-17 10:59:54] [DEBUG] [mqtt_install] Pas de connectivité internet
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Connexion automatique requise pour télécharger les paquets
+[2025-06-17 10:59:54] [INFO] [mqtt_install] Désactivation temporaire de l'AP
+[2025-06-17 10:59:57] [INFO] [mqtt_install] Tentative de connexion à Max
+[2025-06-17 11:00:01] [SUCCESS] [mqtt_install] Connexion WiFi établie
+[2025-06-17 11:00:06] [DEBUG] [mqtt_install] Vérification de la connectivité internet
+[2025-06-17 11:00:06] [DEBUG] [mqtt_install] Connectivité internet OK
+[2025-06-17 11:00:06] [SUCCESS] [mqtt_install] Connectivité internet confirmée
+[2025-06-17 11:00:14] [SUCCESS] [mqtt_install] Paquets installés:  libmosquitto1 libdlt2 mosquitto mosquitto-clients
+[2025-06-17 11:00:14] [INFO] [mqtt_install] Restauration de l'état réseau
+[2025-06-17 11:00:14] [INFO] [mqtt_install] Réactivation du mode AP
+[2025-06-17 11:00:21] [SUCCESS] [mqtt_install] Mosquitto et dépendances installé complètement
+[2025-06-17 11:00:21] [SUCCESS] [mqtt_install] Tous les paquets installés avec succès
+[2025-06-17 11:00:21] [INFO] [mqtt_install] Mosquitto installé avec succès
+[2025-06-17 11:00:21] [INFO] [mqtt_install] Progression: 50% - Paquets installés
+[2025-06-17 11:00:23] [INFO] [mqtt_install] Progression: 60% - Configuration du système...
+[2025-06-17 11:00:23] [INFO] [mqtt_install] Répertoires Mosquitto créés
+[2025-06-17 11:00:23] [INFO] [mqtt_install] ldconfig exécuté
+[2025-06-17 11:00:24] [INFO] [mqtt_install] Progression: 70% - Système configuré
+[2025-06-17 11:00:26] [INFO] [mqtt_install] Progression: 75% - Configuration de Mosquitto...
+[2025-06-17 11:00:26] [CMD] [mqtt_install] Exécution: Création utilisateur MQTT
+[2025-06-17 11:00:26] [CMD] [mqtt_install] Commande: /usr/bin/mosquitto_passwd -b -c '/etc/mosquitto/passwords' 'prod' '1234567890'
+[2025-06-17 11:00:26] [CMD] [mqtt_install] Code de sortie: 0
+[2025-06-17 11:00:26] [INFO] [mqtt_install] Utilisateur MQTT créé: prod
+[2025-06-17 11:00:26] [INFO] [mqtt_install] Ancienne configuration sauvegardée
+[2025-06-17 11:00:26] [SUCCESS] [mqtt_install] Configuration Mosquitto créée avec topics système
+[2025-06-17 11:00:26] [INFO] [mqtt_install] Fichier ACL créé
+[2025-06-17 11:00:26] [INFO] [mqtt_install] Progression: 85% - Configuration terminée
+[2025-06-17 11:00:29] [INFO] [mqtt_install] Progression: 90% - Démarrage du service...
+[2025-06-17 11:00:29] [CMD] [mqtt_install] Exécution: Activation au démarrage
+[2025-06-17 11:00:29] [CMD] [mqtt_install] Commande: systemctl enable mosquitto >/dev/null 2>&1
+[2025-06-17 11:00:30] [CMD] [mqtt_install] Code de sortie: 0
+[2025-06-17 11:00:30] [CMD] [mqtt_install] Exécution: Démarrage Mosquitto
+[2025-06-17 11:00:30] [CMD] [mqtt_install] Commande: systemctl start mosquitto
+[2025-06-17 11:00:30] [CMD] [mqtt_install] Code de sortie: 0
+[2025-06-17 11:00:30] [SUCCESS] [mqtt_install] Mosquitto démarré avec succès
+[2025-06-17 11:00:33] [INFO] [mqtt_install] Service Mosquitto actif
+[2025-06-17 11:00:33] [INFO] [mqtt_install] Progression: 95% - Service démarré
+[2025-06-17 11:00:35] [INFO] [mqtt_install] Progression: 98% - Tests de connexion...
+[2025-06-17 11:00:36] [SUCCESS] [mqtt_install] Test de connexion MQTT réussi
+[2025-06-17 11:00:36] [WARN] [mqtt_install] Port WebSocket non accessible immédiatement
+[2025-06-17 11:00:36] [SUCCESS] [mqtt_install] Topics système  accessibles
+[2025-06-17 11:00:36] [INFO] [mqtt_install] Statut du service mqtt mis à jour: active
+[2025-06-17 11:00:36] [INFO] [mqtt_install] Progression: 100% - Installation terminée
+[2025-06-17 11:00:38] [SUCCESS] [mqtt_install] Installation MQTT Broker terminée
+[2025-06-17 11:00:38] [INFO] [mqtt_install] Configuration: prod/1234567890 sur ports 1883 et 9001
+[2025-06-17 11:00:38] [INFO] [mqtt_install] Redémarrage différé - SKIP_REBOOT=true
+[2025-06-17 11:00:38] [INFO] [mqtt_install] Script mqtt_install terminé avec le code 0
+
+================================================================================
+FIN: mqtt_install
+Code de sortie: 0
+Durée: 49 secondes
+================================================================================
+
