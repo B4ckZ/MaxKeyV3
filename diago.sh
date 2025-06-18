@@ -1,329 +1,245 @@
 #!/bin/bash
 
 # ===============================================================================
-# DIAGNOSTIC TIMESYNC - SCRIPT DE TROUBLESHOOTING
-# Analyse complète du widget TimSync pour identifier les problèmes
+# VÉRIFICATION ET CONFIGURATION DEVICES.JSON
 # ===============================================================================
 
-# Couleurs pour l'affichage
+# Couleurs
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Variables
-SERVICE_NAME="maxlink-widget-timesync"
-WIDGET_NAME="timesync"
-COLLECTOR_PATH="/opt/maxlink/widgets/timesync/timesync_collector.py"
-CONFIG_PATH="/opt/maxlink/config/widgets/timesync_widget.json"
-LOG_PATH="/var/log/maxlink/timesync.log"
+# Le bon chemin
+DEVICES_FILE="/var/www/maxlink-dashboard/widgets/wifistats/devices.json"
 
 echo ""
 echo -e "${BLUE}===============================================================================${NC}"
-echo -e "${BLUE}DIAGNOSTIC WIDGET TIMESYNC MAXLINK${NC}"
+echo -e "${BLUE}CONFIGURATION TIME SOURCE - DEVICES.JSON${NC}"
 echo -e "${BLUE}===============================================================================${NC}"
 echo ""
 
 # ===============================================================================
-# 1. VÉRIFICATION DU SERVICE SYSTEMD
+# 1. VÉRIFICATION DU FICHIER
 # ===============================================================================
 
-echo -e "${BLUE}▶ ÉTAT DU SERVICE SYSTEMD${NC}"
+echo -e "${BLUE}▶ VÉRIFICATION DU FICHIER DEVICES.JSON${NC}"
 echo "========================================================================"
 
-echo "◦ Service : $SERVICE_NAME"
-
-# État du service
-if systemctl is-active --quiet "$SERVICE_NAME"; then
-    echo -e "  ${GREEN}✓${NC} Service actif"
-else
-    echo -e "  ${RED}✗${NC} Service inactif"
-fi
-
-if systemctl is-enabled --quiet "$SERVICE_NAME"; then
-    echo -e "  ${GREEN}✓${NC} Service activé au démarrage"
-else
-    echo -e "  ${RED}✗${NC} Service non activé au démarrage"
-fi
-
-# Statut détaillé
-echo ""
-echo "◦ Statut détaillé :"
-systemctl status "$SERVICE_NAME" --no-pager -l | head -20
-
-echo ""
-
-# ===============================================================================
-# 2. VÉRIFICATION DES FICHIERS
-# ===============================================================================
-
-echo -e "${BLUE}▶ VÉRIFICATION DES FICHIERS${NC}"
-echo "========================================================================"
-
-# Collecteur Python
-if [ -f "$COLLECTOR_PATH" ]; then
-    echo -e "  ${GREEN}✓${NC} Collecteur présent : $COLLECTOR_PATH"
-    echo "    Permissions : $(ls -la "$COLLECTOR_PATH" | awk '{print $1, $3, $4}')"
-    if [ -x "$COLLECTOR_PATH" ]; then
-        echo -e "    ${GREEN}✓${NC} Exécutable"
-    else
-        echo -e "    ${RED}✗${NC} Non exécutable"
-    fi
-else
-    echo -e "  ${RED}✗${NC} Collecteur manquant : $COLLECTOR_PATH"
-fi
-
-# Configuration JSON
-if [ -f "$CONFIG_PATH" ]; then
-    echo -e "  ${GREEN}✓${NC} Configuration présente : $CONFIG_PATH"
-    echo "    Permissions : $(ls -la "$CONFIG_PATH" | awk '{print $1, $3, $4}')"
+if [ -f "$DEVICES_FILE" ]; then
+    echo -e "  ${GREEN}✓${NC} Fichier trouvé : $DEVICES_FILE"
     
-    # Vérifier la syntaxe JSON
-    if python3 -m json.tool "$CONFIG_PATH" >/dev/null 2>&1; then
-        echo -e "    ${GREEN}✓${NC} JSON valide"
-    else
-        echo -e "    ${RED}✗${NC} JSON invalide"
-        echo "    Erreur :"
-        python3 -m json.tool "$CONFIG_PATH" 2>&1 | head -3 | sed 's/^/      /'
-    fi
-else
-    echo -e "  ${RED}✗${NC} Configuration manquante : $CONFIG_PATH"
-fi
-
-# Répertoire de logs
-LOG_DIR=$(dirname "$LOG_PATH")
-if [ -d "$LOG_DIR" ]; then
-    echo -e "  ${GREEN}✓${NC} Répertoire logs : $LOG_DIR"
-    echo "    Permissions : $(ls -lad "$LOG_DIR" | awk '{print $1, $3, $4}')"
-else
-    echo -e "  ${RED}✗${NC} Répertoire logs manquant : $LOG_DIR"
-fi
-
-echo ""
-
-# ===============================================================================
-# 3. TEST DU COLLECTEUR PYTHON
-# ===============================================================================
-
-echo -e "${BLUE}▶ TEST DU COLLECTEUR PYTHON${NC}"
-echo "========================================================================"
-
-if [ -f "$COLLECTOR_PATH" ]; then
-    echo "◦ Test de syntaxe Python :"
-    if python3 -m py_compile "$COLLECTOR_PATH" 2>/dev/null; then
-        echo -e "  ${GREEN}✓${NC} Syntaxe Python correcte"
-    else
-        echo -e "  ${RED}✗${NC} Erreur de syntaxe Python"
-        python3 -m py_compile "$COLLECTOR_PATH" 2>&1 | head -5 | sed 's/^/    /'
-    fi
-    
+    # Afficher le contenu actuel
     echo ""
-    echo "◦ Test des imports :"
+    echo "◦ Contenu actuel :"
+    cat "$DEVICES_FILE" | python3 -m json.tool 2>/dev/null | head -20 | sed 's/^/    /' || {
+        echo "    Format JSON invalide ou fichier vide"
+        cat "$DEVICES_FILE" | head -10 | sed 's/^/    /'
+    }
+    
+    # Chercher les time_source
+    echo ""
+    echo "◦ Devices avec time_source activé :"
     python3 -c "
-import sys
-sys.path.append('/opt/maxlink/widgets/timesync')
+import json
 try:
-    import json, time, subprocess, logging, os, datetime, paho.mqtt.client
-    print('  ✓ Tous les modules disponibles')
-except ImportError as e:
-    print(f'  ✗ Module manquant: {e}')
-" 2>/dev/null || echo -e "  ${RED}✗${NC} Erreur import modules"
-    
+    with open('$DEVICES_FILE', 'r') as f:
+        devices = json.load(f)
+        time_sources = [(mac, info['name']) for mac, info in devices.items() if info.get('time_source', False)]
+        if time_sources:
+            for mac, name in time_sources:
+                print(f'    ✓ {mac} - {name}')
+        else:
+            print('    ⚠ Aucun device configuré comme time_source')
+except:
+    print('    ✗ Erreur lors de la lecture du fichier')
+" 2>/dev/null
+else
+    echo -e "  ${RED}✗${NC} Fichier non trouvé"
+fi
+
+echo ""
+
+# ===============================================================================
+# 2. VÉRIFICATION DES CLIENTS WIFI ACTUELS
+# ===============================================================================
+
+echo -e "${BLUE}▶ CLIENTS WIFI CONNECTÉS${NC}"
+echo "========================================================================"
+
+# Vérifier les clients connectés
+CLIENT_COUNT=$(iw dev wlan0 station dump 2>/dev/null | grep -c "Station")
+
+if [ $CLIENT_COUNT -eq 0 ]; then
+    echo -e "  ${YELLOW}⚠${NC} Aucun client WiFi connecté actuellement"
     echo ""
-    echo "◦ Test de chargement du collecteur :"
-    timeout 5 python3 -c "
-import sys
-sys.path.append('/opt/maxlink/widgets/timesync')
+    echo "  Pour que l'indicateur fonctionne, vous devez :"
+    echo "  1. Connecter un appareil au WiFi MaxLink-NETWORK"
+    echo "  2. Configurer cet appareil comme time_source dans devices.json"
+else
+    echo -e "  ${GREEN}✓${NC} $CLIENT_COUNT client(s) connecté(s) :"
+    echo ""
+    
+    # Lister les MACs des clients
+    MACS=$(iw dev wlan0 station dump 2>/dev/null | grep "Station" | awk '{print $2}')
+    
+    for MAC in $MACS; do
+        echo "    • $MAC"
+        
+        # Vérifier si ce MAC est dans devices.json
+        if [ -f "$DEVICES_FILE" ]; then
+            python3 -c "
+import json
 try:
-    exec(open('$COLLECTOR_PATH').read())
-    print('  ✓ Collecteur se charge sans erreur')
-except Exception as e:
-    print(f'  ✗ Erreur chargement: {e}')
-" 2>/dev/null || echo -e "  ${RED}✗${NC} Timeout ou erreur chargement"
-else
-    echo -e "  ${RED}✗${NC} Impossible de tester, fichier manquant"
+    with open('$DEVICES_FILE', 'r') as f:
+        devices = json.load(f)
+        mac_lower = '$MAC'.lower()
+        if mac_lower in devices:
+            info = devices[mac_lower]
+            print(f'      → Configuré: {info.get(\"name\", \"Sans nom\")}')
+            if info.get('time_source', False):
+                print('      → ✓ TIME SOURCE ACTIF')
+        else:
+            print('      → Non configuré dans devices.json')
+except:
+    pass
+" 2>/dev/null
+        fi
+    done
 fi
 
 echo ""
 
 # ===============================================================================
-# 4. VÉRIFICATION MQTT
+# 3. EXEMPLE DE CONFIGURATION
 # ===============================================================================
 
-echo -e "${BLUE}▶ VÉRIFICATION MQTT${NC}"
+echo -e "${BLUE}▶ EXEMPLE DE CONFIGURATION${NC}"
 echo "========================================================================"
 
-# Broker actif
-if systemctl is-active --quiet mosquitto; then
-    echo -e "  ${GREEN}✓${NC} Broker Mosquitto actif"
-else
-    echo -e "  ${RED}✗${NC} Broker Mosquitto inactif"
-fi
-
-# Test de connexion MQTT
+echo "Pour ajouter un device comme source de temps :"
 echo ""
-echo "◦ Test de connexion MQTT :"
-if timeout 3 mosquitto_sub -h localhost -u maxlink -P maxlink123 -t 'test' -C 1 >/dev/null 2>&1; then
-    echo -e "  ${GREEN}✓${NC} Connexion MQTT OK"
-else
-    echo -e "  ${RED}✗${NC} Impossible de se connecter à MQTT"
-    echo "    Vérifiez les identifiants dans $CONFIG_PATH"
-fi
-
-# Écouter les topics TimSync
+echo "1. Éditez le fichier :"
+echo "   ${YELLOW}sudo nano $DEVICES_FILE${NC}"
 echo ""
-echo "◦ Test des topics TimSync (5 secondes) :"
-timeout 5 mosquitto_sub -h localhost -u maxlink -P maxlink123 -t 'rpi/system/time' -t 'system/time/sync/+' -v 2>/dev/null | head -3 | sed 's/^/    /' &
-MQTT_PID=$!
-sleep 5
-kill $MQTT_PID 2>/dev/null
-wait $MQTT_PID 2>/dev/null
+echo "2. Ajoutez ou modifiez une entrée (exemple) :"
+echo '   {'
+echo '     "aa:bb:cc:dd:ee:ff": {'
+echo '       "name": "PC Bureau",'
+echo '       "type": "computer",'
+echo '       "icon": "laptop",'
+echo '       "time_source": true'
+echo '     }'
+echo '   }'
+echo ""
+echo "3. Remplacez aa:bb:cc:dd:ee:ff par l'adresse MAC réelle"
+echo ""
+echo "4. Sauvegardez et rafraîchissez le dashboard"
 
 echo ""
 
 # ===============================================================================
-# 5. ANALYSE DES LOGS
+# 4. TEST EN TEMPS RÉEL
 # ===============================================================================
 
-echo -e "${BLUE}▶ ANALYSE DES LOGS${NC}"
+echo -e "${BLUE}▶ TEST EN TEMPS RÉEL${NC}"
 echo "========================================================================"
 
-# Logs systemd
-echo "◦ Derniers logs systemd (10 lignes) :"
-journalctl -u "$SERVICE_NAME" -n 10 --no-pager | sed 's/^/    /'
-
+echo "Surveillance des messages MQTT (10 secondes)..."
+echo "Topics surveillés :"
+echo "  - rpi/network/wifi/clients"
+echo "  - rpi/system/time"
 echo ""
 
-# Logs du collecteur
-if [ -f "$LOG_PATH" ]; then
-    echo "◦ Derniers logs du collecteur :"
-    tail -10 "$LOG_PATH" | sed 's/^/    /'
+# Écouter les deux topics
+timeout 10 mosquitto_sub \
+    -h localhost -u mosquitto -P mqtt \
+    -t "rpi/network/wifi/clients" \
+    -t "rpi/system/time" \
+    -v 2>/dev/null | while read line; do
     
-    echo ""
-    echo "◦ Erreurs dans les logs :"
-    grep -i "error\|exception\|fail" "$LOG_PATH" 2>/dev/null | tail -5 | sed 's/^/    /' || echo "    Aucune erreur trouvée"
-else
-    echo -e "  ${YELLOW}⚠${NC} Fichier log non trouvé : $LOG_PATH"
-fi
+    if [[ $line == *"rpi/network/wifi/clients"* ]]; then
+        echo -e "${BLUE}[WIFI]${NC} Clients détectés"
+        # Extraire le nombre de clients
+        COUNT=$(echo "$line" | grep -o '"count": [0-9]*' | grep -o '[0-9]*' || echo "0")
+        echo "       → $COUNT client(s)"
+    elif [[ $line == *"rpi/system/time"* ]]; then
+        echo -e "${GREEN}[TIME]${NC} Heure système reçue"
+    fi
+done
 
 echo ""
 
 # ===============================================================================
-# 6. VÉRIFICATION DES DÉPENDANCES
+# 5. RÉSUMÉ DU STATUT
 # ===============================================================================
 
-echo -e "${BLUE}▶ VÉRIFICATION DES DÉPENDANCES${NC}"
+echo -e "${BLUE}▶ RÉSUMÉ DU STATUT${NC}"
 echo "========================================================================"
 
-# Python et modules
-echo "◦ Python et modules :"
-python3 --version | sed 's/^/    /'
-
-# paho-mqtt
-if python3 -c "import paho.mqtt.client" 2>/dev/null; then
-    echo -e "    ${GREEN}✓${NC} paho-mqtt disponible"
+# Service WiFiStats
+if systemctl is-active --quiet maxlink-widget-wifistats; then
+    echo -e "  ${GREEN}✓${NC} Service WiFiStats : Actif"
 else
-    echo -e "    ${RED}✗${NC} paho-mqtt manquant"
+    echo -e "  ${RED}✗${NC} Service WiFiStats : Inactif"
 fi
 
-# timedatectl
-if command -v timedatectl >/dev/null 2>&1; then
-    echo -e "    ${GREEN}✓${NC} timedatectl disponible"
-    echo "    État NTP : $(timedatectl show -p NTP --value 2>/dev/null || echo 'Inconnu')"
+# Service TimSync
+if systemctl is-active --quiet maxlink-widget-timesync; then
+    echo -e "  ${GREEN}✓${NC} Service TimSync : Actif"
 else
-    echo -e "    ${RED}✗${NC} timedatectl manquant"
+    echo -e "  ${RED}✗${NC} Service TimSync : Inactif"
 fi
 
-echo ""
+# Clients WiFi
+if [ $CLIENT_COUNT -gt 0 ]; then
+    echo -e "  ${GREEN}✓${NC} Clients WiFi : $CLIENT_COUNT connecté(s)"
+else
+    echo -e "  ${YELLOW}⚠${NC} Clients WiFi : Aucun"
+fi
 
-# ===============================================================================
-# 7. TEST MANUEL DU SERVICE
-# ===============================================================================
-
-echo -e "${BLUE}▶ TEST MANUEL DU SERVICE${NC}"
-echo "========================================================================"
-
-echo "◦ Tentative de démarrage manuel :"
-if systemctl start "$SERVICE_NAME" 2>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} Service démarré manuellement"
-    sleep 3
+# Time Source
+if [ -f "$DEVICES_FILE" ]; then
+    TIME_SOURCE_COUNT=$(python3 -c "
+import json
+try:
+    with open('$DEVICES_FILE', 'r') as f:
+        devices = json.load(f)
+        count = sum(1 for d in devices.values() if d.get('time_source', False))
+        print(count)
+except:
+    print(0)
+" 2>/dev/null)
     
-    if systemctl is-active --quiet "$SERVICE_NAME"; then
-        echo -e "  ${GREEN}✓${NC} Service reste actif"
+    if [ "$TIME_SOURCE_COUNT" -gt 0 ]; then
+        echo -e "  ${GREEN}✓${NC} Time Source : $TIME_SOURCE_COUNT configuré(s)"
     else
-        echo -e "  ${RED}✗${NC} Service s'est arrêté"
-        echo "    Dernière erreur :"
-        journalctl -u "$SERVICE_NAME" -n 3 --no-pager | sed 's/^/      /'
+        echo -e "  ${YELLOW}⚠${NC} Time Source : Aucun configuré"
     fi
 else
-    echo -e "  ${RED}✗${NC} Échec du démarrage manuel"
-    echo "    Erreur :"
-    systemctl status "$SERVICE_NAME" --no-pager | grep -A 5 "Active:" | sed 's/^/      /'
-fi
-
-echo ""
-
-# ===============================================================================
-# 8. RECOMMANDATIONS
-# ===============================================================================
-
-echo -e "${BLUE}▶ RECOMMANDATIONS${NC}"
-echo "========================================================================"
-
-# Analyser les problèmes détectés
-ISSUES=0
-
-if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-    ((ISSUES++))
-    echo -e "${RED}1.${NC} Service inactif"
-    echo "   → Commande : sudo systemctl start $SERVICE_NAME"
-    echo "   → Puis vérifier : sudo systemctl status $SERVICE_NAME"
-fi
-
-if [ ! -f "$COLLECTOR_PATH" ]; then
-    ((ISSUES++))
-    echo -e "${RED}2.${NC} Collecteur manquant"
-    echo "   → Réinstaller le widget : sudo /path/to/timesync_install.sh"
-fi
-
-if [ ! -f "$CONFIG_PATH" ]; then
-    ((ISSUES++))
-    echo -e "${RED}3.${NC} Configuration manquante"
-    echo "   → Vérifier l'installation du widget"
-fi
-
-if ! systemctl is-active --quiet mosquitto; then
-    ((ISSUES++))
-    echo -e "${RED}4.${NC} MQTT inactif"
-    echo "   → Commande : sudo systemctl start mosquitto"
-fi
-
-if [ $ISSUES -eq 0 ]; then
-    echo -e "${GREEN}✓ Aucun problème majeur détecté${NC}"
-    echo ""
-    echo "Si le service reste inactif :"
-    echo "  1. Vérifier les logs détaillés : journalctl -u $SERVICE_NAME -f"
-    echo "  2. Tester le collecteur manuellement : python3 $COLLECTOR_PATH"
-    echo "  3. Redémarrer le service : sudo systemctl restart $SERVICE_NAME"
+    echo -e "  ${RED}✗${NC} Fichier devices.json : Non trouvé"
 fi
 
 echo ""
 echo -e "${BLUE}===============================================================================${NC}"
-echo -e "${BLUE}FIN DU DIAGNOSTIC${NC}"
-echo -e "${BLUE}===============================================================================${NC}"
 echo ""
 
 # ===============================================================================
-# 9. COMMANDES UTILES
+# 6. ACTION SUGGÉRÉE
 # ===============================================================================
 
-echo -e "${YELLOW}Commandes utiles pour le debugging :${NC}"
-echo ""
-echo "• Logs en temps réel        : journalctl -u $SERVICE_NAME -f"
-echo "• Redémarrer le service     : sudo systemctl restart $SERVICE_NAME"
-echo "• Test manuel du collecteur : sudo python3 $COLLECTOR_PATH"
-echo "• État détaillé du service  : sudo systemctl status $SERVICE_NAME -l"
-echo "• Logs du broker MQTT       : journalctl -u mosquitto -f"
-echo "• Test MQTT                 : mosquitto_sub -h localhost -u maxlink -P maxlink123 -t '#' -v"
+if [ $CLIENT_COUNT -eq 0 ]; then
+    echo -e "${YELLOW}⚠ ACTION REQUISE :${NC}"
+    echo "  Connectez votre PC ou téléphone au réseau WiFi MaxLink-NETWORK"
+    echo "  pour que le widget puisse détecter des clients."
+elif [ "$TIME_SOURCE_COUNT" -eq 0 ]; then
+    echo -e "${YELLOW}⚠ ACTION REQUISE :${NC}"
+    echo "  Configurez au moins un device comme time_source dans devices.json"
+    echo "  pour que l'indicateur passe au vert."
+else
+    echo -e "${GREEN}✓ Tout semble correctement configuré !${NC}"
+    echo "  Si l'indicateur reste rouge, rafraîchissez le dashboard."
+fi
+
 echo ""
