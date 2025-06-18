@@ -1,0 +1,52 @@
+{
+  "widget": {
+    "id": "timesync",
+    "name": "Time Synchronization",
+    "version": "1.0.0",
+    "description": "Synchronisation automatique temps RTC + sources connectées",
+    "author": "MaxLink Team"
+  },
+  "mqtt": {
+    "required": true,
+    "broker": {
+      "host": "localhost",
+      "port": 1883,
+      "username": "maxlink",
+      "password": "maxlink123"
+    },
+    "topics": {
+      "publish": [
+        {
+          "topic": "rpi/system/time",
+          "description": "Heure système du Raspberry Pi"
+        },
+        {
+          "topic": "system/time/sync/result",
+          "description": "Résultat des synchronisations automatiques"
+        }
+      ],
+      "subscribe": [
+        {
+          "topic": "system/time/sync/command",
+          "description": "Commandes de synchronisation automatique"
+        }
+      ]
+    }
+  },
+  "collector": {
+    "enabled": true,
+    "script": "timesync_collector.py",
+    "service_name": "maxlink-widget-timesync",
+    "service_description": "MaxLink Time Synchronization Collector"
+  },
+  "time": {
+    "publish_interval": 10,
+    "max_drift_seconds": 180
+  },
+  "dependencies": {
+    "python_packages": ["paho-mqtt"],
+    "system_packages": ["systemd-timesyncd"],
+    "services": ["mosquitto"],
+    "python_version": ">=3.7"
+  }
+}
