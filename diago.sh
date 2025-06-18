@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# VÉRIFICATION ET CONFIGURATION DEVICES.JSON
+# TRAÇAGE DU MAUVAIS TIMESTAMP
+# Identifier d'où vient le timestamp 21
 # ===============================================================================
 
 # Couleurs
@@ -11,235 +12,204 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Le bon chemin
-DEVICES_FILE="/var/www/maxlink-dashboard/widgets/wifistats/devices.json"
-
 echo ""
 echo -e "${BLUE}===============================================================================${NC}"
-echo -e "${BLUE}CONFIGURATION TIME SOURCE - DEVICES.JSON${NC}"
+echo -e "${BLUE}TRAÇAGE DU TIMESTAMP ERRONÉ${NC}"
 echo -e "${BLUE}===============================================================================${NC}"
 echo ""
 
 # ===============================================================================
-# 1. VÉRIFICATION DU FICHIER
+# 1. CAPTURER TOUS LES MESSAGES SUR LES TOPICS TIME
 # ===============================================================================
 
-echo -e "${BLUE}▶ VÉRIFICATION DU FICHIER DEVICES.JSON${NC}"
+echo -e "${BLUE}▶ CAPTURE COMPLÈTE DES TOPICS TIME (15 secondes)${NC}"
 echo "========================================================================"
 
-if [ -f "$DEVICES_FILE" ]; then
-    echo -e "  ${GREEN}✓${NC} Fichier trouvé : $DEVICES_FILE"
-    
-    # Afficher le contenu actuel
-    echo ""
-    echo "◦ Contenu actuel :"
-    cat "$DEVICES_FILE" | python3 -m json.tool 2>/dev/null | head -20 | sed 's/^/    /' || {
-        echo "    Format JSON invalide ou fichier vide"
-        cat "$DEVICES_FILE" | head -10 | sed 's/^/    /'
-    }
-    
-    # Chercher les time_source
-    echo ""
-    echo "◦ Devices avec time_source activé :"
-    python3 -c "
-import json
-try:
-    with open('$DEVICES_FILE', 'r') as f:
-        devices = json.load(f)
-        time_sources = [(mac, info['name']) for mac, info in devices.items() if info.get('time_source', False)]
-        if time_sources:
-            for mac, name in time_sources:
-                print(f'    ✓ {mac} - {name}')
-        else:
-            print('    ⚠ Aucun device configuré comme time_source')
-except:
-    print('    ✗ Erreur lors de la lecture du fichier')
-" 2>/dev/null
-else
-    echo -e "  ${RED}✗${NC} Fichier non trouvé"
-fi
-
+echo "Topics surveillés :"
+echo "  - rpi/system/time"
+echo "  - system/time/+"
+echo "  - rpi/system/+"
 echo ""
 
-# ===============================================================================
-# 2. VÉRIFICATION DES CLIENTS WIFI ACTUELS
-# ===============================================================================
+# Fichier temporaire
+TMPFILE=$(mktemp)
 
-echo -e "${BLUE}▶ CLIENTS WIFI CONNECTÉS${NC}"
-echo "========================================================================"
+# Capturer TOUS les topics système
+timeout 15 mosquitto_sub \
+    -h localhost \
+    -u mosquitto \
+    -P mqtt \
+    -t "rpi/system/+" \
+    -t "system/time/+" \
+    -t "rpi/system/time" \
+    -v 2>/dev/null > "$TMPFILE" &
 
-# Vérifier les clients connectés
-CLIENT_COUNT=$(iw dev wlan0 station dump 2>/dev/null | grep -c "Station")
+MQTT_PID=$!
 
-if [ $CLIENT_COUNT -eq 0 ]; then
-    echo -e "  ${YELLOW}⚠${NC} Aucun client WiFi connecté actuellement"
-    echo ""
-    echo "  Pour que l'indicateur fonctionne, vous devez :"
-    echo "  1. Connecter un appareil au WiFi MaxLink-NETWORK"
-    echo "  2. Configurer cet appareil comme time_source dans devices.json"
-else
-    echo -e "  ${GREEN}✓${NC} $CLIENT_COUNT client(s) connecté(s) :"
-    echo ""
-    
-    # Lister les MACs des clients
-    MACS=$(iw dev wlan0 station dump 2>/dev/null | grep "Station" | awk '{print $2}')
-    
-    for MAC in $MACS; do
-        echo "    • $MAC"
+# Progress
+echo -n "Capture en cours: "
+for i in {1..15}; do
+    echo -n "."
+    sleep 1
+done
+echo " Terminé"
+
+wait $MQTT_PID 2>/dev/null
+
+# Analyser les résultats
+echo ""
+echo "◦ Messages capturés :"
+
+if [ -s "$TMPFILE" ]; then
+    while IFS= read -r line; do
+        # Extraire topic et payload
+        TOPIC=$(echo "$line" | cut -d' ' -f1)
+        PAYLOAD=$(echo "$line" | cut -d' ' -f2-)
         
-        # Vérifier si ce MAC est dans devices.json
-        if [ -f "$DEVICES_FILE" ]; then
-            python3 -c "
-import json
+        echo ""
+        echo -e "  ${YELLOW}Topic:${NC} $TOPIC"
+        
+        # Vérifier si c'est du JSON
+        if echo "$PAYLOAD" | python3 -m json.tool >/dev/null 2>&1; then
+            # Analyser le timestamp
+            TS=$(echo "$PAYLOAD" | python3 -c "
+import json, sys
 try:
-    with open('$DEVICES_FILE', 'r') as f:
-        devices = json.load(f)
-        mac_lower = '$MAC'.lower()
-        if mac_lower in devices:
-            info = devices[mac_lower]
-            print(f'      → Configuré: {info.get(\"name\", \"Sans nom\")}')
-            if info.get('time_source', False):
-                print('      → ✓ TIME SOURCE ACTIF')
-        else:
-            print('      → Non configuré dans devices.json')
+    data = json.load(sys.stdin)
+    ts = data.get('timestamp', 'N/A')
+    if isinstance(ts, (int, float)):
+        print(f'Timestamp: {ts}')
+        if ts < 1000:  # Timestamp suspect
+            print('⚠ TIMESTAMP SUSPECT!')
+    else:
+        print(f'Timestamp non numérique: {ts}')
 except:
     pass
-" 2>/dev/null
+" 2>/dev/null)
+            
+            echo "    $TS"
+            
+            # Afficher le payload complet si timestamp suspect
+            if echo "$TS" | grep -q "SUSPECT"; then
+                echo -e "    ${RED}Payload complet:${NC}"
+                echo "$PAYLOAD" | python3 -m json.tool | head -10 | sed 's/^/      /'
+            fi
+        else
+            # Pas du JSON, afficher tel quel
+            echo "    Payload: $PAYLOAD" | cut -c1-80
         fi
-    done
+    done < "$TMPFILE"
+else
+    echo -e "  ${RED}Aucun message capturé${NC}"
 fi
 
+rm -f "$TMPFILE"
+
 echo ""
 
 # ===============================================================================
-# 3. EXEMPLE DE CONFIGURATION
+# 2. VÉRIFIER TOUS LES SERVICES WIDGET
 # ===============================================================================
 
-echo -e "${BLUE}▶ EXEMPLE DE CONFIGURATION${NC}"
+echo -e "${BLUE}▶ ÉTAT DES SERVICES WIDGETS${NC}"
 echo "========================================================================"
 
-echo "Pour ajouter un device comme source de temps :"
-echo ""
-echo "1. Éditez le fichier :"
-echo "   ${YELLOW}sudo nano $DEVICES_FILE${NC}"
-echo ""
-echo "2. Ajoutez ou modifiez une entrée (exemple) :"
-echo '   {'
-echo '     "aa:bb:cc:dd:ee:ff": {'
-echo '       "name": "PC Bureau",'
-echo '       "type": "computer",'
-echo '       "icon": "laptop",'
-echo '       "time_source": true'
-echo '     }'
-echo '   }'
-echo ""
-echo "3. Remplacez aa:bb:cc:dd:ee:ff par l'adresse MAC réelle"
-echo ""
-echo "4. Sauvegardez et rafraîchissez le dashboard"
+# Liste des services à vérifier
+SERVICES=(
+    "maxlink-widget-timesync"
+    "maxlink-widget-wifistats"
+    "maxlink-widget-uptime"
+    "maxlink-widget-servermonitoring"
+    "maxlink-widget-mqttstats"
+)
 
-echo ""
-
-# ===============================================================================
-# 4. TEST EN TEMPS RÉEL
-# ===============================================================================
-
-echo -e "${BLUE}▶ TEST EN TEMPS RÉEL${NC}"
-echo "========================================================================"
-
-echo "Surveillance des messages MQTT (10 secondes)..."
-echo "Topics surveillés :"
-echo "  - rpi/network/wifi/clients"
-echo "  - rpi/system/time"
-echo ""
-
-# Écouter les deux topics
-timeout 10 mosquitto_sub \
-    -h localhost -u mosquitto -P mqtt \
-    -t "rpi/network/wifi/clients" \
-    -t "rpi/system/time" \
-    -v 2>/dev/null | while read line; do
-    
-    if [[ $line == *"rpi/network/wifi/clients"* ]]; then
-        echo -e "${BLUE}[WIFI]${NC} Clients détectés"
-        # Extraire le nombre de clients
-        COUNT=$(echo "$line" | grep -o '"count": [0-9]*' | grep -o '[0-9]*' || echo "0")
-        echo "       → $COUNT client(s)"
-    elif [[ $line == *"rpi/system/time"* ]]; then
-        echo -e "${GREEN}[TIME]${NC} Heure système reçue"
+for SERVICE in "${SERVICES[@]}"; do
+    if systemctl is-active --quiet "$SERVICE"; then
+        echo -e "  ${GREEN}✓${NC} $SERVICE : Actif"
+        
+        # Vérifier si ce service publie sur un topic time
+        if [[ "$SERVICE" == *"uptime"* ]] || [[ "$SERVICE" == *"servermonitoring"* ]]; then
+            echo "    ⚠ Ce service pourrait publier des données temps"
+        fi
+    else
+        echo -e "  ${YELLOW}○${NC} $SERVICE : Inactif"
     fi
 done
 
 echo ""
 
 # ===============================================================================
-# 5. RÉSUMÉ DU STATUT
+# 3. VÉRIFIER LE WIDGET UPTIME
 # ===============================================================================
 
-echo -e "${BLUE}▶ RÉSUMÉ DU STATUT${NC}"
+echo -e "${BLUE}▶ ANALYSE DU WIDGET UPTIME${NC}"
 echo "========================================================================"
 
-# Service WiFiStats
-if systemctl is-active --quiet maxlink-widget-wifistats; then
-    echo -e "  ${GREEN}✓${NC} Service WiFiStats : Actif"
-else
-    echo -e "  ${RED}✗${NC} Service WiFiStats : Inactif"
-fi
+# Le widget uptime pourrait publier un mauvais timestamp
+echo "◦ Vérification du topic rpi/system/uptime :"
 
-# Service TimSync
-if systemctl is-active --quiet maxlink-widget-timesync; then
-    echo -e "  ${GREEN}✓${NC} Service TimSync : Actif"
-else
-    echo -e "  ${RED}✗${NC} Service TimSync : Inactif"
-fi
+UPTIME_MSG=$(timeout 5 mosquitto_sub \
+    -h localhost -u mosquitto -P mqtt \
+    -t "rpi/system/uptime" \
+    -C 1 2>/dev/null)
 
-# Clients WiFi
-if [ $CLIENT_COUNT -gt 0 ]; then
-    echo -e "  ${GREEN}✓${NC} Clients WiFi : $CLIENT_COUNT connecté(s)"
-else
-    echo -e "  ${YELLOW}⚠${NC} Clients WiFi : Aucun"
-fi
-
-# Time Source
-if [ -f "$DEVICES_FILE" ]; then
-    TIME_SOURCE_COUNT=$(python3 -c "
-import json
-try:
-    with open('$DEVICES_FILE', 'r') as f:
-        devices = json.load(f)
-        count = sum(1 for d in devices.values() if d.get('time_source', False))
-        print(count)
-except:
-    print(0)
-" 2>/dev/null)
+if [ -n "$UPTIME_MSG" ]; then
+    echo "  Message reçu : $UPTIME_MSG"
     
-    if [ "$TIME_SOURCE_COUNT" -gt 0 ]; then
-        echo -e "  ${GREEN}✓${NC} Time Source : $TIME_SOURCE_COUNT configuré(s)"
-    else
-        echo -e "  ${YELLOW}⚠${NC} Time Source : Aucun configuré"
+    # Vérifier si c'est un nombre simple
+    if [[ "$UPTIME_MSG" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        echo -e "  ${YELLOW}⚠ Uptime publié comme nombre simple${NC}"
+        echo "    Valeur: $UPTIME_MSG secondes"
+        
+        # Si c'est environ 21, c'est probablement notre coupable
+        if (( $(echo "$UPTIME_MSG < 100" | bc -l) )); then
+            echo -e "  ${RED}✗ PROBLÈME IDENTIFIÉ !${NC}"
+            echo "    Le widget uptime publie probablement un timestamp erroné"
+        fi
     fi
 else
-    echo -e "  ${RED}✗${NC} Fichier devices.json : Non trouvé"
+    echo "  Aucun message reçu sur ce topic"
 fi
+
+echo ""
+
+# ===============================================================================
+# 4. VÉRIFIER L'ORCHESTRATEUR
+# ===============================================================================
+
+echo -e "${BLUE}▶ MAPPING DE L'ORCHESTRATEUR${NC}"
+echo "========================================================================"
+
+echo "L'orchestrateur pourrait mal interpréter certains topics."
+echo ""
+echo "Topics qui pourraient causer confusion :"
+echo "  - rpi/system/uptime → pourrait être mappé vers system.time ?"
+echo "  - rpi/system/time → mappé vers system.time"
+echo ""
+echo "Vérifiez dans le navigateur (F12) :"
+echo "  ${YELLOW}window.orchestrator.subscribedTopics${NC}"
+echo "  ${YELLOW}window.orchestrator.topicMapping${NC}"
+
+echo ""
+
+# ===============================================================================
+# 5. SOLUTION SUGGÉRÉE
+# ===============================================================================
+
+echo -e "${BLUE}▶ SOLUTION SUGGÉRÉE${NC}"
+echo "========================================================================"
+
+echo "1. Si le widget uptime publie un mauvais timestamp :"
+echo "   ${YELLOW}sudo systemctl stop maxlink-widget-uptime${NC}"
+echo ""
+echo "2. Vérifiez dans config/variables.js le mapping des topics"
+echo ""
+echo "3. Dans la console du navigateur, tracez l'origine :"
+echo "   ${YELLOW}window.orchestrator.handleMessage = function(topic, payload) {${NC}"
+echo "   ${YELLOW}  console.log('MQTT Message:', topic, payload);${NC}"
+echo "   ${YELLOW}  // Code original...${NC}"
+echo "   ${YELLOW}}${NC}"
 
 echo ""
 echo -e "${BLUE}===============================================================================${NC}"
-echo ""
-
-# ===============================================================================
-# 6. ACTION SUGGÉRÉE
-# ===============================================================================
-
-if [ $CLIENT_COUNT -eq 0 ]; then
-    echo -e "${YELLOW}⚠ ACTION REQUISE :${NC}"
-    echo "  Connectez votre PC ou téléphone au réseau WiFi MaxLink-NETWORK"
-    echo "  pour que le widget puisse détecter des clients."
-elif [ "$TIME_SOURCE_COUNT" -eq 0 ]; then
-    echo -e "${YELLOW}⚠ ACTION REQUISE :${NC}"
-    echo "  Configurez au moins un device comme time_source dans devices.json"
-    echo "  pour que l'indicateur passe au vert."
-else
-    echo -e "${GREEN}✓ Tout semble correctement configuré !${NC}"
-    echo "  Si l'indicateur reste rouge, rafraîchissez le dashboard."
-fi
-
 echo ""
