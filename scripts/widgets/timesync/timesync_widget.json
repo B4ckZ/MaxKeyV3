@@ -3,7 +3,7 @@
     "id": "timesync",
     "name": "Time Synchronization",
     "version": "1.0.0",
-    "description": "Synchronisation automatique temps RTC + sources connectées",
+    "description": "Synchronisation automatique temps RTC (logs SystemD)",
     "author": "MaxLink Team"
   },
   "mqtt": {
@@ -11,8 +11,8 @@
     "broker": {
       "host": "localhost",
       "port": 1883,
-      "username": "maxlink",
-      "password": "maxlink123"
+      "username": "mosquitto",
+      "password": "mqtt"
     },
     "topics": {
       "publish": [
@@ -37,7 +37,8 @@
     "enabled": true,
     "script": "timesync_collector.py",
     "service_name": "maxlink-widget-timesync",
-    "service_description": "MaxLink Time Synchronization Collector"
+    "service_description": "MaxLink Time Synchronization Collector",
+    "user": "root"
   },
   "time": {
     "publish_interval": 10,
@@ -45,7 +46,7 @@
   },
   "dependencies": {
     "python_packages": ["paho-mqtt"],
-    "system_packages": ["systemd-timesyncd"],
+    "system_packages": [],
     "services": ["mosquitto"],
     "python_version": ">=3.7"
   }

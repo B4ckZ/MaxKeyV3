@@ -2,7 +2,7 @@
 
 # ===============================================================================
 # WIDGET TIME SYNCHRONIZATION - INSTALLATION SIMPLIFIÉE
-# Synchronisation automatique uniquement
+# User=root, logs SystemD uniquement, pas de gestion fichiers
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -34,7 +34,7 @@ log_info "========== INSTALLATION WIDGET TIMESYNC SIMPLIFIÉ =========="
 
 echo ""
 echo "========================================================================"
-echo "Installation du widget Time Synchronization (Auto)"
+echo "Installation du widget Time Synchronization (Simplifié)"
 echo "========================================================================"
 echo ""
 
@@ -49,7 +49,7 @@ fi
 echo "◦ Installation du widget TimSync..."
 if widget_standard_install "$WIDGET_NAME"; then
     echo "  ↦ Installation réussie ✓"
-    log_success "Widget TimSync installé"
+    log_success "Widget TimSync installé (logs SystemD uniquement)"
 else
     echo "  ↦ Erreur lors de l'installation ✗"
     log_error "Échec installation timesync"
@@ -90,44 +90,11 @@ else
 fi
 
 # ===============================================================================
-# PERMISSIONS SUDO SIMPLIFIÉES
-# ===============================================================================
-
-echo ""
-echo "◦ Configuration permissions..."
-
-# Permissions sudo minimales
-cat > "/etc/sudoers.d/maxlink-timesync" << 'EOF'
-# MaxLink TimSync - Permissions minimales
-maxlink ALL=(ALL) NOPASSWD: /usr/bin/timedatectl set-time *
-maxlink ALL=(ALL) NOPASSWD: /usr/bin/timedatectl set-ntp *
-EOF
-
-# Vérifier la syntaxe
-if visudo -c -f "/etc/sudoers.d/maxlink-timesync" >/dev/null 2>&1; then
-    echo "  ↦ Permissions configurées ✓"
-    log_info "Permissions sudo configurées"
-else
-    echo "  ↦ Erreur permissions ✗"
-    log_error "Erreur configuration sudo"
-    rm -f "/etc/sudoers.d/maxlink-timesync"
-    exit 1
-fi
-
-# ===============================================================================
-# FINALISATION
+# FINALISATION SIMPLIFIÉE
 # ===============================================================================
 
 echo ""
 echo "◦ Finalisation..."
-
-# Utilisateur maxlink
-if ! id "maxlink" &>/dev/null; then
-    useradd -r -s /bin/bash -d /opt/maxlink maxlink
-    log_info "Utilisateur maxlink créé"
-fi
-
-usermod -a -G sudo maxlink 2>/dev/null || true
 
 # Recharger systemd
 systemctl daemon-reload
@@ -140,7 +107,8 @@ echo "Installation terminée !"
 echo "========================================================================"
 echo ""
 echo "◦ Widget TimSync configuré pour synchronisation automatique"
-echo "◦ Service: $SERVICE_NAME"
+echo "◦ Service: $SERVICE_NAME (User=root)"
+echo "◦ Logs: SystemD uniquement (journalctl)"
 echo "◦ Seuil décalage: 3 minutes"
 echo "◦ Indicateur: Vert = OK, Rouge = Problème"
 echo ""
@@ -155,6 +123,10 @@ else
     echo "◦ Pour plus de fiabilité, installer un module RTC DS3231"
 fi
 
+echo ""
+echo "◦ Logs disponibles via SystemD :"
+echo "  • Logs temps réel : journalctl -u $SERVICE_NAME -f"
+echo "  • Logs récents    : journalctl -u $SERVICE_NAME -n 20"
 echo ""
 
 log_success "Installation TimSync simplifiée terminée"

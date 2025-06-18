@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Collecteur de synchronisation temps MaxLink - Version simplifiée
-Synchronisation automatique uniquement
+User=root, logs SystemD uniquement, identifiants MQTT corrects
 """
 
 import json
@@ -13,14 +13,11 @@ import sys
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
-# Configuration du logging simplifié
+# Configuration du logging SIMPLIFIÉ (SystemD uniquement)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('/var/log/maxlink/timesync.log')
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger('timesync')
 
@@ -45,8 +42,8 @@ class TimeSyncCollector:
             'mqtt': {
                 'host': 'localhost',
                 'port': 1883,
-                'username': 'maxlink',
-                'password': 'maxlink123'
+                'username': 'mosquitto',  # Identifiants corrects
+                'password': 'mqtt'        # comme les autres widgets
             },
             'time': {
                 'publish_interval': 10,
@@ -62,6 +59,7 @@ class TimeSyncCollector:
                         default_config['mqtt'].update(file_config['mqtt'])
                     if 'time' in file_config:
                         default_config['time'].update(file_config['time'])
+                logger.info(f"Configuration chargée depuis {config_file}")
             except Exception as e:
                 logger.error(f"Erreur lecture config: {e}")
         
@@ -78,7 +76,7 @@ class TimeSyncCollector:
             self.client.on_message = self.on_message
             
             self.client.connect(mqtt_config['host'], mqtt_config['port'], 60)
-            logger.info(f"Connexion MQTT: {mqtt_config['host']}:{mqtt_config['port']}")
+            logger.info(f"Connexion MQTT: {mqtt_config['host']}:{mqtt_config['port']} ({mqtt_config['username']})")
             return True
             
         except Exception as e:
@@ -90,6 +88,7 @@ class TimeSyncCollector:
         if rc == 0:
             logger.info("Connecté au broker MQTT")
             client.subscribe(self.topics['sync_command'])
+            logger.info("Abonné aux commandes de synchronisation")
         else:
             logger.error(f"Échec connexion MQTT: {rc}")
     
@@ -109,12 +108,14 @@ class TimeSyncCollector:
         """Exécuter une synchronisation temps"""
         try:
             if payload.get('action') != 'set_time':
+                logger.warning(f"Action inconnue: {payload.get('action')}")
                 return
             
             new_timestamp = payload.get('timestamp')
             source_mac = payload.get('source_mac', 'unknown')
             
             if not new_timestamp:
+                logger.error("Timestamp manquant dans commande sync")
                 self.publish_sync_result('error', 'Timestamp manquant')
                 return
             
@@ -125,6 +126,7 @@ class TimeSyncCollector:
             logger.info(f"Sync demandée - Source: {source_mac}, Décalage: {drift_seconds:.1f}s")
             
             if drift_seconds < 2:
+                logger.info("Décalage acceptable - pas de synchronisation")
                 self.publish_sync_result('skipped', 'Décalage acceptable')
                 return
             
@@ -146,17 +148,20 @@ class TimeSyncCollector:
             new_datetime = datetime.fromtimestamp(timestamp)
             datetime_str = new_datetime.strftime('%Y-%m-%d %H:%M:%S')
             
-            # Synchroniser l'heure
-            subprocess.run(['sudo', 'timedatectl', 'set-ntp', 'false'], check=True, capture_output=True)
-            subprocess.run(['sudo', 'timedatectl', 'set-time', datetime_str], check=True, capture_output=True)
+            # Synchroniser l'heure (commandes directes en root)
+            subprocess.run(['timedatectl', 'set-ntp', 'false'], check=True, capture_output=True)
+            subprocess.run(['timedatectl', 'set-time', datetime_str], check=True, capture_output=True)
             time.sleep(1)
-            subprocess.run(['sudo', 'timedatectl', 'set-ntp', 'true'], check=True, capture_output=True)
+            subprocess.run(['timedatectl', 'set-ntp', 'true'], check=True, capture_output=True)
             
-            logger.info(f"Heure système: {datetime_str}")
+            logger.info(f"Heure système mise à jour: {datetime_str}")
             return True
             
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
             logger.error(f"Erreur commande système: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Erreur synchronisation: {e}")
             return False
     
     def publish_sync_result(self, status, message):
@@ -169,6 +174,7 @@ class TimeSyncCollector:
             }
             
             self.client.publish(self.topics['sync_result'], json.dumps(result))
+            logger.debug(f"Résultat publié: {status}")
             
         except Exception as e:
             logger.error(f"Erreur publication résultat: {e}")
@@ -188,7 +194,7 @@ class TimeSyncCollector:
             self.client.publish(self.topics['time_publish'], json.dumps(time_data))
             
         except Exception as e:
-            logger.error(f"Erreur publication: {e}")
+            logger.error(f"Erreur publication périodique: {e}")
     
     def get_uptime_seconds(self):
         """Récupérer l'uptime système"""
@@ -211,30 +217,32 @@ class TimeSyncCollector:
         
         try:
             publish_interval = self.config['time']['publish_interval']
+            logger.info(f"Publication d'heure toutes les {publish_interval}s")
             
             while self.running:
                 self.publish_periodic_time()
                 time.sleep(publish_interval)
                 
         except KeyboardInterrupt:
-            logger.info("Arrêt demandé")
+            logger.info("Arrêt demandé par l'utilisateur")
+        except Exception as e:
+            logger.error(f"Erreur dans la boucle principale: {e}")
         finally:
             self.cleanup()
     
     def cleanup(self):
         """Nettoyage"""
+        logger.info("Nettoyage du collecteur...")
         self.running = False
         if self.client:
             self.client.loop_stop()
             self.client.disconnect()
-        logger.info("Collecteur arrêté")
+        logger.info("Collecteur TimSync arrêté")
 
 if __name__ == "__main__":
     config_file = "/opt/maxlink/config/widgets/timesync_widget.json"
     if len(sys.argv) > 1:
         config_file = sys.argv[1]
-    
-    os.makedirs('/var/log/maxlink', exist_ok=True)
     
     collector = TimeSyncCollector(config_file)
     collector.run()
