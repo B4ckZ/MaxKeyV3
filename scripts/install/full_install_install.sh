@@ -327,7 +327,7 @@ else
         echo "  ↦ Redémarrage du système dans 30 secondes..."
         echo ""
         
-        sleep 30
+        sleep 60
         log_info "Redémarrage du système malgré les erreurs"
         reboot
     else

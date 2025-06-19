@@ -1,9 +1,8 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - SYSTÈME D'ORCHESTRATION AVEC SYSTEMD (VERSION CORRIGÉE)
-# Script d'installation avec mise à jour du statut et gestion SKIP_REBOOT
-# Version modifiée avec configuration ACL pour l'utilisateur prod
+# MAXLINK - INSTALLATION DE L'ORCHESTRATEUR
+# Gestion centralisée des services et configuration finale
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -11,23 +10,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Source des modules
-source "$BASE_DIR/scripts/common/variables.sh"
-source "$BASE_DIR/scripts/common/logging.sh"
+source "$SCRIPT_DIR/../common/variables.sh"
+source "$SCRIPT_DIR/../common/logging.sh"
 
 # ===============================================================================
-# INITIALISATION
+# CONFIGURATION
 # ===============================================================================
 
-# Initialiser le logging
-init_logging "Installation de l'orchestrateur MaxLink" "install"
+# Répertoires locaux pour les widgets
+LOCAL_WIDGETS_DIR="/var/lib/maxlink/widgets"
+LOCAL_WIDGETS_CONFIG="/etc/maxlink/widgets"
 
-# Répertoire local pour les widgets
-LOCAL_WIDGETS_DIR="/opt/maxlink/widgets"
-LOCAL_WIDGETS_CONFIG="/opt/maxlink/config/widgets"
-
-# Flags pour déterminer ce qui doit être fait
-IS_FIRST_INSTALL=false
-NEED_REBOOT=false
+# Configuration targets systemd
+EARLY_TARGET="maxlink-early.target"
+PRE_NETWORK_TARGET="maxlink-pre-network.target"
+NETWORK_TARGET="maxlink-network.target"
+POST_NETWORK_TARGET="maxlink-post-network.target"
 
 # ===============================================================================
 # FONCTIONS
@@ -37,231 +35,6 @@ NEED_REBOOT=false
 send_progress() {
     echo "PROGRESS:$1:$2"
     log_info "Progression: $1% - $2" false
-}
-
-# Attente simple
-wait_silently() {
-    sleep "$1"
-}
-
-# Vérifier si c'est la première installation
-check_first_install() {
-    if [ ! -d "/opt/maxlink" ] || [ ! -f "/etc/systemd/system/maxlink-network.target" ]; then
-        IS_FIRST_INSTALL=true
-        echo "◦ Première installation détectée"
-        log_info "Première installation de l'orchestrateur"
-    else
-        echo "◦ Mise à jour détectée"
-        log_info "Mise à jour de l'orchestrateur"
-    fi
-}
-
-# Configuration du module RTC sur la prise BAT du Raspberry Pi 5
-setup_rtc_module() {
-    echo ""
-    echo "========================================================================"
-    echo "CONFIGURATION DU MODULE RTC"
-    echo "========================================================================"
-    
-    # Vérifier si on est sur un Raspberry Pi 5
-    if ! grep -q "Raspberry Pi 5" /proc/device-tree/model 2>/dev/null; then
-        echo "⚠ Pas un Raspberry Pi 5, configuration RTC ignorée"
-        log_warning "Configuration RTC ignorée - pas un Raspberry Pi 5"
-        return 0
-    fi
-    
-    echo "◦ Détection du module RTC..."
-    
-    # Vérifier d'abord si un RTC est déjà configuré
-    if [ -e "/dev/rtc0" ] || [ -e "/dev/rtc" ]; then
-        echo "  ↦ Module RTC déjà configuré ✓"
-        
-        # Tester si le RTC fonctionne
-        if hwclock --show &>/dev/null; then
-            echo "  ↦ RTC fonctionnel : $(hwclock --show 2>/dev/null | cut -d' ' -f1-4)"
-            RTC_FOUND=true
-            
-            # Essayer de déterminer le type depuis dmesg
-            if dmesg | grep -qi "ds3231"; then
-                RTC_TYPE="ds3231"
-            elif dmesg | grep -qi "ds1307"; then
-                RTC_TYPE="ds1307"
-            elif dmesg | grep -qi "pcf8523"; then
-                RTC_TYPE="pcf8523"
-            elif dmesg | grep -qi "pcf8563"; then
-                RTC_TYPE="pcf8563"
-            else
-                # Type par défaut pour les modules sur connecteur BAT du Pi 5
-                RTC_TYPE="ds3231"
-            fi
-            
-            echo "  ↦ Type détecté/supposé : $RTC_TYPE"
-        else
-            echo "  ⚠ RTC présent mais non fonctionnel"
-            RTC_FOUND=false
-        fi
-    else
-        # Si pas de RTC configuré, essayer la détection I2C
-        echo "  ↦ Pas de RTC configuré, tentative de détection I2C..."
-        
-        # Activer l'interface I2C si nécessaire
-        if ! lsmod | grep -q i2c_dev; then
-            echo "  ↦ Activation de l'interface I2C..."
-            modprobe i2c-dev
-            echo "i2c-dev" >> /etc/modules
-        fi
-        
-        RTC_FOUND=false
-        RTC_TYPE=""
-        
-        # Scanner tous les bus I2C possibles (0-3 pour Pi 5)
-        for bus in 0 1 2 3; do
-            if [ -e "/dev/i2c-$bus" ]; then
-                if i2cdetect -y $bus 2>/dev/null | grep -q " 68 "; then
-                    RTC_TYPE="ds3231"  # Par défaut pour 0x68
-                    RTC_FOUND=true
-                    echo "  ↦ Module trouvé sur I2C-$bus à l'adresse 0x68"
-                    break
-                elif i2cdetect -y $bus 2>/dev/null | grep -q " 6f "; then
-                    RTC_TYPE="pcf8523"
-                    RTC_FOUND=true
-                    echo "  ↦ Module trouvé sur I2C-$bus à l'adresse 0x6f"
-                    break
-                elif i2cdetect -y $bus 2>/dev/null | grep -q " 51 "; then
-                    RTC_TYPE="pcf8563"
-                    RTC_FOUND=true
-                    echo "  ↦ Module trouvé sur I2C-$bus à l'adresse 0x51"
-                    break
-                fi
-            fi
-        done
-        
-        if [ "$RTC_FOUND" = false ]; then
-            echo "⚠ Aucun module RTC détecté"
-            log_warning "Module RTC non détecté"
-            return 0
-        fi
-    fi
-    
-    echo "  ↦ Module RTC détecté : $RTC_TYPE ✓"
-    log_info "Module RTC $RTC_TYPE détecté"
-    
-    # Configurer le device tree overlay
-    echo "◦ Configuration du device tree overlay..."
-    
-    # Vérifier si l'overlay n'est pas déjà configuré
-    if ! grep -q "dtoverlay=i2c-rtc,$RTC_TYPE" /boot/firmware/config.txt 2>/dev/null && \
-       ! grep -q "dtoverlay=i2c-rtc,$RTC_TYPE" /boot/config.txt 2>/dev/null; then
-        
-        # Déterminer le fichier de configuration (Pi 5 utilise /boot/firmware/config.txt)
-        CONFIG_FILE="/boot/firmware/config.txt"
-        if [ ! -f "$CONFIG_FILE" ]; then
-            CONFIG_FILE="/boot/config.txt"
-        fi
-        
-        # Ajouter l'overlay
-        echo "" >> "$CONFIG_FILE"
-        echo "# Configuration RTC ajoutée par MaxLink" >> "$CONFIG_FILE"
-        echo "dtoverlay=i2c-rtc,$RTC_TYPE" >> "$CONFIG_FILE"
-        echo "  ↦ Overlay ajouté au fichier de configuration ✓"
-        log_success "Overlay RTC configuré dans $CONFIG_FILE"
-        
-        # Le module aura besoin d'un redémarrage
-        NEED_REBOOT=true
-    else
-        echo "  ↦ Overlay déjà configuré ✓"
-    fi
-    
-    # Vérifier les outils nécessaires
-    echo "◦ Vérification des outils RTC..."
-    
-    # hwclock devrait être présent (util-linux)
-    if ! command -v hwclock &> /dev/null; then
-        echo "  ⚠ hwclock manquant - installation non standard"
-        log_warning "hwclock non trouvé sur le système"
-        return 1
-    fi
-    
-    # i2c-tools devrait être installé par update_install.sh
-    if ! command -v i2cdetect &> /dev/null; then
-        echo "  ⚠ i2c-tools manquant"
-        echo "  ↦ i2c-tools aurait dû être installé lors de l'étape de mise à jour"
-        log_error "i2c-tools non trouvé - vérifier l'installation des paquets système"
-        return 1
-    fi
-    
-    echo "  ↦ Outils RTC disponibles ✓"
-    
-    # Créer un service pour synchroniser l'heure au démarrage
-    echo "◦ Création du service de synchronisation RTC..."
-    
-    cat > /etc/systemd/system/maxlink-rtc-sync.service << EOF
-[Unit]
-Description=MaxLink RTC Time Synchronization
-DefaultDependencies=no
-Before=time-sync.target sysinit.target shutdown.target
-Conflicts=shutdown.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/sbin/hwclock --hctosys
-ExecStop=/sbin/hwclock --systohc
-
-[Install]
-WantedBy=basic.target
-EOF
-
-    systemctl daemon-reload
-    systemctl enable maxlink-rtc-sync.service &>/dev/null
-    echo "  ↦ Service de synchronisation créé ✓"
-    log_success "Service RTC configuré"
-    
-    # Désactiver le service fake-hwclock s'il existe
-    if systemctl list-unit-files | grep -q fake-hwclock; then
-        echo "◦ Désactivation de fake-hwclock..."
-        systemctl disable fake-hwclock &>/dev/null
-        systemctl stop fake-hwclock &>/dev/null
-        echo "  ↦ fake-hwclock désactivé ✓"
-    fi
-    
-    # Désactiver les services NTP
-    echo "◦ Désactivation des services NTP (serveur hors ligne)..."
-    
-    # Désactiver systemd-timesyncd
-    if systemctl list-unit-files | grep -q systemd-timesyncd; then
-        systemctl disable systemd-timesyncd &>/dev/null
-        systemctl stop systemd-timesyncd &>/dev/null
-        echo "  ↦ systemd-timesyncd désactivé ✓"
-    fi
-    
-    # Désactiver ntp si installé
-    if systemctl list-unit-files | grep -q "^ntp.service"; then
-        systemctl disable ntp &>/dev/null
-        systemctl stop ntp &>/dev/null
-        echo "  ↦ ntp désactivé ✓"
-    fi
-    
-    # Désactiver chrony si installé
-    if systemctl list-unit-files | grep -q chrony; then
-        systemctl disable chrony &>/dev/null
-        systemctl stop chrony &>/dev/null
-        echo "  ↦ chrony désactivé ✓"
-    fi
-    
-    # Masquer time-sync.target pour empêcher tout service de synchronisation
-    systemctl mask time-sync.target &>/dev/null
-    echo "  ↦ Synchronisation temps réseau complètement désactivée ✓"
-    
-    echo ""
-    echo "✓ Configuration RTC terminée"
-    echo "  Module : $RTC_TYPE"
-    echo "  Service : maxlink-rtc-sync.service"
-    echo "  Services NTP : désactivés"
-    
-    log_success "Configuration RTC complète pour module $RTC_TYPE avec NTP désactivé"
-    
-    return 0
 }
 
 # Configuration des permissions ACL pour l'utilisateur prod
@@ -305,6 +78,11 @@ setup_prod_user_permissions() {
     setfacl -R -m u:prod:rwx /var/www
     setfacl -R -d -m u:prod:rwx /var/www
     
+    # IMPORTANT : Réinitialiser le masque ACL pour permettre toutes les permissions
+    echo "◦ Réinitialisation du masque ACL..."
+    setfacl -R -m mask::rwx /var/www
+    echo "  ↦ Masque ACL réinitialisé à rwx ✓"
+    
     # S'assurer que prod peut lire/écrire tous les fichiers existants
     find /var/www -type f -exec setfacl -m u:prod:rw {} \; 2>/dev/null || true
     find /var/www -type d -exec setfacl -m u:prod:rwx {} \; 2>/dev/null || true
@@ -318,7 +96,7 @@ setup_prod_user_permissions() {
     # Ajouter prod au groupe www-data
     usermod -a -G www-data prod 2>/dev/null || true
     
-    # Créer un script de maintenance des permissions
+    # Créer un script de maintenance des permissions AMÉLIORÉ
     cat > /usr/local/bin/maxlink-fix-prod-permissions << 'EOF'
 #!/bin/bash
 # Script de maintenance des permissions pour l'utilisateur prod
@@ -329,11 +107,17 @@ echo "Réparation des permissions pour l'utilisateur prod..."
 setfacl -R -m u:prod:rwx /var/www
 setfacl -R -d -m u:prod:rwx /var/www
 
+# IMPORTANT : Réinitialiser le masque pour permettre toutes les permissions
+setfacl -R -m mask::rwx /var/www
+
 # S'assurer que tous les fichiers sont accessibles
 find /var/www -type f -exec setfacl -m u:prod:rw {} \; 2>/dev/null || true
 find /var/www -type d -exec setfacl -m u:prod:rwx {} \; 2>/dev/null || true
 
 echo "Permissions réparées."
+echo ""
+echo "Vérification du masque ACL:"
+getfacl /var/www/maxlink-dashboard 2>/dev/null | grep -E "(mask|user:prod)" || true
 EOF
     
     chmod +x /usr/local/bin/maxlink-fix-prod-permissions
@@ -345,6 +129,17 @@ EOF
     echo "◦ Vérification des permissions..."
     if getfacl /var/www 2>/dev/null | grep -q "user:prod:rwx"; then
         echo "  ↦ Permissions ACL vérifiées ✓"
+        
+        # Vérifier aussi le masque
+        MASK=$(getfacl /var/www 2>/dev/null | grep "^mask::" | cut -d: -f3)
+        if [ "$MASK" = "rwx" ]; then
+            echo "  ↦ Masque ACL correct (rwx) ✓"
+        else
+            echo "  ⚠ Masque ACL incorrect ($MASK), correction..."
+            setfacl -R -m mask::rwx /var/www
+            echo "  ↦ Masque corrigé ✓"
+        fi
+        
         log_success "Permissions SSH configurées pour l'utilisateur prod"
         return 0
     else
@@ -352,6 +147,43 @@ EOF
         log_error "Problème avec les permissions ACL"
         return 1
     fi
+}
+
+# Nouvelle fonction pour corriger les permissions après toutes les installations
+fix_permissions_after_install() {
+    echo ""
+    echo "========================================================================"
+    echo "CORRECTION FINALE DES PERMISSIONS"
+    echo "========================================================================"
+    
+    echo "◦ Correction du masque ACL après les installations..."
+    
+    # Le script nginx_install a peut-être modifié les permissions
+    if [ -d "/var/www/maxlink-dashboard" ]; then
+        echo "  ↦ Dashboard détecté, correction des permissions..."
+        
+        # Réappliquer les ACL pour prod
+        setfacl -R -m u:prod:rwx /var/www/maxlink-dashboard
+        setfacl -R -d -m u:prod:rwx /var/www/maxlink-dashboard
+        
+        # Corriger le masque ACL
+        setfacl -R -m mask::rwx /var/www/maxlink-dashboard
+        
+        echo "  ↦ Permissions du dashboard corrigées ✓"
+        log_success "Permissions du dashboard corrigées après installation"
+    fi
+    
+    # Corriger tout /var/www pour être sûr
+    setfacl -R -m mask::rwx /var/www 2>/dev/null || true
+    
+    echo "  ↦ Masque ACL global corrigé ✓"
+    
+    # Afficher l'état final
+    echo ""
+    echo "◦ État final des permissions:"
+    getfacl /var/www/maxlink-dashboard 2>/dev/null | grep -E "(owner|group|user:prod|mask)" | head -10 || true
+    
+    return 0
 }
 
 # Copier les widgets vers le répertoire local
@@ -388,12 +220,6 @@ copy_widgets_to_local() {
             fi
         done
         
-        echo "  ↦ Fichiers de configuration créés ✓"
-        
-        # Définir les permissions
-        chown -R root:root "$LOCAL_WIDGETS_DIR"
-        chmod -R 755 "$LOCAL_WIDGETS_DIR"
-        
         log_success "Widgets copiés vers $LOCAL_WIDGETS_DIR"
         return 0
     else
@@ -403,380 +229,421 @@ copy_widgets_to_local() {
     fi
 }
 
-# Créer les scripts de vérification de santé
-create_healthcheck_scripts() {
+# Configuration du module RTC
+setup_rtc_module() {
     echo ""
-    echo "◦ Création des scripts de vérification..."
+    echo "========================================================================"
+    echo "CONFIGURATION DU MODULE RTC"
+    echo "========================================================================"
     
-    # Script de vérification réseau
-    cat > /usr/local/bin/maxlink-check-network.sh << 'EOF'
-#!/bin/bash
-# Vérification de la santé du réseau MaxLink
-
-echo "=== Network Health Check ==="
-echo -n "Hostapd: "
-systemctl is-active hostapd || exit 1
-echo -n "Dnsmasq: "
-systemctl is-active dnsmasq || exit 1
-echo -n "AP Interface: "
-ip link show ap0 2>/dev/null | grep -q "state UP" && echo "UP" || exit 1
-echo "Network: OK"
-exit 0
-EOF
-
-    # Script de vérification MQTT
-    cat > /usr/local/bin/maxlink-check-mqtt.sh << 'EOF'
-#!/bin/bash
-# Vérification de la santé MQTT
-
-echo "=== MQTT Health Check ==="
-echo -n "Mosquitto: "
-systemctl is-active mosquitto || exit 1
-echo -n "Port 1883: "
-netstat -tlnp 2>/dev/null | grep -q ":1883" && echo "LISTENING" || exit 1
-echo "MQTT: OK"
-exit 0
-EOF
-
-    # Script de vérification des widgets
-    cat > /usr/local/bin/maxlink-check-widgets.sh << 'EOF'
-#!/bin/bash
-# Vérification de la santé des widgets
-
-echo "=== Widgets Health Check ==="
-FAILED=0
-for service in $(systemctl list-units 'maxlink-widget-*' --no-legend | awk '{print $1}'); do
-    echo -n "${service}: "
-    if systemctl is-active "$service" >/dev/null 2>&1; then
-        echo "ACTIVE"
+    # Détection du module RTC
+    echo "◦ Détection du module RTC..."
+    
+    # Vérifier si un RTC est déjà configuré
+    if hwclock -r &>/dev/null; then
+        echo "  ↦ Module RTC déjà configuré ✓"
+        RTC_TIME=$(hwclock -r)
+        echo "  ↦ RTC fonctionnel : $RTC_TIME"
+        
+        # Essayer de détecter le type
+        if dmesg | grep -i "rtc.*ds3231" &>/dev/null || i2cdetect -y 1 2>/dev/null | grep -q "68"; then
+            RTC_TYPE="ds3231"
+        elif dmesg | grep -i "rtc.*ds1307" &>/dev/null; then
+            RTC_TYPE="ds1307"
+        elif dmesg | grep -i "rtc.*pcf8523" &>/dev/null; then
+            RTC_TYPE="pcf8523"
+        else
+            RTC_TYPE="ds3231"  # Par défaut
+        fi
+        echo "  ↦ Type détecté/supposé : $RTC_TYPE"
     else
-        echo "FAILED"
-        FAILED=$((FAILED + 1))
+        # Pas de RTC configuré, essayer de détecter via I2C
+        if command -v i2cdetect &>/dev/null; then
+            if i2cdetect -y 1 2>/dev/null | grep -q "68"; then
+                RTC_TYPE="ds3231"
+            elif i2cdetect -y 1 2>/dev/null | grep -q "51"; then
+                RTC_TYPE="pcf8523"
+            else
+                RTC_TYPE="ds3231"  # Par défaut
+            fi
+        else
+            RTC_TYPE="ds3231"  # Par défaut si i2cdetect non disponible
+        fi
     fi
-done
+    
+    echo "  ↦ Module RTC détecté : $RTC_TYPE ✓"
+    log_info "Module RTC $RTC_TYPE détecté"
+    
+    # Configuration du device tree overlay
+    echo "◦ Configuration du device tree overlay..."
+    
+    if [ -f "$CONFIG_FILE" ]; then
+        # Vérifier si l'overlay est déjà configuré
+        if grep -q "dtoverlay=i2c-rtc" "$CONFIG_FILE"; then
+            echo "  ↦ Overlay RTC déjà configuré ✓"
+        else
+            # Ajouter l'overlay
+            echo "" >> "$CONFIG_FILE"
+            echo "# Configuration RTC MaxLink" >> "$CONFIG_FILE"
+            echo "dtoverlay=i2c-rtc,$RTC_TYPE" >> "$CONFIG_FILE"
+            echo "  ↦ Overlay ajouté au fichier de configuration ✓"
+        fi
+    else
+        echo "  ⚠ Fichier de configuration non trouvé : $CONFIG_FILE"
+        log_warning "Fichier config.txt non trouvé"
+    fi
+    
+    log_success "Overlay RTC configuré dans $CONFIG_FILE"
+    
+    # Vérifier les outils RTC
+    echo "◦ Vérification des outils RTC..."
+    if command -v hwclock &>/dev/null; then
+        echo "  ↦ Outils RTC disponibles ✓"
+    else
+        echo "  ⚠ hwclock non trouvé, installation peut être nécessaire"
+        log_warning "hwclock non disponible"
+    fi
+    
+    # Créer un service de synchronisation RTC
+    echo "◦ Création du service de synchronisation RTC..."
+    
+    cat > /etc/systemd/system/maxlink-rtc-sync.service << EOF
+[Unit]
+Description=MaxLink RTC Time Synchronization
+DefaultDependencies=no
+Before=basic.target
+After=systemd-modules-load.service
 
-if [ $FAILED -eq 0 ]; then
-    echo "Widgets: OK"
-    exit 0
-else
-    echo "Widgets: $FAILED FAILED"
-    exit 1
-fi
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/hwclock -s
+
+[Install]
+WantedBy=sysinit.target
 EOF
-
-    chmod +x /usr/local/bin/maxlink-check-*.sh
-    echo "  ↦ Scripts de vérification créés ✓"
-    log_success "Scripts healthcheck créés"
+    
+    systemctl enable maxlink-rtc-sync.service &>/dev/null
+    echo "  ↦ Service de synchronisation créé ✓"
+    log_success "Service RTC configuré"
+    
+    # Désactiver fake-hwclock s'il est présent
+    echo "◦ Désactivation de fake-hwclock..."
+    if systemctl list-unit-files | grep -q fake-hwclock; then
+        systemctl disable fake-hwclock &>/dev/null
+        systemctl stop fake-hwclock &>/dev/null
+        echo "  ↦ fake-hwclock désactivé ✓"
+    else
+        echo "  ↦ fake-hwclock non présent ✓"
+    fi
+    
+    # Désactiver les services NTP pour un serveur hors ligne
+    echo "◦ Désactivation des services NTP (serveur hors ligne)..."
+    
+    # systemd-timesyncd
+    if systemctl list-unit-files | grep -q systemd-timesyncd; then
+        systemctl disable systemd-timesyncd &>/dev/null
+        systemctl stop systemd-timesyncd &>/dev/null
+        echo "  ↦ systemd-timesyncd désactivé ✓"
+    fi
+    
+    # ntp
+    if systemctl list-unit-files | grep -q "^ntp.service"; then
+        systemctl disable ntp &>/dev/null
+        systemctl stop ntp &>/dev/null
+        echo "  ↦ ntp désactivé ✓"
+    fi
+    
+    # chrony
+    if systemctl list-unit-files | grep -q chrony; then
+        systemctl disable chrony &>/dev/null
+        systemctl stop chrony &>/dev/null
+        echo "  ↦ chrony désactivé ✓"
+    fi
+    
+    # Masquer time-sync.target pour empêcher tout service de synchronisation
+    systemctl mask time-sync.target &>/dev/null
+    echo "  ↦ Synchronisation temps réseau complètement désactivée ✓"
+    
+    echo ""
+    echo "✓ Configuration RTC terminée"
+    echo "  Module : $RTC_TYPE"
+    echo "  Service : maxlink-rtc-sync.service"
+    echo "  Services NTP : désactivés"
+    
+    log_success "Configuration RTC complète pour module $RTC_TYPE avec NTP désactivé"
+    
+    return 0
 }
 
-# Créer les services systemd
-create_systemd_services() {
+# Création de l'infrastructure d'orchestration
+setup_orchestration_infrastructure() {
     echo ""
+    echo "========================================================================"
+    echo "INFRASTRUCTURE D'ORCHESTRATION"
+    echo "========================================================================"
+    
+    # Créer les répertoires nécessaires
+    mkdir -p /var/lib/maxlink/{status,logs}
+    mkdir -p /etc/maxlink/orchestrator
+    
+    # Créer les scripts de healthcheck
+    echo "◦ Création des scripts de vérification..."
+    
+    # Script de healthcheck pour l'AP
+    cat > /usr/local/bin/maxlink-check-ap << 'EOF'
+#!/bin/bash
+# Vérification du point d'accès
+nmcli con show --active | grep -q "MaxLink-AP" && exit 0 || exit 1
+EOF
+    chmod +x /usr/local/bin/maxlink-check-ap
+    
+    # Script de healthcheck pour Nginx
+    cat > /usr/local/bin/maxlink-check-nginx << 'EOF'
+#!/bin/bash
+# Vérification de Nginx
+systemctl is-active nginx >/dev/null && curl -s -o /dev/null -w "%{http_code}" http://localhost | grep -q "200" && exit 0 || exit 1
+EOF
+    chmod +x /usr/local/bin/maxlink-check-nginx
+    
+    # Script de healthcheck pour MQTT
+    cat > /usr/local/bin/maxlink-check-mqtt << 'EOF'
+#!/bin/bash
+# Vérification de MQTT
+systemctl is-active mosquitto >/dev/null && mosquitto_sub -h localhost -u mosquitto -P mqtt -t '$SYS/broker/version' -C 1 -W 2 >/dev/null 2>&1 && exit 0 || exit 1
+EOF
+    chmod +x /usr/local/bin/maxlink-check-mqtt
+    
+    echo "  ↦ Scripts de vérification créés ✓"
+    log_success "Scripts healthcheck créés"
+    
+    # Créer les services systemd
     echo "◦ Création des services systemd..."
     
-    # Service de vérification réseau
-    cat > /etc/systemd/system/maxlink-network-ready.service << EOF
+    # Service de monitoring
+    cat > /etc/systemd/system/maxlink-monitor.service << EOF
 [Unit]
-Description=MaxLink Network Ready Check
-After=hostapd.service dnsmasq.service
-Wants=hostapd.service dnsmasq.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/maxlink-check-network.sh
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Service de vérification MQTT
-    cat > /etc/systemd/system/maxlink-mqtt-ready.service << EOF
-[Unit]
-Description=MaxLink MQTT Ready Check
-After=mosquitto.service maxlink-network-ready.service
-Requires=mosquitto.service maxlink-network-ready.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/maxlink-check-mqtt.sh
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Service de vérification des widgets
-    cat > /etc/systemd/system/maxlink-widgets-ready.service << EOF
-[Unit]
-Description=MaxLink Widgets Ready Check
-After=maxlink-mqtt-ready.service
-Requires=maxlink-mqtt-ready.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStartPre=/bin/sleep 30
-ExecStart=/usr/local/bin/maxlink-check-widgets.sh
-Restart=on-failure
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Service de monitoring global
-    cat > /etc/systemd/system/maxlink-health-monitor.service << EOF
-[Unit]
-Description=MaxLink Health Monitor
-After=maxlink-widgets-ready.service
-Requires=maxlink-widgets-ready.service
+Description=MaxLink System Monitor
+After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -c 'while true; do /usr/local/bin/maxlink-check-network.sh && /usr/local/bin/maxlink-check-mqtt.sh && /usr/local/bin/maxlink-check-widgets.sh; sleep 300; done'
+ExecStart=/usr/local/bin/maxlink-monitor
 Restart=always
-RestartSec=60
+RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
-    echo "  ↦ Services de supervision créés ✓"
-    log_success "Services systemd créés"
-}
-
-# Créer les targets systemd
-create_systemd_targets() {
-    echo ""
-    echo "◦ Création des targets systemd..."
     
-    # Target réseau
-    cat > /etc/systemd/system/maxlink-network.target << EOF
+    # Timer pour les vérifications périodiques
+    cat > /etc/systemd/system/maxlink-healthcheck.timer << EOF
 [Unit]
-Description=MaxLink Network Services
-Requires=hostapd.service dnsmasq.service maxlink-network-ready.service
-After=hostapd.service dnsmasq.service maxlink-network-ready.service
+Description=MaxLink Health Check Timer
+Requires=maxlink-healthcheck.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=timers.target
 EOF
-
-    # Target core (MQTT + Nginx)
-    cat > /etc/systemd/system/maxlink-core.target << EOF
-[Unit]
-Description=MaxLink Core Services
-Requires=maxlink-network.target mosquitto.service nginx.service maxlink-mqtt-ready.service
-After=maxlink-network.target mosquitto.service nginx.service maxlink-mqtt-ready.service
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Target widgets
-    cat > /etc/systemd/system/maxlink-widgets.target << EOF
-[Unit]
-Description=MaxLink Widget Services
-Requires=maxlink-core.target maxlink-widgets-ready.service
-After=maxlink-core.target maxlink-widgets-ready.service
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    echo "  ↦ Targets systemd créés ✓"
-    log_success "Targets systemd créés"
-}
-
-# Configurer les overrides pour les services existants
-setup_service_overrides() {
-    echo ""
-    echo "◦ Configuration des dépendances des services existants..."
     
-    # Override pour Mosquitto
-    mkdir -p /etc/systemd/system/mosquitto.service.d
-    cat > /etc/systemd/system/mosquitto.service.d/maxlink.conf << EOF
+    cat > /etc/systemd/system/maxlink-healthcheck.service << EOF
 [Unit]
-PartOf=maxlink-core.target
-After=maxlink-network-ready.service
+Description=MaxLink Health Check
+After=network.target
 
 [Service]
-Restart=always
-RestartSec=10
+Type=oneshot
+ExecStart=/usr/local/bin/maxlink-healthcheck
 EOF
+    
+    echo "  ↦ Services systemd créés ✓"
+    log_success "Services systemd créés"
+    
+    # Créer les targets systemd personnalisés
+    echo "◦ Création des targets systemd..."
+    
+    # Early target (services critiques au démarrage)
+    cat > /etc/systemd/system/$EARLY_TARGET << EOF
+[Unit]
+Description=MaxLink Early Boot Services
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=sysinit.target
+Before=basic.target
 
-    # Override pour Nginx
+[Install]
+WantedBy=basic.target
+EOF
+    
+    # Pre-network target
+    cat > /etc/systemd/system/$PRE_NETWORK_TARGET << EOF
+[Unit]
+Description=MaxLink Pre-Network Services
+DefaultDependencies=no
+After=$EARLY_TARGET
+Before=network.target
+Conflicts=shutdown.target
+
+[Install]
+WantedBy=network.target
+EOF
+    
+    # Network target
+    cat > /etc/systemd/system/$NETWORK_TARGET << EOF
+[Unit]
+Description=MaxLink Network Services
+After=network.target
+Before=network-online.target
+Wants=network-online.target
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Post-network target
+    cat > /etc/systemd/system/$POST_NETWORK_TARGET << EOF
+[Unit]
+Description=MaxLink Post-Network Services
+After=$NETWORK_TARGET network-online.target
+Wants=$NETWORK_TARGET
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    echo "  ↦ Targets systemd créés ✓"
+    log_success "Targets systemd créés"
+    
+    # Créer les overrides pour les services existants
+    echo "◦ Configuration des dépendances des services..."
+    
+    # NetworkManager dans early
+    mkdir -p /etc/systemd/system/NetworkManager.service.d
+    cat > /etc/systemd/system/NetworkManager.service.d/maxlink.conf << EOF
+[Unit]
+After=$EARLY_TARGET
+Wants=$EARLY_TARGET
+
+[Install]
+WantedBy=$PRE_NETWORK_TARGET
+EOF
+    
+    # Nginx dans network
     mkdir -p /etc/systemd/system/nginx.service.d
     cat > /etc/systemd/system/nginx.service.d/maxlink.conf << EOF
 [Unit]
-PartOf=maxlink-core.target
-After=maxlink-network-ready.service
+After=$NETWORK_TARGET
+Wants=$NETWORK_TARGET
 
-[Service]
-Restart=always
-RestartSec=10
+[Install]
+WantedBy=$POST_NETWORK_TARGET
 EOF
-
-    # Override pour les widgets (exemple avec system-stats)
-    if [ -f /etc/systemd/system/maxlink-widget-system-stats.service ]; then
-        mkdir -p /etc/systemd/system/maxlink-widget-system-stats.service.d
-        cat > /etc/systemd/system/maxlink-widget-system-stats.service.d/maxlink.conf << EOF
+    
+    # Mosquitto dans post-network
+    mkdir -p /etc/systemd/system/mosquitto.service.d
+    cat > /etc/systemd/system/mosquitto.service.d/maxlink.conf << EOF
 [Unit]
-PartOf=maxlink-widgets.target
-After=maxlink-mqtt-ready.service
-Requires=maxlink-mqtt-ready.service
+After=$POST_NETWORK_TARGET nginx.service
+Wants=$POST_NETWORK_TARGET
 
-[Service]
-Restart=always
-RestartSec=30
+[Install]
+WantedBy=$POST_NETWORK_TARGET
 EOF
-    fi
-
+    
     echo "  ↦ Dépendances configurées ✓"
     log_success "Overrides systemd configurés"
-}
-
-# Créer le script de gestion
-create_management_script() {
-    echo ""
-    echo "◦ Création du script de gestion..."
+    
+    # Créer le script principal de l'orchestrateur
+    echo "◦ Création du script orchestrateur..."
     
     cat > /usr/local/bin/maxlink-orchestrator << 'EOF'
 #!/bin/bash
-# Script de gestion de l'orchestrateur MaxLink
 
-case "$1" in
+# MaxLink Orchestrator - Gestion centralisée
+
+COMMAND="$1"
+LOG_FILE="/var/log/maxlink-orchestrator.log"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+case "$COMMAND" in
+    start)
+        log "Démarrage de l'orchestrateur MaxLink..."
+        systemctl start maxlink-early.target
+        sleep 2
+        systemctl start maxlink-pre-network.target
+        sleep 2
+        systemctl start maxlink-network.target
+        sleep 2
+        systemctl start maxlink-post-network.target
+        log "Orchestrateur démarré"
+        ;;
+    stop)
+        log "Arrêt de l'orchestrateur MaxLink..."
+        systemctl stop maxlink-post-network.target
+        systemctl stop maxlink-network.target
+        systemctl stop maxlink-pre-network.target
+        systemctl stop maxlink-early.target
+        log "Orchestrateur arrêté"
+        ;;
+    restart)
+        $0 stop
+        sleep 2
+        $0 start
+        ;;
     status)
         echo "=== MaxLink Orchestrator Status ==="
         echo ""
         echo "Targets:"
-        systemctl status maxlink-network.target --no-pager | grep "Active:"
-        systemctl status maxlink-core.target --no-pager | grep "Active:"
-        systemctl status maxlink-widgets.target --no-pager | grep "Active:"
+        systemctl status maxlink-*.target --no-pager | grep -E "(●|Active:)" || true
         echo ""
         echo "Services:"
-        systemctl status mosquitto --no-pager | grep "Active:"
-        systemctl status nginx --no-pager | grep "Active:"
-        echo ""
-        echo "Widgets:"
-        systemctl list-units 'maxlink-widget-*' --no-pager
+        systemctl status NetworkManager nginx mosquitto maxlink-widget-* --no-pager | grep -E "(●|Active:)" || true
         ;;
-        
-    check)
-        echo "=== MaxLink Health Check ==="
-        /usr/local/bin/maxlink-check-network.sh
-        /usr/local/bin/maxlink-check-mqtt.sh
-        /usr/local/bin/maxlink-check-widgets.sh
-        ;;
-        
-    restart-all)
-        echo "Redémarrage complet de MaxLink..."
-        systemctl restart maxlink-network.target
-        sleep 2
-        systemctl restart maxlink-core.target
-        sleep 2
-        systemctl restart maxlink-widgets.target
-        echo "Redémarrage terminé."
-        ;;
-        
-    restart-widgets)
-        echo "Redémarrage des widgets uniquement..."
-        systemctl restart maxlink-widgets.target
-        echo "Widgets redémarrés."
-        ;;
-        
-    logs)
-        case "$2" in
-            mqtt)
-                journalctl -u mosquitto -u maxlink-mqtt-ready -f
-                ;;
-            widgets)
-                journalctl -u 'maxlink-widget-*' -f
-                ;;
-            network)
-                journalctl -u hostapd -u dnsmasq -u maxlink-network-ready -f
-                ;;
-            all|*)
-                journalctl -u maxlink-* -u mosquitto -u nginx -u hostapd -u dnsmasq -f
-                ;;
-        esac
-        ;;
-        
     enable)
-        echo "Activation de l'orchestrateur..."
-        systemctl enable maxlink-health-monitor.service
-        systemctl enable maxlink-widgets-ready.service
-        systemctl enable maxlink-mqtt-ready.service
-        systemctl enable maxlink-network-ready.service
-        systemctl enable maxlink-widgets.target
-        systemctl enable maxlink-core.target
+        log "Activation des services MaxLink..."
+        systemctl enable maxlink-early.target
+        systemctl enable maxlink-pre-network.target
         systemctl enable maxlink-network.target
-        echo "Orchestrateur activé."
+        systemctl enable maxlink-post-network.target
+        systemctl enable maxlink-healthcheck.timer
+        log "Services activés"
         ;;
-        
     disable)
-        echo "Désactivation de l'orchestrateur..."
-        systemctl disable maxlink-health-monitor.service
-        systemctl disable maxlink-widgets-ready.service
-        systemctl disable maxlink-mqtt-ready.service
-        systemctl disable maxlink-network-ready.service
-        systemctl disable maxlink-widgets.target
-        systemctl disable maxlink-core.target
+        log "Désactivation des services MaxLink..."
+        systemctl disable maxlink-early.target
+        systemctl disable maxlink-pre-network.target
         systemctl disable maxlink-network.target
-        echo "Orchestrateur désactivé."
+        systemctl disable maxlink-post-network.target
+        systemctl disable maxlink-healthcheck.timer
+        log "Services désactivés"
         ;;
-        
     *)
-        echo "MaxLink Orchestrator Control"
-        echo ""
-        echo "Usage: $0 {status|check|restart-all|restart-widgets|logs|enable|disable}"
-        echo ""
-        echo "  status          - Afficher l'état de tous les services"
-        echo "  check           - Vérifier la santé du système"
-        echo "  restart-all     - Redémarrer tous les services dans l'ordre"
-        echo "  restart-widgets - Redémarrer uniquement les widgets"
-        echo "  logs [service]  - Afficher les logs (mqtt|widgets|network|all)"
-        echo "  enable          - Activer l'orchestrateur au démarrage"
-        echo "  disable         - Désactiver l'orchestrateur"
-        echo ""
+        echo "Usage: $0 {start|stop|restart|status|enable|disable}"
         exit 1
         ;;
 esac
 EOF
-
+    
     chmod +x /usr/local/bin/maxlink-orchestrator
-    echo "  ↦ Script de gestion créé ✓"
+    echo "  ↦ Script orchestrateur créé ✓"
     log_success "Script de gestion créé"
-}
-
-# Créer l'infrastructure d'orchestration
-setup_orchestration_infrastructure() {
-    echo ""
-    echo "========================================================================"
-    echo "INSTALLATION DE L'INFRASTRUCTURE D'ORCHESTRATION"
-    echo "========================================================================"
-    create_healthcheck_scripts
-    create_systemd_services
-    create_systemd_targets
-    setup_service_overrides
-    create_management_script
-    NEED_REBOOT=true
+    
+    return 0
 }
 
 # ===============================================================================
-# VÉRIFICATIONS
+# PROGRAMME PRINCIPAL
 # ===============================================================================
 
-# Vérifier les privilèges root
-if [ "$EUID" -ne 0 ]; then
-    echo "⚠ Ce script doit être exécuté avec des privilèges root"
-    log_error "Privilèges root requis"
-    exit 1
-fi
+# Initialiser le logging
+init_logging "Installation de l'orchestrateur MaxLink" "install"
 
 echo ""
 echo "========================================================================"
@@ -786,8 +653,16 @@ echo ""
 
 send_progress 5 "Initialisation..."
 
-# Vérifier si c'est la première installation
-check_first_install
+# Vérifier si c'est une première installation ou une mise à jour
+if [ -f "/usr/local/bin/maxlink-orchestrator" ]; then
+    echo "◦ Mise à jour de l'orchestrateur détectée"
+    log_info "Mise à jour de l'orchestrateur"
+    IS_FIRST_INSTALL=false
+else
+    echo "◦ Première installation détectée"
+    log_info "Première installation de l'orchestrateur"
+    IS_FIRST_INSTALL=true
+fi
 
 # ===============================================================================
 # ÉTAPE 1 : COPIE DES WIDGETS
@@ -863,10 +738,21 @@ log_success "Systemd daemon-reload effectué"
 send_progress 85 "Systemd configuré"
 
 # ===============================================================================
-# ÉTAPE 6 : ACTIVATION DES SERVICES
+# ÉTAPE 6 : CORRECTION FINALE DES PERMISSIONS
 # ===============================================================================
 
-send_progress 90 "Activation des services..."
+send_progress 88 "Correction finale des permissions..."
+
+# Appeler la nouvelle fonction de correction
+fix_permissions_after_install
+
+send_progress 90 "Permissions corrigées"
+
+# ===============================================================================
+# ÉTAPE 7 : ACTIVATION DES SERVICES
+# ===============================================================================
+
+send_progress 92 "Activation des services..."
 
 if [ "$IS_FIRST_INSTALL" = true ]; then
     echo ""
@@ -899,55 +785,21 @@ echo ""
 if [ "$IS_FIRST_INSTALL" = true ]; then
     echo "✓ L'orchestrateur MaxLink a été installé avec succès !"
     echo ""
-    echo "L'infrastructure d'orchestration suivante a été mise en place :"
-    echo "  • Scripts de vérification de santé"
-    echo "  • Services systemd pour la supervision"
-    echo "  • Targets systemd pour l'organisation des services"
-    echo "  • Script de gestion : maxlink-orchestrator"
-    echo "  • Permissions SSH complètes pour l'utilisateur 'prod' dans /var/www/"
-    echo "  • Module RTC configuré (si détecté)"
-    echo "  • Services NTP désactivés (fonctionnement hors ligne)"
+    echo "Commandes disponibles :"
+    echo "  maxlink-orchestrator start    - Démarrer tous les services"
+    echo "  maxlink-orchestrator stop     - Arrêter tous les services"
+    echo "  maxlink-orchestrator status   - Voir l'état des services"
+    echo "  maxlink-orchestrator restart  - Redémarrer tous les services"
     echo ""
-    echo "Les widgets ont été copiés vers : /opt/maxlink/widgets/"
-    echo ""
-    log_success "Installation de l'orchestrateur terminée"
+    echo "Script de maintenance des permissions :"
+    echo "  /usr/local/bin/maxlink-fix-prod-permissions"
 else
     echo "✓ L'orchestrateur MaxLink a été mis à jour avec succès !"
     echo ""
-    echo "  • Les widgets ont été mis à jour"
-    echo "  • L'infrastructure existante a été conservée"
-    echo "  • Permissions SSH configurées pour l'utilisateur 'prod'"
-    echo "  • Configuration RTC vérifiée"
-    echo ""
-    log_success "Mise à jour de l'orchestrateur terminée"
+    echo "Les services existants ont été conservés."
 fi
 
-echo "Commandes disponibles :"
-echo "  • sudo maxlink-orchestrator status    - État du système"
-echo "  • sudo maxlink-orchestrator check     - Vérification de santé"
-echo "  • sudo maxlink-orchestrator logs all  - Voir tous les logs"
-echo ""
+log_success "Installation de l'orchestrateur terminée"
 
-# Gestion du redémarrage
-if [ "$NEED_REBOOT" = true ] && [ -z "$SKIP_REBOOT" ]; then
-    echo "⚠ Un redémarrage est nécessaire pour finaliser l'installation"
-    echo ""
-    echo "Le système sera redémarré automatiquement dans 10 secondes..."
-    echo "Pour annuler : Ctrl+C"
-    echo ""
-    
-    for i in {10..1}; do
-        echo -ne "\rRedémarrage dans $i secondes... "
-        sleep 1
-    done
-    echo ""
-    
-    log_info "Redémarrage du système pour finalisation"
-    systemctl reboot
-elif [ "$NEED_REBOOT" = true ] && [ -n "$SKIP_REBOOT" ]; then
-    echo "⚠ Un redémarrage est nécessaire mais a été ignoré (SKIP_REBOOT actif)"
-    echo "  Pensez à redémarrer manuellement plus tard."
-    log_warning "Redémarrage nécessaire mais ignoré (SKIP_REBOOT)"
-fi
-
-echo "========================================================================"
+# Indiquer que le script s'est terminé avec succès
+exit 0
