@@ -1,0 +1,93 @@
+
+================================================================================
+DÉMARRAGE: nginx_install
+Description: Installation Nginx et Dashboard (Mode Offline)
+Date: Thu 19 Jun 13:16:06 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-19 13:16:06] [INFO] [nginx_install] Script nginx_install initialisé
+[2025-06-19 13:16:06] [INFO] [nginx_install] ========== DÉBUT DE L'INSTALLATION NGINX ET DASHBOARD (OFFLINE) ==========
+[2025-06-19 13:16:06] [INFO] [nginx_install] Progression: 5% - Vérifications initiales...
+[2025-06-19 13:16:06] [INFO] [nginx_install] Privilèges root confirmés
+[2025-06-19 13:16:06] [INFO] [nginx_install] Vérification du cache dashboard
+[2025-06-19 13:16:06] [INFO] [nginx_install] Dashboard valide trouvé dans le cache
+[2025-06-19 13:16:06] [INFO] [nginx_install] Progression: 10% - Vérifications terminées
+[2025-06-19 13:16:08] [INFO] [nginx_install] Progression: 20% - Installation de Nginx...
+[2025-06-19 13:16:09] [INFO] [nginx_install] Installation de Nginx depuis le cache local
+[2025-06-19 13:16:09] [INFO] [nginx_install] Installation des paquets de la catégorie: nginx
+[2025-06-19 13:16:09] [INFO] [nginx_install] Installation du paquet depuis le cache: nginx
+[2025-06-19 13:16:12] [SUCCESS] [nginx_install] Paquet installé depuis le cache: nginx
+[2025-06-19 13:16:12] [INFO] [nginx_install] Installation du paquet depuis le cache: nginx-common
+[2025-06-19 13:16:13] [SUCCESS] [nginx_install] Paquet installé depuis le cache: nginx-common
+[2025-06-19 13:16:13] [SUCCESS] [nginx_install] Nginx installé avec succès depuis le cache
+[2025-06-19 13:16:13] [CMD] [nginx_install] Exécution: Arrêt Nginx
+[2025-06-19 13:16:13] [CMD] [nginx_install] Commande: systemctl stop nginx >/dev/null 2>&1
+[2025-06-19 13:16:13] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:14] [INFO] [nginx_install] Progression: 35% - Nginx installé
+[2025-06-19 13:16:16] [INFO] [nginx_install] Progression: 40% - Installation du dashboard...
+[2025-06-19 13:16:16] [INFO] [nginx_install] Répertoire temporaire: /tmp/maxlink-dashboard-1750331776
+[2025-06-19 13:16:16] [CMD] [nginx_install] Exécution: Extraction archive
+[2025-06-19 13:16:16] [CMD] [nginx_install] Commande: tar -xzf '/var/cache/maxlink/dashboard/dashboard.tar.gz' -C '/tmp/maxlink-dashboard-1750331776'
+[2025-06-19 13:16:16] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:16] [SUCCESS] [nginx_install] Archive extraite avec succès
+[2025-06-19 13:16:16] [INFO] [nginx_install] Dossier racine de l'archive: /tmp/maxlink-dashboard-1750331776/DashboardV3-main
+[2025-06-19 13:16:16] [INFO] [nginx_install] Recherche du dashboard dans: /tmp/maxlink-dashboard-1750331776/DashboardV3-main
+[2025-06-19 13:16:16] [INFO] [nginx_install] Dossier dashboard trouvé: /tmp/maxlink-dashboard-1750331776/DashboardV3-main
+[2025-06-19 13:16:17] [INFO] [nginx_install] Répertoire destination créé: /var/www/maxlink-dashboard
+[2025-06-19 13:16:17] [CMD] [nginx_install] Exécution: Copie dashboard
+[2025-06-19 13:16:17] [CMD] [nginx_install] Commande: cp -r '/tmp/maxlink-dashboard-1750331776/DashboardV3-main'/* '/var/www/maxlink-dashboard'/
+[2025-06-19 13:16:17] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:17] [SUCCESS] [nginx_install] Dashboard installé avec succès
+[2025-06-19 13:16:17] [INFO] [nginx_install] Nettoyage du répertoire temporaire
+[2025-06-19 13:16:17] [CMD] [nginx_install] Exécution: Application propriétaire
+[2025-06-19 13:16:17] [CMD] [nginx_install] Commande: chown -R www-data:www-data '/var/www/maxlink-dashboard'
+[2025-06-19 13:16:17] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:18] [CMD] [nginx_install] Exécution: Permissions standard
+[2025-06-19 13:16:18] [CMD] [nginx_install] Commande: chmod -R 755 '/var/www/maxlink-dashboard'
+[2025-06-19 13:16:18] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:18] [INFO] [nginx_install] Permissions appliquées au dashboard
+[2025-06-19 13:16:18] [INFO] [nginx_install] Progression: 60% - Dashboard installé
+[2025-06-19 13:16:20] [INFO] [nginx_install] Progression: 70% - Configuration de Nginx...
+[2025-06-19 13:16:20] [INFO] [nginx_install] Création de la configuration Nginx
+[2025-06-19 13:16:20] [SUCCESS] [nginx_install] Configuration Nginx créée
+[2025-06-19 13:16:20] [CMD] [nginx_install] Exécution: Suppression site par défaut
+[2025-06-19 13:16:20] [CMD] [nginx_install] Commande: rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+[2025-06-19 13:16:21] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:21] [CMD] [nginx_install] Exécution: Suppression ancien lien
+[2025-06-19 13:16:21] [CMD] [nginx_install] Commande: rm -f /etc/nginx/sites-enabled/maxlink-dashboard 2>/dev/null || true
+[2025-06-19 13:16:21] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:21] [CMD] [nginx_install] Exécution: Création lien symbolique
+[2025-06-19 13:16:21] [CMD] [nginx_install] Commande: ln -s /etc/nginx/sites-available/maxlink-dashboard /etc/nginx/sites-enabled/
+[2025-06-19 13:16:21] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:21] [INFO] [nginx_install] Site Nginx activé
+[2025-06-19 13:16:21] [CMD] [nginx_install] Exécution: Test configuration Nginx
+[2025-06-19 13:16:21] [CMD] [nginx_install] Commande: nginx -t >/dev/null 2>&1
+[2025-06-19 13:16:22] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:22] [SUCCESS] [nginx_install] Configuration Nginx valide
+[2025-06-19 13:16:22] [CMD] [nginx_install] Exécution: Activation au démarrage
+[2025-06-19 13:16:22] [CMD] [nginx_install] Commande: systemctl enable nginx >/dev/null 2>&1
+[2025-06-19 13:16:23] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:23] [CMD] [nginx_install] Exécution: Démarrage Nginx
+[2025-06-19 13:16:23] [CMD] [nginx_install] Commande: systemctl start nginx >/dev/null 2>&1
+[2025-06-19 13:16:23] [CMD] [nginx_install] Code de sortie: 0
+[2025-06-19 13:16:23] [SUCCESS] [nginx_install] Nginx démarré avec succès
+[2025-06-19 13:16:23] [INFO] [nginx_install] Progression: 85% - Nginx configuré
+[2025-06-19 13:16:26] [INFO] [nginx_install] Progression: 90% - Configuration DNS...
+[2025-06-19 13:16:26] [INFO] [nginx_install] Vérification de la configuration AP existante
+[2025-06-19 13:16:26] [INFO] [nginx_install] Mode AP détecté, mise à jour DNS nécessaire
+[2025-06-19 13:16:26] [INFO] [nginx_install] Configuration DNS déjà présente
+[2025-06-19 13:16:26] [INFO] [nginx_install] Statut du service nginx mis à jour: active
+[2025-06-19 13:16:26] [INFO] [nginx_install] Progression: 100% - Installation terminée !
+[2025-06-19 13:16:26] [INFO] [nginx_install] Installation terminée avec succès
+[2025-06-19 13:16:26] [INFO] [nginx_install] Dashboard accessible à: http://192.168.4.1 et http://maxlink-dashboard.local
+[2025-06-19 13:16:26] [INFO] [nginx_install] Redémarrage différé - SKIP_REBOOT=true
+[2025-06-19 13:16:27] [INFO] [nginx_install] Script nginx_install terminé avec le code 0
+
+================================================================================
+FIN: nginx_install
+Code de sortie: 0
+Durée: 21 secondes
+================================================================================
+

@@ -2,6 +2,7 @@
 """
 Collecteur de synchronisation temps MaxLink - Version simplifiée
 Sans NTP, utilisation du RTC comme source primaire
+Avec redémarrage automatique des services après synchronisation
 """
 
 import json
@@ -33,6 +34,12 @@ class TimeSyncCollector:
             'sync_command': 'system/time/sync/command',
             'sync_result': 'system/time/sync/result'
         }
+        
+        # Services à redémarrer après synchronisation
+        self.services_to_restart = [
+            'maxlink-widget-servermonitoring',
+            'maxlink-widget-mqttstats'
+        ]
         
         logger.info("Collecteur TimSync simplifié initialisé (sans NTP)")
     
@@ -104,6 +111,54 @@ class TimeSyncCollector:
         except Exception as e:
             logger.error(f"Erreur traitement message: {e}")
     
+    def restart_affected_services(self):
+        """Redémarre les services affectés par le changement d'heure"""
+        logger.info("Redémarrage des services affectés par le changement d'heure...")
+        
+        for service in self.services_to_restart:
+            try:
+                # Vérifier si le service existe et est actif
+                check_result = subprocess.run(
+                    ['systemctl', 'is-active', service],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if check_result.returncode == 0:  # Service actif
+                    logger.info(f"  → Redémarrage de {service}...")
+                    
+                    # Redémarrer le service
+                    restart_result = subprocess.run(
+                        ['systemctl', 'restart', service],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    
+                    # Attendre un peu pour laisser le service démarrer
+                    time.sleep(1)
+                    
+                    # Vérifier le statut après redémarrage
+                    status_result = subprocess.run(
+                        ['systemctl', 'is-active', service],
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if status_result.returncode == 0:
+                        logger.info(f"  ✓ {service} redémarré avec succès")
+                    else:
+                        logger.warning(f"  ✗ {service} n'est pas actif après redémarrage")
+                else:
+                    logger.debug(f"  - {service} n'est pas actif, pas de redémarrage nécessaire")
+                    
+            except subprocess.CalledProcessError as e:
+                logger.error(f"  ✗ Erreur lors du redémarrage de {service}: {e}")
+            except Exception as e:
+                logger.error(f"  ✗ Erreur inattendue pour {service}: {e}")
+        
+        logger.info("Processus de redémarrage terminé")
+    
     def handle_sync_command(self, payload):
         """Exécuter une synchronisation temps"""
         try:
@@ -139,6 +194,9 @@ class TimeSyncCollector:
                 message = f'Synchronisé ({drift_seconds:.1f}s en {direction})'
                 logger.info(f"Synchronisation réussie - {message}")
                 self.publish_sync_result('success', message)
+                
+                # Redémarrer les services affectés
+                self.restart_affected_services()
                 
                 # Forcer une republication immédiate de l'heure
                 time.sleep(0.5)  # Petite pause pour laisser le système se stabiliser

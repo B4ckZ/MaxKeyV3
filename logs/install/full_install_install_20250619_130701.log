@@ -1,0 +1,26 @@
+
+================================================================================
+DÉMARRAGE: full_install_install
+Description: Installation complète MaxLink
+Date: Thu 19 Jun 13:07:01 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-19 13:07:01] [INFO] [full_install_install] Script full_install_install initialisé
+[2025-06-19 13:07:01] [INFO] [full_install_install] ========== DÉBUT DE L'INSTALLATION COMPLÈTE MAXLINK ==========
+[2025-06-19 13:07:02] [INFO] [full_install_install] Exécution de update_install.sh
+[2025-06-19 13:15:15] [SUCCESS] [full_install_install] update_install.sh installé avec succès
+[2025-06-19 13:15:26] [INFO] [full_install_install] Exécution de ap_install.sh
+[2025-06-19 13:15:55] [SUCCESS] [full_install_install] ap_install.sh installé avec succès
+[2025-06-19 13:16:06] [INFO] [full_install_install] Exécution de nginx_install.sh
+[2025-06-19 13:16:27] [SUCCESS] [full_install_install] nginx_install.sh installé avec succès
+[2025-06-19 13:16:37] [INFO] [full_install_install] Exécution de mqtt_install.sh
+[2025-06-19 13:17:02] [SUCCESS] [full_install_install] mqtt_install.sh installé avec succès
+[2025-06-19 13:17:12] [INFO] [full_install_install] Exécution de mqtt_wgs_install.sh
+[2025-06-19 13:17:40] [SUCCESS] [full_install_install] mqtt_wgs_install.sh installé avec succès
+[2025-06-19 13:17:51] [INFO] [full_install_install] Exécution de orchestrator_install.sh
+[2025-06-19 13:18:01] [SUCCESS] [full_install_install] orchestrator_install.sh installé avec succès
+[2025-06-19 13:18:01] [SUCCESS] [full_install_install] Installation complète réussie - 0 erreur
+[2025-06-19 13:18:31] [INFO] [full_install_install] Redémarrage du système pour finalisation
+[2025-06-19 13:18:31] [INFO] [full_install_install] Script full_install_install terminé avec le code 0
