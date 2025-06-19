@@ -202,6 +202,10 @@ class MQTTStatsCollector:
                 # Message d'un topic surveillé - incrémenter le compteur
                 self.stats['messages_received'] += 1
                 
+                # Détecter si c'est un message envoyé PAR un device surveillé
+                # (par exemple, les ESP32 qui publient sur SOUFFLAGE/xxx/ESP32/xxx)
+                # Pour l'instant, on ne compte que les messages reçus
+                
                 # Gérer la liste des topics actifs
                 self.update_active_topics(topic)
                 
@@ -298,8 +302,8 @@ class MQTTStatsCollector:
                     json.dumps(stats_data)
                 )
                 
-                # Incrémenter le compteur d'envoi
-                self.stats['messages_sent'] += 1
+                # NE PAS incrémenter le compteur d'envoi (whitelist pure)
+                # self.stats['messages_sent'] += 1
                 
                 # Publier la liste des topics (toutes les 30 secondes)
                 if int(current_time) % 30 == 0:
@@ -314,7 +318,8 @@ class MQTTStatsCollector:
                         json.dumps(topics_data)
                     )
                     
-                    self.stats['messages_sent'] += 1
+                    # NE PAS incrémenter le compteur d'envoi (whitelist pure)
+                    # self.stats['messages_sent'] += 1
                     
                     # Log périodique
                     logger.info(

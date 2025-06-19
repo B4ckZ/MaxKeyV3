@@ -1,0 +1,45 @@
+{
+  "widget": {
+    "id": "rebootbutton",
+    "name": "Reboot Button",
+    "version": "1.0.0",
+    "description": "Bouton de redémarrage sécurisé avec confirmation",
+    "author": "MaxLink Team"
+  },
+  "mqtt": {
+    "required": true,
+    "broker": {
+      "host": "localhost",
+      "port": 1883,
+      "username": "mosquitto",
+      "password": "mqtt"
+    },
+    "topics": {
+      "subscribe": [
+        {
+          "topic": "maxlink/system/reboot",
+          "description": "Commandes de redémarrage système"
+        }
+      ],
+      "publish": [
+        {
+          "topic": "maxlink/system/reboot/status",
+          "description": "Statut du service de redémarrage"
+        }
+      ]
+    }
+  },
+  "collector": {
+    "enabled": true,
+    "script": "rebootbutton_collector.py",
+    "service_name": "maxlink-widget-rebootbutton",
+    "service_description": "MaxLink Reboot Button Service",
+    "user": "root"
+  },
+  "dependencies": {
+    "python_packages": ["paho-mqtt"],
+    "system_packages": [],
+    "services": ["mosquitto"],
+    "python_version": ">=3.7"
+  }
+}
