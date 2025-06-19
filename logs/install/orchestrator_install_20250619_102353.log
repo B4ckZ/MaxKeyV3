@@ -1,0 +1,48 @@
+
+================================================================================
+DÉMARRAGE: orchestrator_install
+Description: Installation de l'orchestrateur MaxLink
+Date: Thu 19 Jun 10:23:53 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-06-19 10:23:53] [INFO] [orchestrator_install] Script orchestrator_install initialisé
+[2025-06-19 10:23:54] [INFO] [orchestrator_install] Progression: 5% - Initialisation...
+[2025-06-19 10:23:54] [INFO] [orchestrator_install] Première installation de l'orchestrateur
+[2025-06-19 10:23:54] [INFO] [orchestrator_install] Progression: 10% - Copie des widgets...
+[2025-06-19 10:23:54] [ERROR] [orchestrator_install] Répertoire widgets non trouvé
+[2025-06-19 10:23:54] [ERROR] [orchestrator_install] Échec de la copie des widgets
+[2025-06-19 10:23:54] [INFO] [orchestrator_install] Progression: 20% - Widgets copiés
+[2025-06-19 10:23:54] [INFO] [orchestrator_install] Progression: 25% - Configuration des permissions SSH...
+[2025-06-19 10:23:54] [SUCCESS] [orchestrator_install] Permissions SSH configurées pour l'utilisateur prod
+[2025-06-19 10:23:55] [INFO] [orchestrator_install] Progression: 30% - Permissions SSH configurées
+[2025-06-19 10:23:55] [INFO] [orchestrator_install] Progression: 35% - Configuration du module RTC...
+[2025-06-19 10:23:57] [INFO] [orchestrator_install] Module RTC ds3231 détecté
+[2025-06-19 10:23:57] [SUCCESS] [orchestrator_install] Overlay RTC configuré dans /boot/firmware/config.txt
+[2025-06-19 10:23:57] [SUCCESS] [orchestrator_install] Service RTC configuré
+[2025-06-19 10:24:01] [SUCCESS] [orchestrator_install] Configuration RTC complète pour module ds3231 avec NTP désactivé
+[2025-06-19 10:24:01] [INFO] [orchestrator_install] Progression: 40% - Module RTC configuré
+[2025-06-19 10:24:01] [INFO] [orchestrator_install] Progression: 45% - Installation de l'orchestrateur...
+[2025-06-19 10:24:01] [SUCCESS] [orchestrator_install] Scripts healthcheck créés
+[2025-06-19 10:24:01] [SUCCESS] [orchestrator_install] Services systemd créés
+[2025-06-19 10:24:01] [SUCCESS] [orchestrator_install] Targets systemd créés
+[2025-06-19 10:24:01] [SUCCESS] [orchestrator_install] Overrides systemd configurés
+[2025-06-19 10:24:02] [SUCCESS] [orchestrator_install] Script de gestion créé
+[2025-06-19 10:24:02] [INFO] [orchestrator_install] Progression: 65% - Orchestrateur installé
+[2025-06-19 10:24:02] [INFO] [orchestrator_install] Progression: 75% - Configuration systemd...
+[2025-06-19 10:24:02] [SUCCESS] [orchestrator_install] Systemd daemon-reload effectué
+[2025-06-19 10:24:02] [INFO] [orchestrator_install] Progression: 85% - Systemd configuré
+[2025-06-19 10:24:02] [INFO] [orchestrator_install] Progression: 90% - Activation des services...
+[2025-06-19 10:24:04] [SUCCESS] [orchestrator_install] Services de l'orchestrateur activés
+[2025-06-19 10:24:04] [INFO] [orchestrator_install] Progression: 95% - Services activés
+[2025-06-19 10:24:04] [INFO] [orchestrator_install] Progression: 100% - Installation terminée
+[2025-06-19 10:24:04] [SUCCESS] [orchestrator_install] Installation de l'orchestrateur terminée
+[2025-06-19 10:24:04] [INFO] [orchestrator_install] Script orchestrator_install terminé avec le code 0
+
+================================================================================
+FIN: orchestrator_install
+Code de sortie: 0
+Durée: 11 secondes
+================================================================================
+
