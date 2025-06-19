@@ -18,5 +18,8 @@ ap:dnsmasq iptables
 # Dépendances Python pour les widgets
 python:python3-psutil python3-paho-mqtt python3-pip python3-setuptools
 
+# Outils système et RTC
+system:i2c-tools
+
 # Outils optionnels mais utiles
 tools:htop iotop net-tools dnsutils python3-pil
