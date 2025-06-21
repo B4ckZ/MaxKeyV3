@@ -2,8 +2,8 @@
   "widget": {
     "id": "servermonitoring",
     "name": "Server Monitoring",
-    "version": "1.0.0",
-    "description": "Collecte et affiche les métriques système (CPU, RAM, température, fréquences)",
+    "version": "1.1.0",
+    "description": "Collecte et affiche les métriques système (CPU, RAM, température, fréquences, USB)",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
   },
@@ -64,6 +64,13 @@
           "description": "Usage disque",
           "format": "json",
           "example": "{\"timestamp\": \"2025-05-27T10:00:00Z\", \"value\": 25.3, \"unit\": \"%\"}"
+        },
+        {
+          "topic": "rpi/system/memory/usb",
+          "description": "Usage clé USB MAXLINKSAVE",
+          "format": "json",
+          "example": "{\"timestamp\": \"2025-05-27T10:00:00Z\", \"value\": 15.2, \"unit\": \"%\"}",
+          "note": "Retourne -1 si la clé USB n'est pas trouvée"
         },
         {
           "topic": "rpi/system/uptime",

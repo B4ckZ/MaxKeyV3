@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Collecteur de métriques système pour le widget Server Monitoring
-Version corrigée pour utiliser les chemins locaux
+Version avec support USB MAXLINKSAVE
 """
 
 import os
@@ -11,6 +11,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+import subprocess
 
 # Configuration du logging
 logging.basicConfig(
@@ -52,7 +53,7 @@ class SystemMetricsCollector(BaseCollector):
         self.intervals = {
             'fast': 1,    # CPU usage, Fréquences, RAM/SWAP
             'normal': 5,  # Températures
-            'slow': 30    # Disk
+            'slow': 30    # Disk et USB
         }
         
         self.last_update = {
@@ -60,6 +61,10 @@ class SystemMetricsCollector(BaseCollector):
             'normal': 0,
             'slow': 0
         }
+        
+        # Cache pour le point de montage USB
+        self.usb_mount_point = None
+        self.last_usb_check = 0
     
     def on_mqtt_connected(self):
         """Appelé quand la connexion MQTT est établie"""
@@ -96,10 +101,89 @@ class SystemMetricsCollector(BaseCollector):
             self.collect_temperature_metrics()
             self.last_update['normal'] = current_time
         
-        # Groupe SLOW (Disque)
+        # Groupe SLOW (Disque et USB)
         if current_time - self.last_update['slow'] >= self.intervals['slow']:
             self.collect_disk_metrics()
+            self.collect_usb_metrics()
             self.last_update['slow'] = current_time
+    
+    def find_usb_mount_point(self):
+        """Trouve le point de montage de la clé USB MAXLINKSAVE"""
+        try:
+            # Utiliser lsblk pour obtenir les informations sur les périphériques
+            result = subprocess.run(['lsblk', '-J', '-o', 'NAME,LABEL,MOUNTPOINT,TYPE'], 
+                                  capture_output=True, text=True, check=True)
+            
+            lsblk_data = json.loads(result.stdout)
+            
+            # Parcourir les périphériques
+            for device in lsblk_data.get('blockdevices', []):
+                # Vérifier le périphérique principal et ses partitions
+                devices_to_check = [device]
+                if 'children' in device:
+                    devices_to_check.extend(device['children'])
+                
+                for dev in devices_to_check:
+                    # Vérifier si c'est une partition avec le label MAXLINKSAVE
+                    if (dev.get('type') == 'part' and 
+                        dev.get('label') == 'MAXLINKSAVE' and 
+                        dev.get('mountpoint')):
+                        logger.info(f"Clé USB MAXLINKSAVE trouvée : {dev['mountpoint']}")
+                        return dev['mountpoint']
+            
+            logger.debug("Clé USB MAXLINKSAVE non trouvée")
+            return None
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Erreur lors de l'exécution de lsblk : {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Erreur lors du parsing JSON de lsblk : {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Erreur lors de la recherche de la clé USB : {e}")
+            return None
+    
+    def collect_usb_metrics(self):
+        """Collecte les métriques de la clé USB MAXLINKSAVE"""
+        try:
+            current_time = time.time()
+            
+            # Rechercher le point de montage toutes les 60 secondes
+            # ou si on n'a pas encore de point de montage
+            if (self.usb_mount_point is None or 
+                current_time - self.last_usb_check >= 60):
+                self.usb_mount_point = self.find_usb_mount_point()
+                self.last_usb_check = current_time
+            
+            if self.usb_mount_point:
+                # Vérifier que le point de montage existe toujours
+                if os.path.exists(self.usb_mount_point):
+                    try:
+                        disk_usage = psutil.disk_usage(self.usb_mount_point)
+                        self.publish_metric(
+                            "rpi/system/memory/usb", 
+                            round(disk_usage.percent, 1), 
+                            "%"
+                        )
+                        logger.debug(f"USB usage: {disk_usage.percent:.1f}%")
+                    except PermissionError:
+                        logger.warning(f"Pas de permission pour accéder à {self.usb_mount_point}")
+                        self.publish_metric("rpi/system/memory/usb", -1, "N/A")
+                        self.usb_mount_point = None
+                else:
+                    # Le point de montage n'existe plus
+                    logger.info("Le point de montage USB n'existe plus")
+                    self.usb_mount_point = None
+                    self.publish_metric("rpi/system/memory/usb", -1, "N/A")
+            else:
+                # Pas de clé USB trouvée
+                self.publish_metric("rpi/system/memory/usb", -1, "N/A")
+                
+        except Exception as e:
+            logger.error(f"Erreur collecte USB: {e}")
+            self.stats['errors'] += 1
+            self.publish_metric("rpi/system/memory/usb", -1, "N/A")
     
     def collect_cpu_metrics(self):
         """Collecte les métriques CPU sans blocage - comme htop"""
