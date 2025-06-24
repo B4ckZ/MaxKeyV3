@@ -46,7 +46,7 @@
     }
   },
   "storage": {
-    "base_path": "/var/www/traçabilité",
+    "base_path": "/home/prod/Documents/traçabilité",
     "file_mapping": {
       "509": "509.json",
       "511": "511.json",

@@ -2,6 +2,7 @@
 """
 MaxLink Test Results Persistence Collector
 Persiste les résultats de tests dans des fichiers JSON et confirme la sauvegarde
+Version corrigée avec toutes les méthodes abstraites implémentées
 """
 
 import os
@@ -97,11 +98,13 @@ class TestPersistCollector(BaseCollector):
             # S'abonner aux résultats de tests
             topic = "SOUFFLAGE/+/ESP32/result"
             client.subscribe(topic)
-            self.logger.info(f"Abonné au topic: {topic}")
+            self.logger.info(f"Reconnexion - Abonné au topic: {topic}")
     
     def on_message(self, client, userdata, msg):
         """Traitement des messages MQTT"""
         try:
+            self.logger.debug(f"Message reçu sur {msg.topic}")
+            
             # Parser le topic pour extraire l'ID de la machine
             topic_parts = msg.topic.split('/')
             if len(topic_parts) < 4:
@@ -113,6 +116,7 @@ class TestPersistCollector(BaseCollector):
             # Décoder le message JSON
             try:
                 data = json.loads(msg.payload.decode('utf-8'))
+                self.logger.debug(f"Données décodées: {data}")
             except json.JSONDecodeError as e:
                 self.logger.error(f"Erreur JSON: {e}")
                 return
@@ -149,8 +153,12 @@ class TestPersistCollector(BaseCollector):
             if self.persist_data(filepath, data):
                 # Si la persistance réussit, publier la confirmation
                 confirm_topic = f"SOUFFLAGE/{machine_id}/ESP32/result/confirmed"
-                self.mqtt_publish(confirm_topic, data)
-                self.logger.info(f"Résultat persisté et confirmé: {barcode} -> {filename} (machine {machine_id})")
+                
+                # Publier exactement les mêmes données reçues
+                if self.mqtt_publish(confirm_topic, data):
+                    self.logger.info(f"Résultat persisté et confirmé: {barcode} -> {filename} (machine {machine_id})")
+                else:
+                    self.logger.error(f"Échec de la publication de confirmation pour: {barcode}")
             else:
                 self.logger.error(f"Échec de la persistance pour: {barcode}")
                 
@@ -167,18 +175,50 @@ class TestPersistCollector(BaseCollector):
                 self.file_locks[str(filepath)] = lock
             
             with lock:
+                # S'assurer que le fichier existe
+                if not filepath.exists():
+                    filepath.touch()
+                    self.logger.info(f"Fichier créé: {filepath}")
+                
                 # Ouvrir le fichier en mode append
                 with open(filepath, 'a', encoding='utf-8') as f:
                     # Écrire la ligne JSON
                     json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
                     f.write('\n')
                     f.flush()  # Forcer l'écriture sur disque
-                    os.fsync(f.fileno())  # Synchronisation avec le système de fichiers
+                    
+                    # Synchronisation avec le système de fichiers
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError:
+                        # Certains systèmes de fichiers ne supportent pas fsync
+                        pass
             
+            self.logger.debug(f"Données persistées dans {filepath}")
             return True
             
         except Exception as e:
             self.logger.error(f"Erreur lors de la persistance dans {filepath}: {e}")
+            return False
+    
+    def mqtt_publish(self, topic, data):
+        """Publie un message MQTT avec gestion d'erreur"""
+        try:
+            # Convertir les données en JSON
+            payload = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+            
+            # Publier avec QoS 1 pour garantir la livraison
+            result = self.mqtt_client.publish(topic, payload, qos=1)
+            
+            if result.rc == 0:
+                self.logger.debug(f"Message publié sur {topic}")
+                return True
+            else:
+                self.logger.error(f"Échec publication sur {topic}, code: {result.rc}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Erreur publication MQTT: {e}")
             return False
     
     def cleanup(self):
@@ -188,8 +228,15 @@ class TestPersistCollector(BaseCollector):
 
 if __name__ == "__main__":
     try:
+        # Configurer le niveau de log si nécessaire
+        import logging
+        if os.environ.get('DEBUG', '').lower() == 'true':
+            logging.getLogger().setLevel(logging.DEBUG)
+        
         collector = TestPersistCollector()
         collector.run()  # Utiliser la méthode run() de BaseCollector
+    except KeyboardInterrupt:
+        logging.info("Arrêt demandé par l'utilisateur")
     except Exception as e:
         logging.error(f"Erreur fatale: {e}", exc_info=True)
         sys.exit(1)

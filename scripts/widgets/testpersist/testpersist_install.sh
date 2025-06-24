@@ -3,6 +3,7 @@
 # ===============================================================================
 # WIDGET TEST PERSIST - INSTALLATION
 # Service de persistance des résultats de tests de pression
+# Version utilisant /home/prod/Documents pour éviter les conflits de permissions
 # ===============================================================================
 
 # Définir le répertoire de base
@@ -77,16 +78,32 @@ if ! check_mqtt_broker; then
 fi
 echo "  ↦ Broker MQTT actif ✓"
 
-# Créer le répertoire de stockage des données
-STORAGE_DIR="/var/www/traçabilité"
+# Créer le répertoire de stockage des données dans le home de prod
+STORAGE_DIR="/home/prod/Documents/traçabilité"
 echo ""
 echo "◦ Préparation du répertoire de stockage..."
+
+# Créer le répertoire Documents s'il n'existe pas
+if [ ! -d "/home/prod/Documents" ]; then
+    mkdir -p "/home/prod/Documents"
+    chown prod:prod "/home/prod/Documents"
+    chmod 755 "/home/prod/Documents"
+    log_info "Répertoire Documents créé"
+fi
+
+# Créer le répertoire de traçabilité
 if [ ! -d "$STORAGE_DIR" ]; then
     mkdir -p "$STORAGE_DIR"
     log_info "Répertoire créé: $STORAGE_DIR"
 fi
-chmod 755 "$STORAGE_DIR"
+
+# Définir les permissions pour permettre à root (le service) d'écrire
+# et à prod de lire/modifier via SSH
+chown prod:prod "$STORAGE_DIR"
+chmod 775 "$STORAGE_DIR"
 echo "  ↦ Répertoire: $STORAGE_DIR ✓"
+echo "  ↦ Propriétaire: prod:prod"
+echo "  ↦ Permissions: 775 (lecture/écriture pour prod et root)"
 
 # Créer les fichiers JSON vides s'ils n'existent pas
 echo ""
@@ -95,11 +112,15 @@ for machine in "509" "511" "998" "999"; do
     filepath="$STORAGE_DIR/${machine}.json"
     if [ ! -f "$filepath" ]; then
         touch "$filepath"
-        chmod 644 "$filepath"
+        chown prod:prod "$filepath"
+        chmod 664 "$filepath"
         echo "  ↦ Fichier créé: ${machine}.json"
         log_info "Fichier créé: $filepath"
     else
         echo "  ↦ Fichier existant: ${machine}.json"
+        # S'assurer que les permissions sont correctes même pour les fichiers existants
+        chown prod:prod "$filepath"
+        chmod 664 "$filepath"
     fi
 done
 
@@ -128,6 +149,9 @@ if widget_standard_install "$WIDGET_NAME"; then
     echo "  • Machine 999 → $STORAGE_DIR/999.json"
     echo ""
     echo "◦ Format: NDJSON (une ligne JSON par résultat)"
+    echo ""
+    echo "◦ Accès SSH: Les fichiers sont directement accessibles"
+    echo "  par l'utilisateur prod dans ~/Documents/traçabilité"
     echo ""
     echo "IMPORTANT: Le widget mqttlogs509511 affichera maintenant"
     echo "uniquement les résultats confirmés (après persistance)"
