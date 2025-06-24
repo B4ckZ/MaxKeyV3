@@ -41,13 +41,53 @@ class TestPersistCollector(BaseCollector):
         self.file_locks = {}
         
         # Créer le répertoire de base s'il n'existe pas
-        self.base_path.mkdir(parents=True, exist_ok=True)
-        self.logger.info(f"Répertoire de stockage: {self.base_path}")
+        try:
+            self.base_path.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Répertoire de stockage: {self.base_path}")
+        except Exception as e:
+            self.logger.error(f"Erreur création répertoire {self.base_path}: {e}")
         
         # Initialiser les verrous pour chaque fichier
         for machine, filename in self.file_mapping.items():
             filepath = self.base_path / filename
             self.file_locks[str(filepath)] = threading.Lock()
+            
+        # S'assurer que les fichiers JSON existent
+        self._ensure_json_files_exist()
+    
+    def _ensure_json_files_exist(self):
+        """S'assure que tous les fichiers JSON existent"""
+        for machine, filename in self.file_mapping.items():
+            filepath = self.base_path / filename
+            if not filepath.exists():
+                try:
+                    filepath.touch()
+                    self.logger.info(f"Fichier créé: {filepath}")
+                except Exception as e:
+                    self.logger.error(f"Erreur création fichier {filepath}: {e}")
+    
+    def initialize(self):
+        """Initialise les variables spécifiques au widget"""
+        self.logger.info("Initialisation du collecteur de persistance des tests")
+        self.logger.info(f"Mapping machines -> fichiers: {self.file_mapping}")
+        self.logger.info(f"Position machine dans barcode: caractères {self.machine_pos_start} à {self.machine_pos_start + self.machine_pos_length}")
+    
+    def on_mqtt_connected(self):
+        """Appelé quand la connexion MQTT est établie"""
+        # S'abonner aux résultats de tests
+        topic = "SOUFFLAGE/+/ESP32/result"
+        self.mqtt_client.subscribe(topic)
+        self.logger.info(f"Connecté au broker MQTT - Abonné au topic: {topic}")
+    
+    def get_update_interval(self):
+        """Retourne l'intervalle de mise à jour en secondes"""
+        # Widget event-driven, pas de polling
+        return 1  # Retourne 1 seconde pour la boucle principale
+    
+    def collect_and_publish(self):
+        """Collecte et publie les données - Non utilisé car event-driven"""
+        # Ce widget est event-driven, les données sont traitées dans on_message
+        pass
     
     def on_connect(self, client, userdata, flags, rc):
         """Callback de connexion MQTT"""
@@ -141,28 +181,15 @@ class TestPersistCollector(BaseCollector):
             self.logger.error(f"Erreur lors de la persistance dans {filepath}: {e}")
             return False
     
-    def run(self):
-        """Boucle principale du collecteur"""
-        self.logger.info("Démarrage du collecteur de persistance des tests")
-        self.logger.info(f"Mapping machines -> fichiers: {self.file_mapping}")
-        
-        try:
-            # Se connecter à MQTT
-            self.connect_mqtt()
-            
-            # Boucle principale
-            while True:
-                time.sleep(1)
-                
-        except KeyboardInterrupt:
-            self.logger.info("Arrêt demandé")
-        except Exception as e:
-            self.logger.error(f"Erreur fatale: {e}", exc_info=True)
-        finally:
-            if self.mqtt_client:
-                self.mqtt_client.disconnect()
-                self.mqtt_client.loop_stop()
+    def cleanup(self):
+        """Nettoyage avant l'arrêt"""
+        self.logger.info("Nettoyage du collecteur de persistance")
+        # Pas de nettoyage spécifique nécessaire
 
 if __name__ == "__main__":
-    collector = TestPersistCollector()
-    collector.run()
+    try:
+        collector = TestPersistCollector()
+        collector.run()  # Utiliser la méthode run() de BaseCollector
+    except Exception as e:
+        logging.error(f"Erreur fatale: {e}", exc_info=True)
+        sys.exit(1)
