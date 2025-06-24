@@ -1,0 +1,84 @@
+prod@raspberrypi:~ $ sudo bash /media/prod/USBTOOL/mqtt.sh
+
+===================================================
+  DIAGNOSTIC SYSTÈME DE PERSISTANCE MAXLINK
+===================================================
+
+Date: 2025-06-24 14:21:17
+
+▶ VÉRIFICATION DU SERVICE
+========================================
+◦ Service testpersist                 [INACTIF]
+
+Dernières lignes du journal :
+Jun 24 14:21:09 raspberrypi systemd[1]: Started maxlink-widget-testpersist.service - MaxLink Test Results Persistence Service.
+Jun 24 14:21:09 raspberrypi python3[1439]: Traceback (most recent call last):
+Jun 24 14:21:09 raspberrypi python3[1439]:   File "/opt/maxlink/widgets/testpersist/testpersist_collector.py", line 167, in <module>
+Jun 24 14:21:09 raspberrypi python3[1439]:     collector = TestPersistCollector()
+Jun 24 14:21:09 raspberrypi python3[1439]:                 ^^^^^^^^^^^^^^^^^^^^^^
+Jun 24 14:21:09 raspberrypi python3[1439]: TypeError: Can't instantiate abstract class TestPersistCollector with abstract methods collect_and_publish, get_update_interval, initialize, on_mqtt_connected
+Jun 24 14:21:09 raspberrypi systemd[1]: maxlink-widget-testpersist.service: Main process exited, code=exited, status=1/FAILURE
+Jun 24 14:21:09 raspberrypi systemd[1]: maxlink-widget-testpersist.service: Failed with result 'exit-code'.
+
+◦ Démarrage automatique              [ACTIVÉ]
+
+▶ VÉRIFICATION DU STOCKAGE
+========================================
+◦ Répertoire /var/www/traçabilité  [MANQUANT]
+
+◦ Fichiers de données:
+  • 509.json                      [ABSENT]
+  • 511.json                      [ABSENT]
+  • 998.json                      [ABSENT]
+  • 999.json                      [ABSENT]
+
+▶ VÉRIFICATION MQTT
+========================================
+◦ Connexion au broker MQTT            [OK]
+
+◦ Test d'écoute des topics (5 secondes)...
+  .....
+  ↦ Aucun message confirmé reçu
+
+▶ TEST DE PERSISTANCE
+========================================
+◦ Envoi d'un message de test...
+  • Machine: 511
+  • Barcode: 150525511000000001750767682
+  • JSON: {"timestamp":"24-06-2025T14:21:22","team":"TEST","barcode":"150525511000000001750767682","result":"OK"}
+
+/media/prod/USBTOOL/mqtt.sh: line 224: /var/www/traçabilité/511.json: No such file or directory
+◦ Envoi sur MQTT                      [ENVOYÉ]
+  ↦ Attente de la persistance (3 sec)...
+/media/prod/USBTOOL/mqtt.sh: line 242: /var/www/traçabilité/511.json: No such file or directory
+◦ Vérification de la persistance     [ÉCHEC]
+  ↦ Aucune nouvelle ligne ajoutée
+
+◦ Écoute de la confirmation (5 sec)...
+  ↦ Pas de confirmation reçue
+
+▶ ANALYSE DES LOGS
+========================================
+◦ Derniers logs du service (20 lignes):
+
+Jun 24 14:21:09 raspberrypi systemd[1]: Started maxlink-widget-testpersist.service - MaxLink Test Results Persistence Service.
+Jun 24 14:21:09 raspberrypi python3[1439]: Traceback (most recent call last):
+Jun 24 14:21:09 raspberrypi python3[1439]:   File "/opt/maxlink/widgets/testpersist/testpersist_collector.py", line 167, in <module>
+Jun 24 14:21:09 raspberrypi python3[1439]:     collector = TestPersistCollector()
+Jun 24 14:21:09 raspberrypi python3[1439]:                 ^^^^^^^^^^^^^^^^^^^^^^
+Jun 24 14:21:09 raspberrypi python3[1439]: TypeError: Can't instantiate abstract class TestPersistCollector with abstract methods collect_and_publish, get_update_interval, initialize, on_mqtt_connected
+Jun 24 14:21:09 raspberrypi systemd[1]: maxlink-widget-testpersist.service: Main process exited, code=exited, status=1/FAILURE
+Jun 24 14:21:09 raspberrypi systemd[1]: maxlink-widget-testpersist.service: Failed with result 'exit-code'.
+
+▶ RÉSUMÉ DU DIAGNOSTIC
+========================================
+✗ 3 erreur(s) critique(s) détectée(s)
+⚠ 5 avertissement(s)
+
+Recommandations:
+• Démarrer le service: sudo systemctl start maxlink-widget-testpersist
+• Créer le répertoire: sudo mkdir -p /var/www/traçabilité
+• Vérifier les permissions des fichiers
+• Consulter les logs pour plus de détails
+
+prod@raspberrypi:~ $ 
