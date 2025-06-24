@@ -1,0 +1,70 @@
+{
+  "widget": {
+    "id": "testpersist",
+    "name": "Test Results Persistence",
+    "version": "1.0.0",
+    "description": "Persiste les résultats de tests de pression dans des fichiers JSON et publie une confirmation",
+    "author": "MaxLink Team",
+    "dashboard_compatibility": "1.0+"
+  },
+  "mqtt": {
+    "required": true,
+    "broker": {
+      "host": "localhost",
+      "port": 1883,
+      "username": "mosquitto",
+      "password": "mqtt"
+    },
+    "topics": {
+      "subscribe": [
+        {
+          "topic": "SOUFFLAGE/+/ESP32/result",
+          "description": "Résultats de tests des ESP32",
+          "format": "json",
+          "example": "{\"timestamp\":\"27-01-2025T10:46:24\",\"team\":\"B\",\"barcode\":\"15052599910000000151005001\",\"result\":\"OK\"}"
+        }
+      ],
+      "publish": [
+        {
+          "topic": "SOUFFLAGE/{machine_id}/ESP32/result/confirmed",
+          "description": "Confirmation après persistance réussie",
+          "format": "json",
+          "example": "{\"timestamp\":\"27-01-2025T10:46:24\",\"team\":\"B\",\"barcode\":\"15052599910000000151005001\",\"result\":\"OK\"}",
+          "note": "Publie le même JSON que reçu après écriture réussie"
+        }
+      ]
+    }
+  },
+  "collector": {
+    "enabled": true,
+    "script": "testpersist_collector.py",
+    "service_name": "maxlink-widget-testpersist",
+    "service_description": "MaxLink Test Results Persistence Service",
+    "update_intervals": {
+      "default": 0,
+      "note": "Event-driven, no polling"
+    }
+  },
+  "storage": {
+    "base_path": "/var/www/traçabilité",
+    "file_mapping": {
+      "509": "509.json",
+      "511": "511.json",
+      "998": "998.json",
+      "999": "999.json"
+    },
+    "format": "ndjson",
+    "barcode_machine_position": {
+      "start": 6,
+      "length": 3
+    }
+  },
+  "dependencies": {
+    "python_packages": [
+      "paho-mqtt"
+    ],
+    "system_packages": [],
+    "services": ["mosquitto"],
+    "python_version": ">=3.7"
+  }
+}
