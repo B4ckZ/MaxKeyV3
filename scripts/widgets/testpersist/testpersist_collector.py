@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-MaxLink Test Results Persistence Collector - Version CORRIGÉE
-Correction du problème de callback MQTT
+MaxLink Test Results Persistence Collector - Version MODIFIÉE
+Utilisation du topic unique SOUFFLAGE/ESP32/RTP/CONFIRMED
 """
 
 import os
@@ -77,6 +77,7 @@ class TestPersistCollector(BaseCollector):
         # CORRECTION: Définir explicitement les callbacks MQTT
         self.mqtt_client.on_message = self.on_message
         self.logger.info("Callback on_message configuré explicitement")
+        self.logger.info("NOUVEAU: Publication sur topic unique SOUFFLAGE/ESP32/RTP/CONFIRMED")
     
     def on_mqtt_connected(self):
         """Appelé quand la connexion MQTT est établie"""
@@ -127,7 +128,7 @@ class TestPersistCollector(BaseCollector):
     
     def on_message(self, client, userdata, msg):
         """Traitement des messages MQTT - VERSION CORRIGÉE"""
-        self.logger.info("=== MESSAGE MQTT REÇU ! ===")
+        self.logger.info("=== MESSAGE MQTT REÇU ===")
         self.logger.info(f"Topic: {msg.topic}")
         self.logger.info(f"Payload: {msg.payload}")
         
@@ -170,12 +171,12 @@ class TestPersistCollector(BaseCollector):
             if self.persist_csv_data(filepath, csv_line):
                 self.logger.info("Persistance réussie !")
                 
-                # Publier la confirmation
-                confirm_topic = f"SOUFFLAGE/{machine_id}/ESP32/result/confirmed"
+                # MODIFICATION PRINCIPALE: Publication sur topic unique
+                confirm_topic = "SOUFFLAGE/ESP32/RTP/CONFIRMED"
                 if self.mqtt_publish(confirm_topic, csv_line):
-                    self.logger.info(f"Confirmation publiée: {codebarre} -> {filename}")
+                    self.logger.info(f"Confirmation publiée: {codebarre} -> {filename} sur topic unique: {confirm_topic}")
                 else:
-                    self.logger.error(f"Échec publication confirmation")
+                    self.logger.error(f"Échec publication confirmation sur: {confirm_topic}")
             else:
                 self.logger.error(f"Échec persistance pour: {codebarre}")
                 
