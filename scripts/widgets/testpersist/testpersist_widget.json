@@ -1,9 +1,9 @@
 {
   "widget": {
     "id": "testpersist",
-    "name": "Test Results Persistence",
-    "version": "1.0.0",
-    "description": "Persiste les résultats de tests de pression dans des fichiers JSON et publie une confirmation",
+    "name": "Test Results Persistence CSV",
+    "version": "2.0.0",
+    "description": "Persiste les résultats de tests de pression dans des fichiers CSV et publie une confirmation",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
   },
@@ -18,19 +18,19 @@
     "topics": {
       "subscribe": [
         {
-          "topic": "SOUFFLAGE/+/ESP32/result",
-          "description": "Résultats de tests des ESP32",
-          "format": "json",
-          "example": "{\"timestamp\":\"27-01-2025T10:46:24\",\"team\":\"B\",\"barcode\":\"15052599910000000151005001\",\"result\":\"OK\"}"
+          "topic": "SOUFFLAGE/ESP32/RTP",
+          "description": "Résultats de tests des ESP32 (topic unique)",
+          "format": "csv",
+          "example": "08/07/2025,14H46,B,24042551110457205101005321,1"
         }
       ],
       "publish": [
         {
           "topic": "SOUFFLAGE/{machine_id}/ESP32/result/confirmed",
           "description": "Confirmation après persistance réussie",
-          "format": "json",
-          "example": "{\"timestamp\":\"27-01-2025T10:46:24\",\"team\":\"B\",\"barcode\":\"15052599910000000151005001\",\"result\":\"OK\"}",
-          "note": "Publie le même JSON que reçu après écriture réussie"
+          "format": "csv",
+          "example": "08/07/2025,14H46,B,24042551110457205101005321,1",
+          "note": "Publie la même ligne CSV que reçue après écriture réussie"
         }
       ]
     }
@@ -39,7 +39,7 @@
     "enabled": true,
     "script": "testpersist_collector.py",
     "service_name": "maxlink-widget-testpersist",
-    "service_description": "MaxLink Test Results Persistence Service",
+    "service_description": "MaxLink Test Results Persistence CSV Service",
     "update_intervals": {
       "default": 0,
       "note": "Event-driven, no polling"
@@ -48,15 +48,17 @@
   "storage": {
     "base_path": "/home/prod/Documents/traçabilité",
     "file_mapping": {
-      "509": "509.json",
-      "511": "511.json",
-      "998": "998.json",
-      "999": "999.json"
+      "509": "509.csv",
+      "511": "511.csv",
+      "998": "RPDT.csv",
+      "999": "RPDT.csv"
     },
-    "format": "ndjson",
+    "format": "csv",
+    "headers": false,
     "barcode_machine_position": {
       "start": 6,
-      "length": 3
+      "length": 3,
+      "note": "Positions 7,8,9 depuis la gauche (indices 6,7,8 en programmation)"
     }
   },
   "dependencies": {

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-MaxLink Test Results Persistence Collector
-Persiste les résultats de tests dans des fichiers JSON et confirme la sauvegarde
-Version corrigée avec toutes les méthodes abstraites implémentées
+MaxLink Test Results Persistence Collector - Version CORRIGÉE
+Correction du problème de callback MQTT
 """
 
 import os
@@ -23,14 +22,14 @@ except ImportError:
     sys.exit(1)
 
 class TestPersistCollector(BaseCollector):
-    """Collecteur pour la persistance des résultats de tests"""
+    """Collecteur pour la persistance des résultats de tests CSV"""
     
     def __init__(self):
         super().__init__(None, 'testpersist_collector')
         
         # Configuration du stockage
         self.storage_config = self.config.get('storage', {})
-        self.base_path = Path(self.storage_config.get('base_path', '/var/www/traçabilité'))
+        self.base_path = Path(self.storage_config.get('base_path', '/home/prod/Documents/traçabilité'))
         self.file_mapping = self.storage_config.get('file_mapping', {})
         
         # Position du numéro de machine dans le code-barres
@@ -48,125 +47,145 @@ class TestPersistCollector(BaseCollector):
         except Exception as e:
             self.logger.error(f"Erreur création répertoire {self.base_path}: {e}")
         
-        # Initialiser les verrous pour chaque fichier
-        for machine, filename in self.file_mapping.items():
+        # Initialiser les verrous pour chaque fichier unique
+        unique_files = set(self.file_mapping.values())
+        for filename in unique_files:
             filepath = self.base_path / filename
             self.file_locks[str(filepath)] = threading.Lock()
             
-        # S'assurer que les fichiers JSON existent
-        self._ensure_json_files_exist()
+        # S'assurer que les fichiers CSV existent
+        self._ensure_csv_files_exist()
     
-    def _ensure_json_files_exist(self):
-        """S'assure que tous les fichiers JSON existent"""
-        for machine, filename in self.file_mapping.items():
+    def _ensure_csv_files_exist(self):
+        """S'assure que tous les fichiers CSV existent"""
+        unique_files = set(self.file_mapping.values())
+        for filename in unique_files:
             filepath = self.base_path / filename
             if not filepath.exists():
                 try:
                     filepath.touch()
-                    self.logger.info(f"Fichier créé: {filepath}")
+                    self.logger.info(f"Fichier CSV créé: {filepath}")
                 except Exception as e:
                     self.logger.error(f"Erreur création fichier {filepath}: {e}")
     
     def initialize(self):
         """Initialise les variables spécifiques au widget"""
-        self.logger.info("Initialisation du collecteur de persistance des tests")
+        self.logger.info("Initialisation du collecteur de persistance des tests CSV")
         self.logger.info(f"Mapping machines -> fichiers: {self.file_mapping}")
-        self.logger.info(f"Position machine dans barcode: caractères {self.machine_pos_start} à {self.machine_pos_start + self.machine_pos_length}")
+        self.logger.info(f"Position machine dans barcode: caractères {self.machine_pos_start+1} à {self.machine_pos_start + self.machine_pos_length}")
+        
+        # CORRECTION: Définir explicitement les callbacks MQTT
+        self.mqtt_client.on_message = self.on_message
+        self.logger.info("Callback on_message configuré explicitement")
     
     def on_mqtt_connected(self):
         """Appelé quand la connexion MQTT est établie"""
-        # S'abonner aux résultats de tests
-        topic = "SOUFFLAGE/+/ESP32/result"
-        self.mqtt_client.subscribe(topic)
+        # S'abonner au topic unique pour tous les ESP32
+        topic = "SOUFFLAGE/ESP32/RTP"
+        result = self.mqtt_client.subscribe(topic)
         self.logger.info(f"Connecté au broker MQTT - Abonné au topic: {topic}")
+        self.logger.info(f"Résultat abonnement: {result}")
+        
+        # CORRECTION: Re-configurer le callback après connexion
+        self.mqtt_client.on_message = self.on_message
+        self.logger.info("Callback on_message reconfiguré après connexion")
     
     def get_update_interval(self):
         """Retourne l'intervalle de mise à jour en secondes"""
-        # Widget event-driven, pas de polling
-        return 1  # Retourne 1 seconde pour la boucle principale
+        return 1  # Widget event-driven
     
     def collect_and_publish(self):
         """Collecte et publie les données - Non utilisé car event-driven"""
-        # Ce widget est event-driven, les données sont traitées dans on_message
         pass
     
     def on_connect(self, client, userdata, flags, rc):
-        """Callback de connexion MQTT"""
-        super().on_connect(client, userdata, flags, rc)
+        """Callback de connexion MQTT - OVERRIDE COMPLET"""
+        self.logger.info(f"=== CALLBACK ON_CONNECT - RC: {rc} ===")
         
         if rc == 0:
-            # S'abonner aux résultats de tests
-            topic = "SOUFFLAGE/+/ESP32/result"
-            client.subscribe(topic)
-            self.logger.info(f"Reconnexion - Abonné au topic: {topic}")
+            self.logger.info("Connecté au broker MQTT")
+            self.connected = True
+            
+            # S'abonner au topic
+            topic = "SOUFFLAGE/ESP32/RTP"
+            result = client.subscribe(topic)
+            self.logger.info(f"Abonnement au topic: {topic}")
+            self.logger.info(f"Résultat subscribe: {result}")
+            
+            # CORRECTION CRITIQUE: Forcer le callback on_message
+            client.on_message = self.on_message
+            self.logger.info("Callback on_message forcé après connexion")
+            
+            # Appeler la méthode parent
+            try:
+                self.on_mqtt_connected()
+            except Exception as e:
+                self.logger.error(f"Erreur dans on_mqtt_connected: {e}")
+        else:
+            self.logger.error(f"Échec connexion MQTT, code: {rc}")
+            self.connected = False
     
     def on_message(self, client, userdata, msg):
-        """Traitement des messages MQTT"""
+        """Traitement des messages MQTT - VERSION CORRIGÉE"""
+        self.logger.info("=== MESSAGE MQTT REÇU ! ===")
+        self.logger.info(f"Topic: {msg.topic}")
+        self.logger.info(f"Payload: {msg.payload}")
+        
         try:
-            self.logger.debug(f"Message reçu sur {msg.topic}")
+            # Décoder le message CSV
+            csv_line = msg.payload.decode('utf-8').strip()
+            self.logger.info(f"Ligne CSV décodée: '{csv_line}'")
             
-            # Parser le topic pour extraire l'ID de la machine
-            topic_parts = msg.topic.split('/')
-            if len(topic_parts) < 4:
-                self.logger.warning(f"Topic invalide: {msg.topic}")
+            # Parser la ligne CSV: date,heure,équipe,codebarre,résultat
+            csv_fields = csv_line.split(',')
+            self.logger.info(f"Champs CSV: {csv_fields} (nombre: {len(csv_fields)})")
+            
+            if len(csv_fields) != 5:
+                self.logger.error(f"Format CSV invalide - {len(csv_fields)} champs au lieu de 5")
                 return
             
-            machine_id = topic_parts[1]
+            date, heure, equipe, codebarre, resultat = csv_fields
             
-            # Décoder le message JSON
-            try:
-                data = json.loads(msg.payload.decode('utf-8'))
-                self.logger.debug(f"Données décodées: {data}")
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Erreur JSON: {e}")
+            # Vérifier la longueur du code-barres
+            if len(codebarre) < self.machine_pos_start + self.machine_pos_length:
+                self.logger.error(f"Code-barres trop court: {codebarre}")
                 return
             
-            # Vérifier que toutes les données requises sont présentes
-            required_fields = ['timestamp', 'team', 'barcode', 'result']
-            if not all(field in data for field in required_fields):
-                self.logger.error(f"Champs manquants dans les données: {data}")
-                return
+            # Extraire le numéro de machine
+            machine_id = codebarre[self.machine_pos_start:self.machine_pos_start + self.machine_pos_length]
+            self.logger.info(f"Machine extraite: '{machine_id}'")
             
-            # Extraire le numéro de machine du code-barres
-            barcode = data.get('barcode', '')
-            if len(barcode) >= self.machine_pos_start + self.machine_pos_length:
-                barcode_machine = barcode[self.machine_pos_start:self.machine_pos_start + self.machine_pos_length]
-            else:
-                self.logger.error(f"Code-barres trop court: {barcode}")
+            # Vérifier que la machine est connue
+            if machine_id not in self.file_mapping:
+                self.logger.error(f"Machine inconnue: '{machine_id}'")
+                self.logger.info(f"Machines connues: {list(self.file_mapping.keys())}")
                 return
-            
-            # Vérifier la cohérence entre le topic et le code-barres
-            if machine_id != barcode_machine:
-                self.logger.warning(f"Incohérence machine: topic={machine_id}, barcode={barcode_machine}")
-                # Utiliser le numéro du code-barres comme référence
-                machine_id = barcode_machine
             
             # Déterminer le fichier de destination
-            if machine_id not in self.file_mapping:
-                self.logger.error(f"Machine inconnue: {machine_id}")
-                return
-            
             filename = self.file_mapping[machine_id]
             filepath = self.base_path / filename
+            self.logger.info(f"Fichier de destination: {filepath}")
             
-            # Persister les données
-            if self.persist_data(filepath, data):
-                # Si la persistance réussit, publier la confirmation
-                confirm_topic = f"SOUFFLAGE/{machine_id}/ESP32/result/confirmed"
+            # Persister les données CSV
+            if self.persist_csv_data(filepath, csv_line):
+                self.logger.info("Persistance réussie !")
                 
-                # Publier exactement les mêmes données reçues
-                if self.mqtt_publish(confirm_topic, data):
-                    self.logger.info(f"Résultat persisté et confirmé: {barcode} -> {filename} (machine {machine_id})")
+                # Publier la confirmation
+                confirm_topic = f"SOUFFLAGE/{machine_id}/ESP32/result/confirmed"
+                if self.mqtt_publish(confirm_topic, csv_line):
+                    self.logger.info(f"Confirmation publiée: {codebarre} -> {filename}")
                 else:
-                    self.logger.error(f"Échec de la publication de confirmation pour: {barcode}")
+                    self.logger.error(f"Échec publication confirmation")
             else:
-                self.logger.error(f"Échec de la persistance pour: {barcode}")
+                self.logger.error(f"Échec persistance pour: {codebarre}")
                 
         except Exception as e:
-            self.logger.error(f"Erreur dans on_message: {e}", exc_info=True)
+            self.logger.error(f"Erreur traitement message: {e}", exc_info=True)
+        
+        self.logger.info("=== FIN TRAITEMENT MESSAGE ===")
     
-    def persist_data(self, filepath, data):
-        """Persiste les données dans le fichier JSON"""
+    def persist_csv_data(self, filepath, csv_line):
+        """Persiste la ligne CSV dans le fichier"""
         try:
             # Acquérir le verrou pour ce fichier
             lock = self.file_locks.get(str(filepath))
@@ -178,65 +197,36 @@ class TestPersistCollector(BaseCollector):
                 # S'assurer que le fichier existe
                 if not filepath.exists():
                     filepath.touch()
-                    self.logger.info(f"Fichier créé: {filepath}")
+                    self.logger.info(f"Fichier CSV créé: {filepath}")
                 
                 # Ouvrir le fichier en mode append
-                with open(filepath, 'a', encoding='utf-8') as f:
-                    # Écrire la ligne JSON
-                    json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
-                    f.write('\n')
-                    f.flush()  # Forcer l'écriture sur disque
+                with open(filepath, 'a', encoding='utf-8', newline='') as f:
+                    f.write(csv_line + '\n')
+                    f.flush()
                     
-                    # Synchronisation avec le système de fichiers
-                    try:
-                        os.fsync(f.fileno())
-                    except OSError:
-                        # Certains systèmes de fichiers ne supportent pas fsync
-                        pass
-            
-            self.logger.debug(f"Données persistées dans {filepath}")
-            return True
-            
+                self.logger.info(f"Ligne écrite dans {filepath}: {csv_line}")
+                return True
+                
         except Exception as e:
-            self.logger.error(f"Erreur lors de la persistance dans {filepath}: {e}")
+            self.logger.error(f"Erreur écriture fichier {filepath}: {e}")
             return False
     
-    def mqtt_publish(self, topic, data):
-        """Publie un message MQTT avec gestion d'erreur"""
+    def mqtt_publish(self, topic, message):
+        """Publie un message CSV sur MQTT"""
+        if not self.connected:
+            return False
+        
         try:
-            # Convertir les données en JSON
-            payload = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
-            
-            # Publier avec QoS 1 pour garantir la livraison
-            result = self.mqtt_client.publish(topic, payload, qos=1)
-            
-            if result.rc == 0:
-                self.logger.debug(f"Message publié sur {topic}")
-                return True
-            else:
-                self.logger.error(f"Échec publication sur {topic}, code: {result.rc}")
-                return False
-                
+            result = self.mqtt_client.publish(topic, message, qos=1)
+            return result.rc == 0
         except Exception as e:
             self.logger.error(f"Erreur publication MQTT: {e}")
             return False
-    
-    def cleanup(self):
-        """Nettoyage avant l'arrêt"""
-        self.logger.info("Nettoyage du collecteur de persistance")
-        # Pas de nettoyage spécifique nécessaire
+
+def main():
+    """Point d'entrée principal"""
+    collector = TestPersistCollector()
+    collector.run()
 
 if __name__ == "__main__":
-    try:
-        # Configurer le niveau de log si nécessaire
-        import logging
-        if os.environ.get('DEBUG', '').lower() == 'true':
-            logging.getLogger().setLevel(logging.DEBUG)
-        
-        collector = TestPersistCollector()
-        collector.run()  # Utiliser la méthode run() de BaseCollector
-    except KeyboardInterrupt:
-        logging.info("Arrêt demandé par l'utilisateur")
-    except Exception as e:
-        logging.error(f"Erreur fatale: {e}", exc_info=True)
-        sys.exit(1)
+    main()

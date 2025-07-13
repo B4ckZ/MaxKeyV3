@@ -23,7 +23,7 @@ source "$SCRIPT_DIR/../common/wifi_helper.sh"
 init_logging "Installation du mode Access Point" "install"
 
 # Configuration AP par défaut
-AP_CHANNEL="6"        # Canal 2.4GHz stable
+AP_CHANNEL="1"        # Canal 2.4GHz stable
 AP_BAND="bg"         # Mode compatible
 AP_INTERFACE="wlan0"  # Interface WiFi
 

@@ -1,75 +1,21 @@
 #!/bin/bash
+#
+# Installation du widget Test Persist CSV
+# Version 2.0 - Support fichiers CSV sans en-têtes
+#
 
-# ===============================================================================
-# WIDGET TEST PERSIST - INSTALLATION
-# Service de persistance des résultats de tests de pression
-# Version utilisant /home/prod/Documents pour éviter les conflits de permissions
-# ===============================================================================
-
-# Définir le répertoire de base
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WIDGET_DIR="$SCRIPT_DIR"
-WIDGETS_DIR="$(dirname "$WIDGET_DIR")"
-SCRIPTS_DIR="$(dirname "$WIDGETS_DIR")"
-BASE_DIR="$(dirname "$SCRIPTS_DIR")"
-
-# Source des modules
-source "$BASE_DIR/scripts/common/variables.sh"
-source "$BASE_DIR/scripts/common/logging.sh"
-source "$BASE_DIR/scripts/widgets/_core/widget_common.sh"
-
-# ===============================================================================
-# INITIALISATION
-# ===============================================================================
-
-# Initialiser le logging
-init_logging "Installation widget Test Persist" "widgets"
+source "/opt/maxlink/scripts/_core/common_functions.sh"
 
 WIDGET_NAME="testpersist"
 
-# ===============================================================================
-# VÉRIFICATIONS SPÉCIFIQUES
-# ===============================================================================
-
-check_mqtt_broker() {
-    log_info "Vérification du broker MQTT"
-    
-    if ! systemctl is-active --quiet mosquitto; then
-        log_error "Mosquitto n'est pas actif"
-        return 1
-    fi
-    
-    # Test de connexion avec les bonnes credentials
-    if mosquitto_pub -h localhost -p 1883 -u "$MQTT_USER" -P "$MQTT_PASS" -t "test/widget/install" -m "test" 2>/dev/null; then
-        log_success "Connexion MQTT fonctionnelle"
-        return 0
-    else
-        log_error "Impossible de se connecter au broker MQTT"
-        return 1
-    fi
-}
-
-# ===============================================================================
-# PROGRAMME PRINCIPAL
-# ===============================================================================
-
-log_info "========== DÉBUT DE L'INSTALLATION WIDGET TEST PERSIST =========="
-
-echo ""
+# Vérifications préalables
 echo "========================================================================"
-echo "Installation du widget Test Results Persistence"
+echo "Installation du widget Test Persist CSV"
 echo "========================================================================"
 echo ""
+echo "◦ Vérification des prérequis..."
 
-# Vérifier les privilèges root
-if [ "$EUID" -ne 0 ]; then
-    echo "  ↦ Ce script doit être exécuté avec des privilèges root ✗"
-    log_error "Privilèges root requis"
-    exit 1
-fi
-
-# Vérifier MQTT
-echo "◦ Vérification du broker MQTT..."
+# Vérifier que le broker MQTT est actif
 if ! check_mqtt_broker; then
     echo "  ↦ Le broker MQTT doit être installé et actif ✗"
     echo ""
@@ -105,24 +51,63 @@ echo "  ↦ Répertoire: $STORAGE_DIR ✓"
 echo "  ↦ Propriétaire: prod:prod"
 echo "  ↦ Permissions: 775 (lecture/écriture pour prod et root)"
 
-# Créer les fichiers JSON vides s'ils n'existent pas
+# Créer les fichiers CSV vides s'ils n'existent pas
 echo ""
-echo "◦ Initialisation des fichiers de données..."
-for machine in "509" "511" "998" "999"; do
-    filepath="$STORAGE_DIR/${machine}.json"
+echo "◦ Initialisation des fichiers CSV..."
+CSV_FILES=("509.csv" "511.csv" "RPDT.csv")
+
+for csvfile in "${CSV_FILES[@]}"; do
+    filepath="$STORAGE_DIR/$csvfile"
     if [ ! -f "$filepath" ]; then
         touch "$filepath"
         chown prod:prod "$filepath"
         chmod 664 "$filepath"
-        echo "  ↦ Fichier créé: ${machine}.json"
-        log_info "Fichier créé: $filepath"
+        echo "  ↦ Fichier créé: $csvfile"
+        log_info "Fichier CSV créé: $filepath"
     else
-        echo "  ↦ Fichier existant: ${machine}.json"
+        echo "  ↦ Fichier existant: $csvfile"
         # S'assurer que les permissions sont correctes même pour les fichiers existants
         chown prod:prod "$filepath"
         chmod 664 "$filepath"
     fi
 done
+
+# Migration des anciens fichiers JSON (si présents)
+echo ""
+echo "◦ Vérification de la migration JSON → CSV..."
+OLD_JSON_FILES=("509.json" "511.json" "998.json" "999.json")
+MIGRATION_NEEDED=false
+
+for jsonfile in "${OLD_JSON_FILES[@]}"; do
+    json_filepath="$STORAGE_DIR/$jsonfile"
+    if [ -f "$json_filepath" ]; then
+        MIGRATION_NEEDED=true
+        echo "  ↦ Ancien fichier JSON détecté: $jsonfile"
+    fi
+done
+
+if [ "$MIGRATION_NEEDED" = true ]; then
+    echo ""
+    echo "⚠️  ATTENTION: Anciens fichiers JSON détectés!"
+    echo "   Vous devrez peut-être migrer les données manuellement."
+    echo "   Les anciens fichiers seront renommés avec l'extension .old"
+    echo ""
+    read -p "Continuer l'installation? (o/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Oo]$ ]]; then
+        echo "Installation annulée."
+        exit 1
+    fi
+    
+    # Renommer les anciens fichiers JSON
+    for jsonfile in "${OLD_JSON_FILES[@]}"; do
+        json_filepath="$STORAGE_DIR/$jsonfile"
+        if [ -f "$json_filepath" ]; then
+            mv "$json_filepath" "$json_filepath.old"
+            echo "  ↦ $jsonfile → $jsonfile.old"
+        fi
+    done
+fi
 
 # Utiliser l'installation standard du core
 if widget_standard_install "$WIDGET_NAME"; then
@@ -131,33 +116,36 @@ if widget_standard_install "$WIDGET_NAME"; then
     echo "Installation terminée avec succès !"
     echo "========================================================================"
     echo ""
-    echo "Le widget collecte et persiste les résultats de tests :"
+    echo "Le widget collecte et persiste les résultats de tests CSV :"
     echo ""
-    echo "◦ Topics écoutés:"
-    echo "  • SOUFFLAGE/509/ESP32/result"
-    echo "  • SOUFFLAGE/511/ESP32/result"
-    echo "  • SOUFFLAGE/998/ESP32/result"
-    echo "  • SOUFFLAGE/999/ESP32/result"
+    echo "◦ Topic écouté:"
+    echo "  • SOUFFLAGE/ESP32/RTP (topic unique pour tous les ESP32)"
     echo ""
     echo "◦ Topics de confirmation:"
     echo "  • SOUFFLAGE/[machine]/ESP32/result/confirmed"
     echo ""
-    echo "◦ Fichiers de stockage:"
-    echo "  • Machine 509 → $STORAGE_DIR/509.json"
-    echo "  • Machine 511 → $STORAGE_DIR/511.json"
-    echo "  • Machine 998 → $STORAGE_DIR/998.json"
-    echo "  • Machine 999 → $STORAGE_DIR/999.json"
+    echo "◦ Fichiers de stockage CSV (sans en-têtes):"
+    echo "  • Machine 509 → $STORAGE_DIR/509.csv"
+    echo "  • Machine 511 → $STORAGE_DIR/511.csv"
+    echo "  • Machines 998 & 999 → $STORAGE_DIR/RPDT.csv"
     echo ""
-    echo "◦ Format: NDJSON (une ligne JSON par résultat)"
+    echo "◦ Format d'entrée: CSV"
+    echo "  date,heure,équipe,codebarre,résultat"
+    echo "  Exemple: 08/07/2025,14H46,B,24042551110457205101005321,1"
+    echo ""
+    echo "◦ Parsing automatique:"
+    echo "  • Machine extraite des positions 7,8,9 du code-barres"
+    echo "  • Routage automatique vers le bon fichier CSV"
     echo ""
     echo "◦ Accès SSH: Les fichiers sont directement accessibles"
     echo "  par l'utilisateur prod dans ~/Documents/traçabilité"
+    echo "  Import direct possible dans Excel (pas d'en-têtes)"
     echo ""
     echo "IMPORTANT: Le widget mqttlogs509511 affichera maintenant"
-    echo "uniquement les résultats confirmés (après persistance)"
+    echo "uniquement les résultats confirmés (après persistance CSV)"
     echo ""
     
-    log_success "Installation widget Test Persist terminée"
+    log_success "Installation widget Test Persist CSV terminée"
     exit 0
 else
     echo ""
