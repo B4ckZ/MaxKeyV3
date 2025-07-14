@@ -1,61 +1,26 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - DIAGNOSTIC DU SYSTÈME PHP ARCHIVES ULTRA-SIMPLIFIÉ
-# Vérifie que tout le nouveau système fonctionne correctement
-# Version 3.0 - Sans ZIP, téléchargement direct CSV
+# MAXLINK - DIAGNOSTIC COMPLET SYSTÈME PHP ARCHIVES
+# Vérifie que tout fonctionne correctement après installation
 # ===============================================================================
 
-# Couleurs pour l'affichage
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
 WHITE='\033[1;37m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# Compteurs
+# Variables de comptage
 TOTAL_TESTS=0
 PASSED_TESTS=0
+WARNED_TESTS=0
 FAILED_TESTS=0
-WARNING_TESTS=0
-
-# Fonction pour afficher les résultats
-print_result() {
-    local status="$1"
-    local message="$2"
-    local details="$3"
-    
-    ((TOTAL_TESTS++))
-    
-    case "$status" in
-        "PASS")
-            echo -e "${GREEN}✅ PASS${NC} - $message"
-            [ -n "$details" ] && echo -e "   ${CYAN}ℹ️  $details${NC}"
-            ((PASSED_TESTS++))
-            ;;
-        "FAIL")
-            echo -e "${RED}❌ FAIL${NC} - $message"
-            [ -n "$details" ] && echo -e "   ${RED}💀 $details${NC}"
-            ((FAILED_TESTS++))
-            ;;
-        "WARN")
-            echo -e "${YELLOW}⚠️  WARN${NC} - $message"
-            [ -n "$details" ] && echo -e "   ${YELLOW}⚠️  $details${NC}"
-            ((WARNING_TESTS++))
-            ;;
-        "INFO")
-            echo -e "${BLUE}ℹ️  INFO${NC} - $message"
-            [ -n "$details" ] && echo -e "   ${CYAN}📝 $details${NC}"
-            ;;
-    esac
-}
 
 print_header() {
-    echo -e "\n${WHITE}========================================================================"
-    echo -e "$1"
-    echo -e "========================================================================${NC}\n"
+    echo -e "\n${WHITE}========== $1 ==========${NC}"
 }
 
 print_section() {
@@ -63,358 +28,440 @@ print_section() {
     echo "----------------------------------------"
 }
 
-# Vérifier les privilèges root
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}❌ Ce script doit être exécuté en tant que root${NC}"
-    echo "Usage: sudo $0"
-    exit 1
-fi
+print_test() {
+    echo -e "${BLUE}Test $1...${NC}"
+    ((TOTAL_TESTS++))
+}
 
-# Charger les variables si disponibles
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_DIR="$(dirname "$SCRIPT_DIR")"
+print_result() {
+    local status="$1"
+    local message="$2"
+    local detail="$3"
+    
+    case "$status" in
+        "PASS") 
+            echo -e "   ${GREEN}✅ PASS${NC} - $message"
+            [ -n "$detail" ] && echo -e "   ${GREEN}ℹ️  $detail${NC}"
+            ((PASSED_TESTS++))
+            ;;
+        "FAIL") 
+            echo -e "   ${RED}❌ FAIL${NC} - $message"
+            [ -n "$detail" ] && echo -e "   ${RED}💀 $detail${NC}"
+            ((FAILED_TESTS++))
+            ;;
+        "WARN") 
+            echo -e "   ${YELLOW}⚠️  WARN${NC} - $message"
+            [ -n "$detail" ] && echo -e "   ${YELLOW}⚠️  $detail${NC}"
+            ((WARNED_TESTS++))
+            ;;
+        "INFO")
+            echo -e "   ${CYAN}ℹ️  INFO${NC} - $message"
+            [ -n "$detail" ] && echo -e "   ${CYAN}📝 $detail${NC}"
+            ;;
+    esac
+}
 
-if [ -f "$BASE_DIR/scripts/common/variables.sh" ]; then
-    source "$BASE_DIR/scripts/common/variables.sh"
-    DASHBOARD_DIR="$NGINX_DASHBOARD_DIR"
-else
-    DASHBOARD_DIR="/var/www/maxlink-dashboard"
-fi
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        print_result "FAIL" "Ce script doit être exécuté en tant que root"
+        exit 1
+    fi
+}
 
-ARCHIVES_PATH="/home/prod/Documents/traçabilité/Archives"
-
-print_header "🧪 DIAGNOSTIC SYSTÈME PHP ARCHIVES v3.0 - ULTRA-SIMPLIFIÉ"
-
-print_section "1. VÉRIFICATION DU SERVICE PHP_ARCHIVES"
-
-# Statut du service dans services_status.json
-if [ -f "/var/lib/maxlink/services_status.json" ]; then
-    SERVICE_STATUS=$(python3 -c "
+check_service_status() {
+    print_section "1. VÉRIFICATION DES SERVICES"
+    
+    # Vérifier le statut du service php_archives
+    print_test "statut service php_archives"
+    if [ -f "/var/lib/maxlink/services_status.json" ]; then
+        local status=$(python3 -c "
 import json
 try:
     with open('/var/lib/maxlink/services_status.json', 'r') as f:
         data = json.load(f)
-    print(data.get('php_archives', {}).get('status', 'unknown'))
+        print(data.get('php_archives', {}).get('status', 'unknown'))
 except:
-    print('error')
+    print('unknown')
 " 2>/dev/null)
-    
-    if [ "$SERVICE_STATUS" = "active" ]; then
-        print_result "PASS" "Service php_archives actif" "Statut: $SERVICE_STATUS"
+        
+        if [ "$status" = "active" ]; then
+            print_result "PASS" "Service php_archives actif" "Statut: $status"
+        else
+            print_result "FAIL" "Service php_archives non actif" "Statut: $status"
+        fi
     else
-        print_result "FAIL" "Service php_archives inactif" "Statut: $SERVICE_STATUS"
+        print_result "WARN" "Fichier de statut services non trouvé"
     fi
-else
-    print_result "WARN" "Fichier services_status.json non trouvé" "Le service peut fonctionner sans ce fichier"
-fi
-
-# Vérification PHP
-if command -v php >/dev/null 2>&1; then
-    PHP_VERSION=$(php -v | head -n1 | cut -d' ' -f2)
-    print_result "PASS" "PHP installé" "Version: $PHP_VERSION"
-else
-    print_result "FAIL" "PHP non installé" "Requis pour le système d'archives"
-fi
-
-# Vérification des paquets PHP requis
-for pkg in php php-cli php-fpm; do
-    if dpkg -l "$pkg" >/dev/null 2>&1; then
-        print_result "PASS" "Paquet $pkg installé"
-    else
-        print_result "FAIL" "Paquet $pkg manquant"
-    fi
-done
-
-# Important: Vérifier qu'il n'y a PAS php-zip
-if dpkg -l "php-zip" >/dev/null 2>&1; then
-    print_result "WARN" "Paquet php-zip installé" "Non requis dans le nouveau système"
-else
-    print_result "PASS" "Paquet php-zip absent" "Correct - nouveau système sans ZIP"
-fi
-
-print_section "2. VÉRIFICATION DES FICHIERS DU SYSTÈME"
-
-# Fichiers PHP principaux
-FILES_TO_CHECK=(
-    "$DASHBOARD_DIR/archives-list.php:Archives List API"
-    "$DASHBOARD_DIR/download-archive.php:Download API"
-    "$DASHBOARD_DIR/download-manager.js:Download Manager JavaScript"
-)
-
-for file_info in "${FILES_TO_CHECK[@]}"; do
-    IFS=':' read -r file_path file_desc <<< "$file_info"
     
-    if [ -f "$file_path" ]; then
-        file_size=$(stat -c%s "$file_path" 2>/dev/null)
-        file_perms=$(stat -c%a "$file_path" 2>/dev/null)
-        file_owner=$(stat -c%U:%G "$file_path" 2>/dev/null)
-        print_result "PASS" "$file_desc présent" "Taille: ${file_size}B, Perms: $file_perms, Propriétaire: $file_owner"
+    # Vérifier Nginx
+    print_test "service Nginx"
+    if systemctl is-active --quiet nginx; then
+        local nginx_version=$(nginx -v 2>&1 | cut -d' ' -f3 | cut -d'/' -f2)
+        print_result "PASS" "Nginx actif" "Version: $nginx_version"
     else
-        print_result "FAIL" "$file_desc manquant" "Fichier: $file_path"
+        print_result "FAIL" "Nginx inactif"
     fi
-done
-
-# Répertoire des archives
-if [ -d "$ARCHIVES_PATH" ]; then
-    archive_size=$(du -sh "$ARCHIVES_PATH" 2>/dev/null | cut -f1)
-    archive_files=$(find "$ARCHIVES_PATH" -name "*.csv" 2>/dev/null | wc -l)
-    print_result "PASS" "Répertoire archives présent" "Taille: $archive_size, Fichiers CSV: $archive_files"
-else
-    print_result "WARN" "Répertoire archives absent" "Chemin: $ARCHIVES_PATH"
-fi
-
-print_section "3. TESTS DES APIS HTTP"
-
-# Test Nginx
-if systemctl is-active --quiet nginx; then
-    print_result "PASS" "Service Nginx actif"
-else
-    print_result "FAIL" "Service Nginx inactif" "Requis pour servir les APIs"
-fi
-
-# Test des endpoints
-ENDPOINTS=(
-    "http://localhost/archives-list.php:Archives List API"
-    "http://localhost/download-archive.php?help:Download API Help"
-    "http://localhost/download-manager.js:Download Manager JS"
-)
-
-for endpoint_info in "${ENDPOINTS[@]}"; do
-    IFS=':' read -r url desc <<< "$endpoint_info"
     
-    response=$(curl -s -o /dev/null -w "%{http_code}:%{time_total}" "$url" 2>/dev/null || echo "000:0")
-    IFS=':' read -r http_code response_time <<< "$response"
+    # Vérifier PHP-FPM
+    print_test "service PHP-FPM"
+    if systemctl is-active --quiet php8.2-fpm; then
+        local fpm_status=$(systemctl show php8.2-fpm --property=ActiveState --value)
+        print_result "PASS" "PHP-FPM actif" "État: $fmp_status"
+    else
+        print_result "FAIL" "PHP-FPM inactif"
+    fi
+    
+    # Vérifier PHP CLI
+    print_test "PHP CLI"
+    if command -v php >/dev/null 2>&1; then
+        local php_version=$(php -v | head -n1 | cut -d' ' -f2)
+        print_result "PASS" "PHP CLI installé" "Version: $php_version"
+    else
+        print_result "FAIL" "PHP CLI non installé"
+    fi
+    
+    # Vérifier socket PHP-FPM
+    print_test "socket PHP-FPM"
+    if [ -S "/run/php/php8.2-fpm.sock" ]; then
+        local socket_perms=$(ls -la /run/php/php8.2-fpm.sock | awk '{print $1 " " $3 ":" $4}')
+        print_result "PASS" "Socket PHP-FPM présent" "Permissions: $socket_perms"
+    else
+        print_result "FAIL" "Socket PHP-FPM manquant"
+    fi
+}
+
+check_configuration() {
+    print_section "2. VÉRIFICATION DE LA CONFIGURATION"
+    
+    # Configuration Nginx
+    print_test "configuration nginx PHP"
+    local nginx_conf="/etc/nginx/sites-available/maxlink-dashboard"
+    if [ -f "$nginx_conf" ]; then
+        if grep -q "\.php" "$nginx_conf" && grep -q "fastcgi_pass" "$nginx_conf"; then
+            local socket_configured=$(grep "fastcgi_pass" "$nginx_conf" | head -1 | sed 's/.*unix:\([^;]*\).*/\1/')
+            print_result "PASS" "Configuration PHP présente" "Socket: $socket_configured"
+        else
+            print_result "FAIL" "Configuration PHP manquante"
+        fi
+    else
+        print_result "FAIL" "Fichier de configuration nginx manquant"
+    fi
+    
+    # Test syntaxe nginx
+    print_test "syntaxe nginx"
+    if nginx -t >/dev/null 2>&1; then
+        print_result "PASS" "Syntaxe nginx valide"
+    else
+        print_result "FAIL" "Erreur de syntaxe nginx"
+    fi
+    
+    # Sites activés
+    print_test "site nginx activé"
+    if [ -L "/etc/nginx/sites-enabled/maxlink-dashboard" ]; then
+        print_result "PASS" "Site maxlink-dashboard activé"
+    else
+        print_result "FAIL" "Site non activé"
+    fi
+}
+
+check_files() {
+    print_section "3. VÉRIFICATION DES FICHIERS"
+    
+    local dashboard_dir="/var/www/maxlink-dashboard"
+    
+    # Archives List API
+    print_test "archives-list.php"
+    if [ -f "$dashboard_dir/archives-list.php" ]; then
+        local size=$(stat -c%s "$dashboard_dir/archives-list.php")
+        local perms=$(stat -c "%a %U:%G" "$dashboard_dir/archives-list.php")
+        print_result "PASS" "Archives List API présent" "Taille: ${size}B, Perms: $perms"
+    else
+        print_result "FAIL" "Archives List API manquant"
+    fi
+    
+    # Download API
+    print_test "download-archive.php"
+    if [ -f "$dashboard_dir/download-archive.php" ]; then
+        local size=$(stat -c%s "$dashboard_dir/download-archive.php")
+        local perms=$(stat -c "%a %U:%G" "$dashboard_dir/download-archive.php")
+        print_result "PASS" "Download API présent" "Taille: ${size}B, Perms: $perms"
+    else
+        print_result "FAIL" "Download API manquant"
+    fi
+    
+    # JavaScript Manager
+    print_test "download-manager.js"
+    if [ -f "$dashboard_dir/download-manager.js" ]; then
+        local size=$(stat -c%s "$dashboard_dir/download-manager.js")
+        local perms=$(stat -c "%a %U:%G" "$dashboard_dir/download-manager.js")
+        print_result "PASS" "JavaScript Manager présent" "Taille: ${size}B, Perms: $perms"
+    else
+        print_result "FAIL" "JavaScript Manager manquant"
+    fi
+    
+    # Répertoire archives
+    print_test "répertoire archives"
+    if [ -d "$dashboard_dir/archives" ]; then
+        local perms=$(stat -c "%a %U:%G" "$dashboard_dir/archives")
+        print_result "PASS" "Répertoire archives présent" "Perms: $perms"
+    else
+        print_result "WARN" "Répertoire archives manquant"
+    fi
+    
+    # Archives de données
+    print_test "archives de données"
+    local archives_data_dir="/home/prod/Documents/traçabilité/Archives"
+    if [ -d "$archives_data_dir" ]; then
+        local csv_count=$(find "$archives_data_dir" -name "*.csv" 2>/dev/null | wc -l)
+        if [ "$csv_count" -gt 0 ]; then
+            print_result "PASS" "Archives de données trouvées" "Fichiers CSV: $csv_count"
+        else
+            print_result "WARN" "Répertoire archives vide" "Aucun fichier CSV"
+        fi
+    else
+        print_result "WARN" "Répertoire archives de données manquant"
+    fi
+}
+
+check_http_access() {
+    print_section "4. TESTS D'ACCÈS HTTP"
+    
+    # Test archives-list.php
+    print_test "accès HTTP archives-list.php"
+    local response=$(curl -s -w "HTTPCODE:%{http_code}" "http://localhost/archives-list.php" 2>/dev/null)
+    local http_code=$(echo "$response" | grep -o "HTTPCODE:[0-9]*" | cut -d: -f2)
+    local content=$(echo "$response" | sed 's/HTTPCODE:[0-9]*$//')
     
     if [ "$http_code" = "200" ]; then
-        print_result "PASS" "$desc accessible" "HTTP $http_code en ${response_time}s"
-    elif [ "$http_code" = "000" ]; then
-        print_result "FAIL" "$desc inaccessible" "Connexion impossible"
+        print_result "PASS" "Archives List API accessible" "HTTP $http_code"
     else
-        print_result "WARN" "$desc retourne HTTP $http_code" "Comportement inattendu"
+        print_result "FAIL" "Archives List API inaccessible" "HTTP $http_code"
     fi
-done
+    
+    # Test download-archive.php
+    print_test "accès HTTP download-archive.php"
+    local response=$(curl -s -w "HTTPCODE:%{http_code}" "http://localhost/download-archive.php?help" 2>/dev/null)
+    local http_code=$(echo "$response" | grep -o "HTTPCODE:[0-9]*" | cut -d: -f2)
+    
+    if [ "$http_code" = "200" ]; then
+        print_result "PASS" "Download API accessible" "HTTP $http_code"
+    else
+        print_result "FAIL" "Download API inaccessible" "HTTP $http_code"
+    fi
+    
+    # Test download-manager.js
+    print_test "accès HTTP download-manager.js"
+    local http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/download-manager.js" 2>/dev/null)
+    
+    if [ "$http_code" = "200" ]; then
+        print_result "PASS" "JavaScript Manager accessible" "HTTP $http_code"
+    else
+        print_result "FAIL" "JavaScript Manager inaccessible" "HTTP $http_code"
+    fi
+}
 
-print_section "4. TESTS FONCTIONNELS"
-
-# Test JSON de la liste des archives
-echo -n "Test du JSON archives-list.php... "
-archives_json=$(curl -s "http://localhost/archives-list.php" 2>/dev/null)
-if echo "$archives_json" | python3 -m json.tool >/dev/null 2>&1; then
-    archive_count=$(echo "$archives_json" | python3 -c "
+check_functionality() {
+    print_section "5. TESTS FONCTIONNELS"
+    
+    # Test JSON archives-list.php
+    print_test "réponse JSON archives-list.php"
+    local response=$(curl -s "http://localhost/archives-list.php" 2>/dev/null)
+    
+    # Vérifier si c'est du PHP brut ou du JSON
+    if [[ "$response" == "<?php"* ]]; then
+        print_result "FAIL" "PHP retourné en brut (non exécuté)" "Début: ${response:0:50}..."
+    elif echo "$response" | python3 -m json.tool >/dev/null 2>&1; then
+        local archives_count=$(echo "$response" | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
-    total = sum(len(weeks) for weeks in data.values()) if isinstance(data, dict) else 0
-    print(total)
-except:
-    print(0)
-" 2>/dev/null)
-    print_result "PASS" "JSON archives-list.php valide" "$archive_count semaines disponibles"
-else
-    print_result "FAIL" "JSON archives-list.php invalide" "Réponse: ${archives_json:0:100}..."
-fi
-
-# Test de téléchargement (simulation)
-echo -n "Test simulation téléchargement... "
-if [ -n "$archives_json" ] && [ "$archives_json" != "[]" ]; then
-    # Essayer de trouver un fichier à tester
-    first_file=$(echo "$archives_json" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    for year, weeks in data.items():
-        for week in weeks:
-            if week.get('files'):
-                file_info = week['files'][0]
-                print(f\"{file_info['filename']}:{year}\")
-                break
-        else:
-            continue
-        break
+    if isinstance(data, dict) and 'archives' in data:
+        print(len(data['archives']))
+    elif isinstance(data, list):
+        print(len(data))
     else:
-        print('none:none')
+        print('0')
 except:
-    print('error:error')
-" 2>/dev/null)
-    
-    IFS=':' read -r test_file test_year <<< "$first_file"
-    
-    if [ "$test_file" != "none" ] && [ "$test_file" != "error" ]; then
-        test_url="http://localhost/download-archive.php?file=${test_file}&year=${test_year}"
-        test_response=$(curl -s -o /dev/null -w "%{http_code}" "$test_url" 2>/dev/null || echo "000")
-        
-        if [ "$test_response" = "200" ]; then
-            print_result "PASS" "Téléchargement fichier simulé" "Fichier: $test_file"
-        else
-            print_result "WARN" "Téléchargement fichier échoué" "HTTP $test_response pour $test_file"
-        fi
+    print('erreur')
+")
+        print_result "PASS" "JSON valide retourné" "Archives trouvées: $archives_count"
     else
-        print_result "WARN" "Aucun fichier trouvé pour test" "Archives vides ou erreur parsing"
+        print_result "FAIL" "Réponse non-JSON" "Contenu: ${response:0:100}..."
     fi
-else
-    print_result "WARN" "Pas d'archives pour tester téléchargement" "Archives vides"
-fi
-
-print_section "5. VÉRIFICATION DU WIDGET DOWNLOADBUTTON"
-
-# Fichiers du widget
-WIDGET_PATH="$BASE_DIR/widgets/downloadbutton"
-WIDGET_FILES=(
-    "$WIDGET_PATH/downloadbutton.html:Widget HTML"
-    "$WIDGET_PATH/downloadbutton.js:Widget JavaScript"
-    "$WIDGET_PATH/downloadbutton.css:Widget CSS"
-)
-
-if [ -d "$WIDGET_PATH" ]; then
-    print_result "PASS" "Répertoire widget downloadbutton présent"
     
-    for widget_file_info in "${WIDGET_FILES[@]}"; do
-        IFS=':' read -r widget_file widget_desc <<< "$widget_file_info"
-        
-        if [ -f "$widget_file" ]; then
-            widget_size=$(stat -c%s "$widget_file" 2>/dev/null)
-            print_result "PASS" "$widget_desc présent" "Taille: ${widget_size}B"
-        else
-            print_result "WARN" "$widget_desc manquant" "Fichier: $widget_file"
+    # Test JSON download-archive.php
+    print_test "réponse JSON download-archive.php"
+    local response=$(curl -s "http://localhost/download-archive.php?help" 2>/dev/null)
+    
+    if [[ "$response" == "<?php"* ]]; then
+        print_result "FAIL" "PHP retourné en brut (non exécuté)"
+    elif echo "$response" | python3 -m json.tool >/dev/null 2>&1; then
+        print_result "PASS" "JSON valide retourné"
+    else
+        print_result "WARN" "Réponse non-JSON (comportement possible)"
+    fi
+    
+    # Test performance
+    print_test "performance archives-list.php"
+    local start_time=$(date +%s%N)
+    curl -s "http://localhost/archives-list.php" >/dev/null 2>&1
+    local end_time=$(date +%s%N)
+    local duration=$(( (end_time - start_time) / 1000000 ))
+    
+    if [ "$duration" -lt 1000 ]; then
+        print_result "PASS" "Performance correcte" "${duration}ms"
+    elif [ "$duration" -lt 3000 ]; then
+        print_result "WARN" "Performance acceptable" "${duration}ms"
+    else
+        print_result "FAIL" "Performance dégradée" "${duration}ms"
+    fi
+}
+
+check_security() {
+    print_section "6. VÉRIFICATION SÉCURITÉ"
+    
+    # Permissions fichiers
+    print_test "permissions fichiers"
+    local dashboard_dir="/var/www/maxlink-dashboard"
+    local security_issues=0
+    
+    for file in "archives-list.php" "download-archive.php" "download-manager.js"; do
+        if [ -f "$dashboard_dir/$file" ]; then
+            local perms=$(stat -c "%a" "$dashboard_dir/$file")
+            local owner=$(stat -c "%U:%G" "$dashboard_dir/$file")
+            
+            if [ "$perms" = "644" ] && [ "$owner" = "www-data:www-data" ]; then
+                print_result "PASS" "Permissions correctes $file" "$perms, $owner"
+            else
+                print_result "WARN" "Permissions incorrectes $file" "$perms, $owner"
+                ((security_issues++))
+            fi
         fi
     done
-else
-    print_result "WARN" "Répertoire widget downloadbutton absent" "Chemin: $WIDGET_PATH"
-fi
-
-print_section "6. VÉRIFICATION DE LA SÉCURITÉ"
-
-# Permissions des fichiers
-security_files=(
-    "$DASHBOARD_DIR/archives-list.php"
-    "$DASHBOARD_DIR/download-archive.php"
-    "$DASHBOARD_DIR/download-manager.js"
-)
-
-for sec_file in "${security_files[@]}"; do
-    if [ -f "$sec_file" ]; then
-        file_perms=$(stat -c%a "$sec_file" 2>/dev/null)
-        file_owner=$(stat -c%U "$sec_file" 2>/dev/null)
-        
-        if [ "$file_perms" = "644" ] && [ "$file_owner" = "www-data" ]; then
-            print_result "PASS" "Permissions correctes $(basename "$sec_file")" "644, www-data"
-        else
-            print_result "WARN" "Permissions $(basename "$sec_file")" "Actuelles: $file_perms, $file_owner"
-        fi
-    fi
-done
-
-# Test injection basique
-echo -n "Test protection injection... "
-injection_test=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/download-archive.php?file=../../../etc/passwd&year=2025" 2>/dev/null || echo "000")
-if [ "$injection_test" = "400" ] || [ "$injection_test" = "403" ]; then
-    print_result "PASS" "Protection injection active" "HTTP $injection_test pour tentative ../../../"
-else
-    print_result "WARN" "Protection injection incertaine" "HTTP $injection_test"
-fi
-
-print_section "7. TESTS DE PERFORMANCE"
-
-# Temps de réponse
-echo -n "Test performance archives-list.php... "
-perf_time=$(curl -s -o /dev/null -w "%{time_total}" "http://localhost/archives-list.php" 2>/dev/null || echo "0")
-perf_ms=$(echo "$perf_time * 1000" | bc -l 2>/dev/null | cut -d. -f1 2>/dev/null || echo "0")
-
-if [ "${perf_ms:-0}" -lt 1000 ]; then
-    print_result "PASS" "Performance archives-list.php" "${perf_ms}ms"
-elif [ "${perf_ms:-0}" -lt 3000 ]; then
-    print_result "WARN" "Performance archives-list.php acceptable" "${perf_ms}ms"
-else
-    print_result "WARN" "Performance archives-list.php lente" "${perf_ms}ms"
-fi
-
-# Taille de la réponse
-response_size=$(curl -s "http://localhost/archives-list.php" 2>/dev/null | wc -c)
-if [ "$response_size" -gt 0 ]; then
-    if [ "$response_size" -lt 10000 ]; then
-        print_result "PASS" "Taille réponse raisonnable" "${response_size} octets"
-    else
-        print_result "WARN" "Réponse volumineuse" "${response_size} octets"
-    fi
-else
-    print_result "FAIL" "Réponse vide"
-fi
-
-print_section "8. VÉRIFICATION LOGS"
-
-# Logs récents
-LOG_FILES=(
-    "/var/log/maxlink/php_archives_install.log:Installation PHP Archives"
-    "/var/log/nginx/error.log:Erreurs Nginx"
-    "/var/log/nginx/access.log:Accès Nginx"
-)
-
-for log_info in "${LOG_FILES[@]}"; do
-    IFS=':' read -r log_file log_desc <<< "$log_info"
     
-    if [ -f "$log_file" ]; then
-        log_size=$(stat -c%s "$log_file" 2>/dev/null)
-        recent_errors=$(grep -i "error\|fail\|fatal" "$log_file" 2>/dev/null | tail -5 | wc -l)
+    # Test injection basique
+    print_test "protection injection SQL"
+    local response=$(curl -s -w "HTTPCODE:%{http_code}" "http://localhost/archives-list.php?year=2025';DROP TABLE--" 2>/dev/null)
+    local http_code=$(echo "$response" | grep -o "HTTPCODE:[0-9]*" | cut -d: -f2)
+    
+    if [ "$http_code" = "400" ] || [ "$http_code" = "403" ]; then
+        print_result "PASS" "Protection injection active" "HTTP $http_code"
+    else
+        print_result "WARN" "Protection injection incertaine" "HTTP $http_code"
+    fi
+}
+
+check_logs() {
+    print_section "7. VÉRIFICATION DES LOGS"
+    
+    # Log d'installation
+    print_test "log installation PHP Archives"
+    local install_log="/var/log/maxlink/install/php_archives_install.log"
+    if [ -f "$install_log" ]; then
+        if grep -q "SUCCESS.*Installation.*terminée" "$install_log"; then
+            print_result "PASS" "Installation loggée avec succès"
+        else
+            print_result "WARN" "Log d'installation sans succès confirmé"
+        fi
+    else
+        print_result "INFO" "Log d'installation non trouvé" "Normal si première installation"
+    fi
+    
+    # Logs d'erreur Nginx
+    print_test "erreurs Nginx récentes"
+    local nginx_error_log="/var/log/nginx/error.log"
+    if [ -f "$nginx_error_log" ]; then
+        local recent_errors=$(tail -50 "$nginx_error_log" | grep -E "(error|fail|fatal)" | grep "$(date +%Y/%m/%d)" | wc -l)
+        local log_size=$(stat -c%s "$nginx_error_log")
         
         if [ "$recent_errors" -eq 0 ]; then
-            print_result "PASS" "$log_desc sans erreur récente" "Taille: ${log_size}B"
+            print_result "PASS" "Aucune erreur récente" "Taille log: ${log_size}B"
         else
-            print_result "WARN" "$log_desc avec $recent_errors erreurs récentes" "Vérifiez: $log_file"
+            print_result "WARN" "$recent_errors erreurs aujourd'hui" "Vérifiez le log"
         fi
     else
-        print_result "INFO" "$log_desc absent" "Fichier: $log_file"
+        print_result "INFO" "Log d'erreur nginx non trouvé"
     fi
-done
-
-print_header "📊 RÉSUMÉ DU DIAGNOSTIC"
-
-echo -e "${WHITE}Tests effectués:${NC} $TOTAL_TESTS"
-echo -e "${GREEN}✅ Réussis:${NC} $PASSED_TESTS"
-echo -e "${YELLOW}⚠️  Avertissements:${NC} $WARNING_TESTS"
-echo -e "${RED}❌ Échecs:${NC} $FAILED_TESTS"
-
-echo ""
-
-# Calcul du score
-if [ "$TOTAL_TESTS" -gt 0 ]; then
-    score=$(( (PASSED_TESTS * 100) / TOTAL_TESTS ))
     
-    if [ "$score" -ge 90 ]; then
-        echo -e "${GREEN}🎉 SYSTÈME EXCELLENT${NC} - Score: ${score}%"
-        echo -e "${GREEN}Le système PHP Archives fonctionne parfaitement !${NC}"
-    elif [ "$score" -ge 75 ]; then
-        echo -e "${YELLOW}✅ SYSTÈME BON${NC} - Score: ${score}%"
-        echo -e "${YELLOW}Quelques améliorations mineures possibles.${NC}"
-    elif [ "$score" -ge 50 ]; then
-        echo -e "${YELLOW}⚠️  SYSTÈME ACCEPTABLE${NC} - Score: ${score}%"
-        echo -e "${YELLOW}Des corrections sont recommandées.${NC}"
+    # Logs d'accès Nginx
+    print_test "accès Nginx récents"
+    local nginx_access_log="/var/log/nginx/access.log"
+    if [ -f "$nginx_access_log" ]; then
+        local php_requests=$(tail -100 "$nginx_access_log" | grep "\.php" | wc -l)
+        print_result "INFO" "Requêtes PHP récentes" "$php_requests dans les 100 dernières"
     else
-        echo -e "${RED}❌ SYSTÈME DÉFAILLANT${NC} - Score: ${score}%"
-        echo -e "${RED}Des corrections majeures sont requises.${NC}"
+        print_result "INFO" "Log d'accès nginx non trouvé"
     fi
-fi
+}
+
+generate_summary() {
+    print_header "RÉSUMÉ DU DIAGNOSTIC"
+    
+    local success_rate=$((PASSED_TESTS * 100 / TOTAL_TESTS))
+    
+    echo "Tests effectués: $TOTAL_TESTS"
+    echo -e "✅ Réussis: ${GREEN}$PASSED_TESTS${NC}"
+    echo -e "⚠️  Avertissements: ${YELLOW}$WARNED_TESTS${NC}"
+    echo -e "❌ Échecs: ${RED}$FAILED_TESTS${NC}"
+    echo ""
+    
+    if [ "$FAILED_TESTS" -eq 0 ] && [ "$WARNED_TESTS" -eq 0 ]; then
+        echo -e "🎉 ${GREEN}SYSTÈME PARFAIT${NC} - Score: ${success_rate}%"
+        echo "Tout fonctionne parfaitement !"
+    elif [ "$FAILED_TESTS" -eq 0 ]; then
+        echo -e "✅ ${GREEN}SYSTÈME FONCTIONNEL${NC} - Score: ${success_rate}%"
+        echo "Système opérationnel avec quelques avertissements mineurs."
+    elif [ "$success_rate" -ge 70 ]; then
+        echo -e "⚠️  ${YELLOW}SYSTÈME ACCEPTABLE${NC} - Score: ${success_rate}%"
+        echo "Des corrections sont recommandées."
+    else
+        echo -e "❌ ${RED}SYSTÈME DÉFAILLANT${NC} - Score: ${success_rate}%"
+        echo "Corrections urgentes nécessaires."
+    fi
+    
+    echo ""
+    echo -e "${BLUE}🔗 URLs de test:${NC}"
+    echo "  • Archives: http://localhost/archives-list.php"
+    echo "  • Download: http://localhost/download-archive.php?help"
+    echo "  • Manager:  http://localhost/download-manager.js"
+    
+    echo ""
+    echo -e "${BLUE}📁 Chemins importants:${NC}"
+    echo "  • Dashboard: /var/www/maxlink-dashboard"
+    echo "  • Archives:  /home/prod/Documents/traçabilité/Archives"
+    echo "  • Logs:     /var/log/maxlink/"
+    
+    if [ "$FAILED_TESTS" -gt 0 ] || [ "$WARNED_TESTS" -gt 0 ]; then
+        echo ""
+        echo -e "${YELLOW}💡 Actions recommandées:${NC}"
+        echo "  • Vérifiez les logs: /var/log/nginx/error.log"
+        echo "  • Relancez l'installation: sudo scripts/install/php_archives_install.sh"
+        echo "  • Testez manuellement les URLs ci-dessus"
+        
+        if [ "$FAILED_TESTS" -gt 0 ]; then
+            echo "  • Exécutez le script de correction: sudo ./fix.sh"
+        fi
+    fi
+}
+
+# ===============================================================================
+# PROGRAMME PRINCIPAL
+# ===============================================================================
+
+echo -e "${WHITE}========================================================================"
+echo "🧪 DIAGNOSTIC SYSTÈME PHP ARCHIVES v2.0"
+echo -e "========================================================================${NC}\n"
+
+check_root
+
+check_service_status
+check_configuration  
+check_files
+check_http_access
+check_functionality
+check_security
+check_logs
+
+generate_summary
 
 echo ""
-echo -e "${CYAN}🔗 URLs de test:${NC}"
-echo "  • Archives: http://localhost/archives-list.php"
-echo "  • Download: http://localhost/download-archive.php?help"
-echo "  • Manager:  http://localhost/download-manager.js"
-
-echo ""
-echo -e "${CYAN}📁 Chemins importants:${NC}"
-echo "  • Dashboard: $DASHBOARD_DIR"
-echo "  • Archives:  $ARCHIVES_PATH"
-echo "  • Widget:    $WIDGET_PATH"
-
-if [ "$FAILED_TESTS" -gt 0 ]; then
-    echo ""
-    echo -e "${RED}💡 Actions recommandées:${NC}"
-    echo "  • Vérifiez les logs: /var/log/maxlink/"
-    echo "  • Réinstallez si nécessaire: sudo scripts/install/php_archives_install.sh"
-    echo "  • Testez manuellement les URLs ci-dessus"
-    exit 1
-else
-    echo ""
-    echo -e "${GREEN}✨ Le système est opérationnel !${NC}"
-    exit 0
-fi

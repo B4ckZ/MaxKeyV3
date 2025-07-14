@@ -1,94 +1,111 @@
+prod@raspberrypi:~ $ sudo bash /media/prod/USBTOOL/test.sh
 ========================================================================
-🧪 DIAGNOSTIC SYSTÈME PHP ARCHIVES v3.0 - ULTRA-SIMPLIFIÉ
+🧪 DIAGNOSTIC SYSTÈME PHP ARCHIVES v2.0
 ========================================================================
 
 
-🔍 1. VÉRIFICATION DU SERVICE PHP_ARCHIVES
+🔍 1. VÉRIFICATION DES SERVICES
 ----------------------------------------
-✅ PASS - Service php_archives actif
+Test statut service php_archives...
+   ✅ PASS - Service php_archives actif
    ℹ️  Statut: active
-✅ PASS - PHP installé
+Test service Nginx...
+   ✅ PASS - Nginx actif
+   ℹ️  Version: 1.22.1
+Test service PHP-FPM...
+   ✅ PASS - PHP-FPM actif
+   ℹ️  État: 
+Test PHP CLI...
+   ✅ PASS - PHP CLI installé
    ℹ️  Version: 8.2.28
-✅ PASS - Paquet php installé
-✅ PASS - Paquet php-cli installé
-✅ PASS - Paquet php-fpm installé
-✅ PASS - Paquet php-zip absent
-   ℹ️  Correct - nouveau système sans ZIP
+Test socket PHP-FPM...
+   ✅ PASS - Socket PHP-FPM présent
+   ℹ️  Permissions: srw-rw---- www-data:www-data
 
-🔍 2. VÉRIFICATION DES FICHIERS DU SYSTÈME
+🔍 2. VÉRIFICATION DE LA CONFIGURATION
 ----------------------------------------
-✅ PASS - Archives List API présent
-   ℹ️  Taille: 2913B, Perms: 644, Propriétaire: www-data:www-data
-✅ PASS - Download API présent
-   ℹ️  Taille: 4370B, Perms: 644, Propriétaire: www-data:www-data
-✅ PASS - Download Manager JavaScript présent
-   ℹ️  Taille: 5058B, Perms: 644, Propriétaire: www-data:www-data
-✅ PASS - Répertoire archives présent
-   ℹ️  Taille: 32K, Fichiers CSV: 6
+Test configuration nginx PHP...
+   ✅ PASS - Configuration PHP présente
+   ℹ️  Socket: /run/php/php8.2-fpm.sock
+Test syntaxe nginx...
+   ✅ PASS - Syntaxe nginx valide
+Test site nginx activé...
+   ✅ PASS - Site maxlink-dashboard activé
 
-🔍 3. TESTS DES APIS HTTP
+🔍 3. VÉRIFICATION DES FICHIERS
 ----------------------------------------
-✅ PASS - Service Nginx actif
-❌ FAIL - //localhost/archives-list.php:Archives List API inaccessible
-   💀 Connexion impossible
-❌ FAIL - //localhost/download-archive.php?help:Download API Help inaccessible
-   💀 Connexion impossible
-❌ FAIL - //localhost/download-manager.js:Download Manager JS inaccessible
-   💀 Connexion impossible
+Test archives-list.php...
+   ✅ PASS - Archives List API présent
+   ℹ️  Taille: 2913B, Perms: 775 www-data:www-data
+Test download-archive.php...
+   ✅ PASS - Download API présent
+   ℹ️  Taille: 4370B, Perms: 775 www-data:www-data
+Test download-manager.js...
+   ✅ PASS - JavaScript Manager présent
+   ℹ️  Taille: 5058B, Perms: 775 www-data:www-data
+Test répertoire archives...
+   ✅ PASS - Répertoire archives présent
+   ℹ️  Perms: 775 www-data:www-data
+Test archives de données...
+   ⚠️  WARN - Répertoire archives vide
+   ⚠️  Aucun fichier CSV
 
-🔍 4. TESTS FONCTIONNELS
+🔍 4. TESTS D'ACCÈS HTTP
 ----------------------------------------
-Test du JSON archives-list.php... ❌ FAIL - JSON archives-list.php invalide
-   💀 Réponse: <?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Ac...
-Test simulation téléchargement... ⚠️  WARN - Aucun fichier trouvé pour test
-   ⚠️  Archives vides ou erreur parsing
+Test accès HTTP archives-list.php...
+   ✅ PASS - Archives List API accessible
+   ℹ️  HTTP 200
+Test accès HTTP download-archive.php...
+   ✅ PASS - Download API accessible
+   ℹ️  HTTP 200
+Test accès HTTP download-manager.js...
+   ✅ PASS - JavaScript Manager accessible
+   ℹ️  HTTP 200
 
-🔍 5. VÉRIFICATION DU WIDGET DOWNLOADBUTTON
+🔍 5. TESTS FONCTIONNELS
 ----------------------------------------
-⚠️  WARN - Répertoire widget downloadbutton absent
-   ⚠️  Chemin: /media/prod/widgets/downloadbutton
+Test réponse JSON archives-list.php...
+   ✅ PASS - JSON valide retourné
+   ℹ️  Archives trouvées: 0
+Test réponse JSON download-archive.php...
+   ✅ PASS - JSON valide retourné
+Test performance archives-list.php...
+   ✅ PASS - Performance correcte
+   ℹ️  12ms
 
-🔍 6. VÉRIFICATION DE LA SÉCURITÉ
+🔍 6. VÉRIFICATION SÉCURITÉ
 ----------------------------------------
-✅ PASS - Permissions correctes archives-list.php
-   ℹ️  644, www-data
-✅ PASS - Permissions correctes download-archive.php
-   ℹ️  644, www-data
-✅ PASS - Permissions correctes download-manager.js
-   ℹ️  644, www-data
-Test protection injection... ⚠️  WARN - Protection injection incertaine
-   ⚠️  HTTP 200
+Test permissions fichiers...
+   ⚠️  WARN - Permissions incorrectes archives-list.php
+   ⚠️  775, www-data:www-data
+   ⚠️  WARN - Permissions incorrectes download-archive.php
+   ⚠️  775, www-data:www-data
+   ⚠️  WARN - Permissions incorrectes download-manager.js
+   ⚠️  775, www-data:www-data
+Test protection injection SQL...
+   ⚠️  WARN - Protection injection incertaine
+   ⚠️  HTTP 000
 
-🔍 7. TESTS DE PERFORMANCE
+🔍 7. VÉRIFICATION DES LOGS
 ----------------------------------------
-Test performance archives-list.php... ✅ PASS - Performance archives-list.php
-   ℹ️  ms
-✅ PASS - Taille réponse raisonnable
-   ℹ️  2913 octets
+Test log installation PHP Archives...
+   ℹ️  INFO - Log d'installation non trouvé
+   📝 Normal si première installation
+Test erreurs Nginx récentes...
+   ✅ PASS - Aucune erreur récente
+   ℹ️  Taille log: 78B
+Test accès Nginx récents...
+   ℹ️  INFO - Requêtes PHP récentes
+   📝 0 dans les 100 dernières
 
-🔍 8. VÉRIFICATION LOGS
-----------------------------------------
-ℹ️  INFO - Installation PHP Archives absent
-   📝 Fichier: /var/log/maxlink/php_archives_install.log
-✅ PASS - Erreurs Nginx sans erreur récente
-   ℹ️  Taille: 78B
-✅ PASS - Accès Nginx sans erreur récente
-   ℹ️  Taille: 0B
+========== RÉSUMÉ DU DIAGNOSTIC ==========
+Tests effectués: 24
+✅ Réussis: 19
+⚠️  Avertissements: 5
+❌ Échecs: 0
 
-========================================================================
-📊 RÉSUMÉ DU DIAGNOSTIC
-========================================================================
-
-Tests effectués: 26
-✅ Réussis: 18
-⚠️  Avertissements: 3
-❌ Échecs: 4
-
-⚠️  SYSTÈME ACCEPTABLE - Score: 69%
-Des corrections sont recommandées.
+✅ SYSTÈME FONCTIONNEL - Score: 79%
+Système opérationnel avec quelques avertissements mineurs.
 
 🔗 URLs de test:
   • Archives: http://localhost/archives-list.php
@@ -98,10 +115,11 @@ Des corrections sont recommandées.
 📁 Chemins importants:
   • Dashboard: /var/www/maxlink-dashboard
   • Archives:  /home/prod/Documents/traçabilité/Archives
-  • Widget:    /media/prod/widgets/downloadbutton
+  • Logs:     /var/log/maxlink/
 
 💡 Actions recommandées:
-  • Vérifiez les logs: /var/log/maxlink/
-  • Réinstallez si nécessaire: sudo scripts/install/php_archives_install.sh
+  • Vérifiez les logs: /var/log/nginx/error.log
+  • Relancez l'installation: sudo scripts/install/php_archives_install.sh
   • Testez manuellement les URLs ci-dessus
+
 prod@raspberrypi:~ $ 
