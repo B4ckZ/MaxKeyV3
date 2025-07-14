@@ -144,6 +144,7 @@ class VariablesLoader:
                 {"id": "nginx", "name": "NginX Web"},
                 {"id": "mqtt", "name": "MQTT BKR"},
                 {"id": "mqtt_wgs", "name": "MQTT WGS"},
+                {"id": "php_archives", "name": "PHP Archives"},
                 {"id": "orchestrator", "name": "Finalisation"}
             ]
             

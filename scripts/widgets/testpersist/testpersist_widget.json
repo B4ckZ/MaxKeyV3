@@ -3,7 +3,7 @@
     "id": "testpersist",
     "name": "Test Results Persistence CSV",
     "version": "3.1.0",
-    "description": "Persiste les résultats de tests dans des fichiers CSV avec traçabilité hebdomadaire",
+    "description": "Persiste les résultats de tests dans des fichiers CSV avec traçabilité hebdomadaire - Version service modulaire",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
   },
@@ -68,33 +68,32 @@
       "note": "Traçabilité hebdomadaire automatique avec archivage"
     }
   },
-  "download": {
+  "download_system": {
     "enabled": true,
-    "backend": "php",
-    "endpoints": {
-      "/archives-list.php": {
-        "method": "GET",
-        "description": "Liste toutes les semaines archivées par année",
-        "response_format": "json"
-      },
-      "/download-archive.php": {
-        "method": "GET", 
-        "description": "Télécharge tous les fichiers CSV d'une semaine en ZIP",
-        "parameters": "year, week",
-        "response_format": "application/zip"
-      }
-    }
+    "service_integration": "php_archives",
+    "description": "Le téléchargement des archives est géré par le service modulaire php_archives",
+    "widget": "downloadbutton",
+    "note": "Plus besoin d'API Flask - système PHP pur intégré dans l'architecture modulaire MaxLink"
   },
   "dependencies": {
     "python_packages": [
       "paho-mqtt"
     ],
-    "system_packages": [
-      "php-zip",
-      "php-cli"
+    "services": [
+      "mosquitto", 
+      "nginx",
+      "php_archives"
     ],
-    "services": ["mosquitto", "nginx"],
     "python_version": ">=3.7",
-    "php_version": ">=7.4"
+    "notes": {
+      "php_archives_service": "Le service php_archives doit être installé via l'interface MaxKey ou scripts/install/php_archives_install.sh",
+      "no_flask_api": "L'API Flask a été supprimée au profit du service php_archives plus simple et intégré"
+    }
+  },
+  "installation_notes": {
+    "service_order": "Ce widget nécessite que le service php_archives soit installé en premier",
+    "modular_architecture": "Intégré dans l'architecture modulaire MaxLink avec indicateur de statut",
+    "ultra_simple": "Solution ultra-simple sans complexité API - juste PHP pur",
+    "maintenance": "Le service php_archives apparaît dans l'interface MaxKey avec indicateur visuel"
   }
 }

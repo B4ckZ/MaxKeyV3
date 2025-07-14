@@ -29,6 +29,7 @@ INSTALL_SCRIPTS=(
     "nginx_install.sh:Serveur Web et Dashboard"
     "mqtt_install.sh:Broker MQTT"
     "mqtt_wgs_install.sh:Widgets MQTT"
+	"php_archives_install.sh:Systeme php"
     "orchestrator_install.sh:Orchestrateur et finalisation"
 )
 
@@ -93,7 +94,7 @@ with open('$SERVICES_STATUS_FILE', 'r') as f:
     data = json.load(f)
 
 for service_id, info in data.items():
-    if service_id in ['update', 'ap', 'nginx', 'mqtt', 'mqtt_wgs', 'orchestrator']:
+    if service_id in ['update', 'ap', 'nginx', 'mqtt', 'mqtt_wgs', 'php_archives', 'orchestrator']:
         status = info.get('status', 'inactive')
         symbol = '✓' if status == 'active' else '✗'
         print(f'  {symbol} {service_id}: {status}')
