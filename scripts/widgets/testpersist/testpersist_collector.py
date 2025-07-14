@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-MaxLink Test Results Persistence Collector - Version MODIFIÉE
-Utilisation du topic unique SOUFFLAGE/ESP32/RTP/CONFIRMED
+MaxLink Test Results Persistence Collector
+Persiste les résultats de tests CSV et publie une confirmation
 """
 
 import os
 import sys
-import json
-import time
 import threading
 from pathlib import Path
-from datetime import datetime
 
 # Ajouter le répertoire parent au path pour l'import
 sys.path.insert(0, '/opt/maxlink/widgets/_core')
@@ -70,26 +67,17 @@ class TestPersistCollector(BaseCollector):
     
     def initialize(self):
         """Initialise les variables spécifiques au widget"""
-        self.logger.info("Initialisation du collecteur de persistance des tests CSV")
-        self.logger.info(f"Mapping machines -> fichiers: {self.file_mapping}")
-        self.logger.info(f"Position machine dans barcode: caractères {self.machine_pos_start+1} à {self.machine_pos_start + self.machine_pos_length}")
+        self.logger.info("Collecteur de persistance CSV initialisé")
+        self.logger.info(f"Machines surveillées: {list(self.file_mapping.keys())}")
         
-        # CORRECTION: Définir explicitement les callbacks MQTT
+        # Configuration explicite du callback MQTT
         self.mqtt_client.on_message = self.on_message
-        self.logger.info("Callback on_message configuré explicitement")
-        self.logger.info("NOUVEAU: Publication sur topic unique SOUFFLAGE/ESP32/RTP/CONFIRMED")
     
     def on_mqtt_connected(self):
         """Appelé quand la connexion MQTT est établie"""
-        # S'abonner au topic unique pour tous les ESP32
         topic = "SOUFFLAGE/ESP32/RTP"
         result = self.mqtt_client.subscribe(topic)
-        self.logger.info(f"Connecté au broker MQTT - Abonné au topic: {topic}")
-        self.logger.info(f"Résultat abonnement: {result}")
-        
-        # CORRECTION: Re-configurer le callback après connexion
-        self.mqtt_client.on_message = self.on_message
-        self.logger.info("Callback on_message reconfiguré après connexion")
+        self.logger.info(f"Abonné au topic: {topic}")
     
     def get_update_interval(self):
         """Retourne l'intervalle de mise à jour en secondes"""
@@ -100,24 +88,17 @@ class TestPersistCollector(BaseCollector):
         pass
     
     def on_connect(self, client, userdata, flags, rc):
-        """Callback de connexion MQTT - OVERRIDE COMPLET"""
-        self.logger.info(f"=== CALLBACK ON_CONNECT - RC: {rc} ===")
-        
+        """Callback de connexion MQTT"""
         if rc == 0:
             self.logger.info("Connecté au broker MQTT")
             self.connected = True
             
-            # S'abonner au topic
             topic = "SOUFFLAGE/ESP32/RTP"
             result = client.subscribe(topic)
-            self.logger.info(f"Abonnement au topic: {topic}")
-            self.logger.info(f"Résultat subscribe: {result}")
             
-            # CORRECTION CRITIQUE: Forcer le callback on_message
+            # Configuration du callback
             client.on_message = self.on_message
-            self.logger.info("Callback on_message forcé après connexion")
             
-            # Appeler la méthode parent
             try:
                 self.on_mqtt_connected()
             except Exception as e:
@@ -127,19 +108,13 @@ class TestPersistCollector(BaseCollector):
             self.connected = False
     
     def on_message(self, client, userdata, msg):
-        """Traitement des messages MQTT - VERSION CORRIGÉE"""
-        self.logger.info("=== MESSAGE MQTT REÇU ===")
-        self.logger.info(f"Topic: {msg.topic}")
-        self.logger.info(f"Payload: {msg.payload}")
-        
+        """Traitement des messages MQTT"""
         try:
             # Décoder le message CSV
             csv_line = msg.payload.decode('utf-8').strip()
-            self.logger.info(f"Ligne CSV décodée: '{csv_line}'")
             
             # Parser la ligne CSV: date,heure,équipe,codebarre,résultat
             csv_fields = csv_line.split(',')
-            self.logger.info(f"Champs CSV: {csv_fields} (nombre: {len(csv_fields)})")
             
             if len(csv_fields) != 5:
                 self.logger.error(f"Format CSV invalide - {len(csv_fields)} champs au lieu de 5")
@@ -154,36 +129,29 @@ class TestPersistCollector(BaseCollector):
             
             # Extraire le numéro de machine
             machine_id = codebarre[self.machine_pos_start:self.machine_pos_start + self.machine_pos_length]
-            self.logger.info(f"Machine extraite: '{machine_id}'")
             
             # Vérifier que la machine est connue
             if machine_id not in self.file_mapping:
-                self.logger.error(f"Machine inconnue: '{machine_id}'")
-                self.logger.info(f"Machines connues: {list(self.file_mapping.keys())}")
+                self.logger.warning(f"Machine non configurée: {machine_id}")
                 return
             
             # Déterminer le fichier de destination
             filename = self.file_mapping[machine_id]
             filepath = self.base_path / filename
-            self.logger.info(f"Fichier de destination: {filepath}")
             
             # Persister les données CSV
             if self.persist_csv_data(filepath, csv_line):
-                self.logger.info("Persistance réussie !")
-                
-                # MODIFICATION PRINCIPALE: Publication sur topic unique
+                # Publication de la confirmation après persistance réussie
                 confirm_topic = "SOUFFLAGE/ESP32/RTP/CONFIRMED"
                 if self.mqtt_publish(confirm_topic, csv_line):
-                    self.logger.info(f"Confirmation publiée: {codebarre} -> {filename} sur topic unique: {confirm_topic}")
+                    self.logger.info(f"Résultat persisté et confirmé: {machine_id} -> {filename}")
                 else:
-                    self.logger.error(f"Échec publication confirmation sur: {confirm_topic}")
+                    self.logger.error(f"Échec publication confirmation")
             else:
-                self.logger.error(f"Échec persistance pour: {codebarre}")
+                self.logger.error(f"Échec persistance pour machine {machine_id}")
                 
         except Exception as e:
             self.logger.error(f"Erreur traitement message: {e}", exc_info=True)
-        
-        self.logger.info("=== FIN TRAITEMENT MESSAGE ===")
     
     def persist_csv_data(self, filepath, csv_line):
         """Persiste la ligne CSV dans le fichier"""
@@ -198,14 +166,12 @@ class TestPersistCollector(BaseCollector):
                 # S'assurer que le fichier existe
                 if not filepath.exists():
                     filepath.touch()
-                    self.logger.info(f"Fichier CSV créé: {filepath}")
                 
-                # Ouvrir le fichier en mode append
+                # Écriture en mode append
                 with open(filepath, 'a', encoding='utf-8', newline='') as f:
                     f.write(csv_line + '\n')
                     f.flush()
                     
-                self.logger.info(f"Ligne écrite dans {filepath}: {csv_line}")
                 return True
                 
         except Exception as e:

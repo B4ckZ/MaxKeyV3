@@ -1,8 +1,11 @@
 {
-  "description": "Patterns MQTT à surveiller (whitelist)",
+  "description": "Topics MQTT spécifiques à surveiller pour RTP et confirmations",
   "monitoredPatterns": [
-    "SOUFFLAGE/509/ESP32/#",
-    "SOUFFLAGE/511/ESP32/#", 
-    "SOUFFLAGE/999/ESP32/#"
-  ]
+    "SOUFFLAGE/ESP32/RTP",
+    "SOUFFLAGE/ESP32/RTP/CONFIRMED"
+  ],
+  "topicRoles": {
+    "SOUFFLAGE/ESP32/RTP": "received",
+    "SOUFFLAGE/ESP32/RTP/CONFIRMED": "sent"
+  }
 }

@@ -3,7 +3,7 @@
     "id": "testpersist",
     "name": "Test Results Persistence CSV",
     "version": "2.1.0",
-    "description": "Persiste les résultats de tests de pression dans des fichiers CSV et publie une confirmation unique",
+    "description": "Persiste les résultats de tests dans des fichiers CSV et publie une confirmation",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
   },
@@ -19,7 +19,7 @@
       "subscribe": [
         {
           "topic": "SOUFFLAGE/ESP32/RTP",
-          "description": "Résultats de tests des ESP32 (topic unique)",
+          "description": "Résultats de tests des ESP32",
           "format": "csv",
           "example": "08/07/2025,14H46,B,24042551110457205101005321,1"
         }
@@ -27,10 +27,9 @@
       "publish": [
         {
           "topic": "SOUFFLAGE/ESP32/RTP/CONFIRMED",
-          "description": "Confirmation après persistance réussie (topic unique pour toutes les machines)",
+          "description": "Confirmation après persistance réussie",
           "format": "csv",
-          "example": "08/07/2025,14H46,B,24042551110457205101005321,1",
-          "note": "Publie la même ligne CSV que reçue après écriture réussie dans les fichiers"
+          "example": "08/07/2025,14H46,B,24042551110457205101005321,1"
         }
       ]
     }
@@ -60,11 +59,6 @@
       "length": 3,
       "note": "Positions 7,8,9 depuis la gauche (indices 6,7,8 en programmation)"
     }
-  },
-  "security": {
-    "confirmation_policy": "write_then_publish",
-    "description": "Les données ne sont publiées sur le topic de confirmation qu'après écriture réussie dans les fichiers CSV",
-    "guarantee": "Si affiché dans le widget mqttlogs509511 = sauvegardé dans les fichiers"
   },
   "dependencies": {
     "python_packages": [

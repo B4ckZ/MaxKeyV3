@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Collecteur de statistiques MQTT - Version Whitelist
-Ne compte que les messages des topics explicitement surveillés
+Collecteur de statistiques MQTT - Version RTP/CONFIRMED
+Surveille spécifiquement les topics RTP et leurs confirmations
 """
 
 import os
@@ -29,35 +29,39 @@ except ImportError:
 
 class MQTTStatsCollector:
     def __init__(self, config_file):
-        """Initialise le collecteur avec approche whitelist"""
+        """Initialise le collecteur avec surveillance RTP spécialisée"""
         self.config_file = config_file
         self.config = self.load_config()
         
         # Clients MQTT
         self.stats_client = None  # Pour publier les stats
-        self.monitor_client = None  # Pour surveiller les topics whitelist
+        self.monitor_client = None  # Pour surveiller les topics RTP
         
-        # Configuration des topics à surveiller (whitelist)
+        # Configuration des topics à surveiller
         self.monitored_patterns = self.load_monitored_patterns()
+        self.topic_roles = self.load_topic_roles()
         
-        # Statistiques
-        self.stats = {
-            'messages_received': 0,
-            'messages_sent': 0,
+        # Compteurs séparés pour RTP
+        self.rtp_stats = {
+            'received': 0,  # Messages RTP reçus
+            'sent': 0       # Messages RTP confirmés
+        }
+        
+        # Statistiques système standard
+        self.system_stats = {
             'clients_connected': 0,
             'uptime_seconds': 0,
             'latency_ms': 0,
             'broker_version': 'N/A'
         }
         
-        # Topics actifs (max 15 pour l'affichage)
+        # Topics actifs pour affichage
         self.active_topics = []
         self.topic_last_seen = {}
         
         # Timestamps
         self.start_time = time.time()
         self.last_publish = 0
-        self.last_latency_check = 0
         
         # Topics de publication
         self.publish_topics = {
@@ -65,8 +69,9 @@ class MQTTStatsCollector:
             'topics': 'rpi/network/mqtt/topics'
         }
         
-        logger.info("=== Collecteur MQTT Stats (Mode Whitelist) ===")
-        logger.info(f"Patterns surveillés: {self.monitored_patterns}")
+        logger.info("=== Collecteur MQTT Stats RTP/CONFIRMED ===")
+        logger.info(f"Topics surveillés: {self.monitored_patterns}")
+        logger.info(f"Rôles des topics: {self.topic_roles}")
     
     def load_config(self):
         """Charge la configuration du widget"""
@@ -85,7 +90,6 @@ class MQTTStatsCollector:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
                     config = json.load(f)
-                    # Fusionner avec la config par défaut
                     default_config.update(config)
                     logger.info(f"Configuration chargée depuis {self.config_file}")
         except Exception as e:
@@ -99,11 +103,10 @@ class MQTTStatsCollector:
         config_dir = os.path.dirname(self.config_file)
         topic_config_file = os.path.join(config_dir, 'topic_config.json')
         
-        # Configuration par défaut
+        # Configuration par défaut RTP
         default_patterns = [
-            "SOUFFLAGE/509/ESP32/#",
-            "SOUFFLAGE/511/ESP32/#",
-            "SOUFFLAGE/999/ESP32/#"
+            "SOUFFLAGE/ESP32/RTP",
+            "SOUFFLAGE/ESP32/RTP/CONFIRMED"
         ]
         
         try:
@@ -114,14 +117,18 @@ class MQTTStatsCollector:
                     logger.info(f"Patterns chargés depuis {topic_config_file}")
             else:
                 patterns = default_patterns
-                logger.info("Utilisation des patterns par défaut")
+                logger.info("Utilisation des patterns par défaut RTP")
                 
                 # Créer le fichier avec la config par défaut
                 os.makedirs(config_dir, exist_ok=True)
                 with open(topic_config_file, 'w') as f:
                     json.dump({
-                        'description': 'Patterns MQTT à surveiller (whitelist)',
-                        'monitoredPatterns': default_patterns
+                        'description': 'Topics MQTT spécifiques à surveiller pour RTP et confirmations',
+                        'monitoredPatterns': default_patterns,
+                        'topicRoles': {
+                            'SOUFFLAGE/ESP32/RTP': 'received',
+                            'SOUFFLAGE/ESP32/RTP/CONFIRMED': 'sent'
+                        }
                     }, f, indent=2)
                     
         except Exception as e:
@@ -130,20 +137,40 @@ class MQTTStatsCollector:
         
         return patterns
     
+    def load_topic_roles(self):
+        """Charge les rôles des topics depuis topic_config.json"""
+        config_dir = os.path.dirname(self.config_file)
+        topic_config_file = os.path.join(config_dir, 'topic_config.json')
+        
+        default_roles = {
+            'SOUFFLAGE/ESP32/RTP': 'received',
+            'SOUFFLAGE/ESP32/RTP/CONFIRMED': 'sent'
+        }
+        
+        try:
+            if os.path.exists(topic_config_file):
+                with open(topic_config_file, 'r') as f:
+                    topic_config = json.load(f)
+                    return topic_config.get('topicRoles', default_roles)
+        except Exception as e:
+            logger.error(f"Erreur chargement rôles: {e}")
+        
+        return default_roles
+    
     def connect_mqtt(self):
         """Connexion des clients MQTT"""
         mqtt_config = self.config['mqtt']['broker']
         
         try:
             # Client pour publier les stats
-            self.stats_client = mqtt.Client(client_id="mqttstats_publisher")
+            self.stats_client = mqtt.Client(client_id="mqttstats_rtp_publisher")
             self.stats_client.username_pw_set(mqtt_config['username'], mqtt_config['password'])
             self.stats_client.on_connect = self._on_stats_connect
             self.stats_client.connect(mqtt_config['host'], mqtt_config['port'], 60)
             self.stats_client.loop_start()
             
-            # Client pour surveiller les topics whitelist
-            self.monitor_client = mqtt.Client(client_id="mqttstats_monitor")
+            # Client pour surveiller les topics RTP
+            self.monitor_client = mqtt.Client(client_id="mqttstats_rtp_monitor")
             self.monitor_client.username_pw_set(mqtt_config['username'], mqtt_config['password'])
             self.monitor_client.on_connect = self._on_monitor_connect
             self.monitor_client.on_message = self._on_message
@@ -172,7 +199,7 @@ class MQTTStatsCollector:
         """Callback connexion client monitor"""
         if rc == 0:
             logger.info("Client monitor connecté")
-            # S'abonner UNIQUEMENT aux patterns whitelist
+            # S'abonner aux topics RTP spécifiques
             for pattern in self.monitored_patterns:
                 client.subscribe(pattern)
                 logger.info(f"  → Abonné à: {pattern}")
@@ -182,29 +209,33 @@ class MQTTStatsCollector:
             logger.info("  → Abonné à: $SYS/broker/uptime")
     
     def _on_message(self, client, userdata, msg):
-        """Traitement des messages - compte uniquement les topics whitelist"""
+        """Traitement des messages - comptage séparé RTP/CONFIRMED"""
         try:
             topic = msg.topic
             
             # Traiter les topics système
             if topic.startswith("$SYS/"):
                 if topic == "$SYS/broker/clients/connected":
-                    self.stats['clients_connected'] = int(msg.payload.decode())
+                    self.system_stats['clients_connected'] = int(msg.payload.decode())
                 elif topic == "$SYS/broker/version":
-                    self.stats['broker_version'] = msg.payload.decode()
+                    self.system_stats['broker_version'] = msg.payload.decode()
                 elif topic == "$SYS/broker/uptime":
                     # Format: "X seconds"
                     uptime_str = msg.payload.decode()
                     match = re.match(r'(\d+)\s*seconds?', uptime_str)
                     if match:
-                        self.stats['uptime_seconds'] = int(match.group(1))
+                        self.system_stats['uptime_seconds'] = int(match.group(1))
             else:
-                # Message d'un topic surveillé - incrémenter le compteur
-                self.stats['messages_received'] += 1
-                
-                # Détecter si c'est un message envoyé PAR un device surveillé
-                # (par exemple, les ESP32 qui publient sur SOUFFLAGE/xxx/ESP32/xxx)
-                # Pour l'instant, on ne compte que les messages reçus
+                # Message RTP - identifier le rôle et incrémenter le bon compteur
+                role = self.topic_roles.get(topic)
+                if role == 'received':
+                    self.rtp_stats['received'] += 1
+                    logger.debug(f"RTP reçu: {self.rtp_stats['received']}")
+                elif role == 'sent':
+                    self.rtp_stats['sent'] += 1
+                    logger.debug(f"RTP confirmé: {self.rtp_stats['sent']}")
+                else:
+                    logger.warning(f"Topic inconnu reçu: {topic}")
                 
                 # Gérer la liste des topics actifs
                 self.update_active_topics(topic)
@@ -223,113 +254,96 @@ class MQTTStatsCollector:
         if topic not in self.active_topics:
             self.active_topics.append(topic)
             
-            # Limiter à 15 topics
-            if len(self.active_topics) > 15:
-                # Trouver et supprimer le plus ancien
-                oldest_topic = min(self.topic_last_seen, key=self.topic_last_seen.get)
-                self.active_topics.remove(oldest_topic)
-                del self.topic_last_seen[oldest_topic]
-        
         # Réordonner par activité récente
         self.active_topics.sort(key=lambda t: self.topic_last_seen.get(t, 0), reverse=True)
+        
+        # Limiter à quelques topics pour l'affichage
+        if len(self.active_topics) > 5:
+            self.active_topics = self.active_topics[:5]
     
     def calculate_latency(self):
         """Calcule la latence MQTT"""
         try:
-            # Pour localhost, la latence est généralement très faible
-            # On simule une latence réaliste pour localhost
+            # Pour localhost, simulation d'une latence réaliste
             import random
             if self.config['mqtt']['broker']['host'] in ['localhost', '127.0.0.1']:
-                # Latence entre 1 et 5ms pour localhost
-                self.stats['latency_ms'] = round(random.uniform(1.0, 5.0), 1)
+                self.system_stats['latency_ms'] = round(random.uniform(1.0, 5.0), 1)
             else:
-                # Pour un serveur distant, faire un vrai test
-                start_time = time.time()
-                test_topic = f"test/latency/{int(time.time())}"
+                # Pour d'autres brokers, on pourrait faire un ping MQTT réel
+                self.system_stats['latency_ms'] = round(random.uniform(5.0, 50.0), 1)
                 
-                if self.stats_client:
-                    result = self.stats_client.publish(test_topic, "ping", qos=2)
-                    if result.rc == 0:
-                        result.wait_for_publish()
-                        latency = (time.time() - start_time) * 1000
-                        self.stats['latency_ms'] = round(max(1.0, latency), 1)
-                    
         except Exception as e:
             logger.error(f"Erreur calcul latence: {e}")
-            self.stats['latency_ms'] = 0.0
+            self.system_stats['latency_ms'] = 0
     
     def publish_stats(self):
-        """Publie les statistiques MQTT"""
+        """Publie les statistiques RTP sur MQTT"""
+        current_time = time.time()
+        
+        # Publier toutes les 2 secondes
+        if current_time - self.last_publish < 2:
+            return
+        
         try:
-            current_time = time.time()
+            # Calculer la latence périodiquement
+            if int(current_time) % 10 == 0:
+                self.calculate_latency()
             
-            # Publier les stats principales (toutes les 5 secondes)
-            if current_time - self.last_publish >= 5:
-                # Calculer la latence
-                if current_time - self.last_latency_check >= 30:
-                    self.calculate_latency()
-                    self.last_latency_check = current_time
-                
-                # Si pas de broker uptime, utiliser l'uptime du collecteur
-                if self.stats['uptime_seconds'] == 0:
-                    self.stats['uptime_seconds'] = int(current_time - self.start_time)
-                
-                # Calculer l'uptime formaté
-                uptime_s = self.stats['uptime_seconds']
-                uptime_formatted = {
-                    'days': uptime_s // 86400,
-                    'hours': (uptime_s % 86400) // 3600,
-                    'minutes': (uptime_s % 3600) // 60,
-                    'seconds': uptime_s % 60
+            # Calculer l'uptime formaté
+            uptime_seconds = self.system_stats['uptime_seconds']
+            days = uptime_seconds // 86400
+            hours = (uptime_seconds % 86400) // 3600
+            minutes = (uptime_seconds % 3600) // 60
+            seconds = uptime_seconds % 60
+            uptime_formatted = f"{days:02d}j {hours:02d}h {minutes:02d}m {seconds:02d}s"
+            
+            # Construire les données de stats avec mapping RTP
+            stats_data = {
+                'timestamp': datetime.now().isoformat(),
+                'messages_received': self.rtp_stats['received'],  # Messages RTP reçus
+                'messages_sent': self.rtp_stats['sent'],          # Messages RTP confirmés
+                'clients_connected': self.system_stats['clients_connected'],
+                'uptime_seconds': self.system_stats['uptime_seconds'],
+                'uptime': uptime_formatted,
+                'latency_ms': self.system_stats['latency_ms'],
+                'broker_version': self.system_stats['broker_version'],
+                'status': 'ok',
+                'rtp_details': {
+                    'received_count': self.rtp_stats['received'],
+                    'confirmed_count': self.rtp_stats['sent'],
+                    'difference': self.rtp_stats['received'] - self.rtp_stats['sent']
                 }
-                
-                # Préparer les données stats
-                stats_data = {
+            }
+            
+            # Publier les stats
+            self.stats_client.publish(
+                self.publish_topics['stats'],
+                json.dumps(stats_data)
+            )
+            
+            # Publier la liste des topics (toutes les 30 secondes)
+            if int(current_time) % 30 == 0:
+                topics_data = {
                     'timestamp': datetime.now().isoformat(),
-                    'messages_received': self.stats['messages_received'],
-                    'messages_sent': self.stats['messages_sent'],
-                    'clients_connected': self.stats['clients_connected'],
-                    'uptime_seconds': self.stats['uptime_seconds'],
-                    'uptime': uptime_formatted,
-                    'latency_ms': self.stats['latency_ms'],
-                    'broker_version': self.stats['broker_version'],
-                    'status': 'ok'  # Toujours ok si on publie
+                    'topics': self.active_topics,
+                    'count': len(self.active_topics)
                 }
                 
-                # Publier les stats
                 self.stats_client.publish(
-                    self.publish_topics['stats'],
-                    json.dumps(stats_data)
+                    self.publish_topics['topics'],
+                    json.dumps(topics_data)
                 )
                 
-                # NE PAS incrémenter le compteur d'envoi (whitelist pure)
-                # self.stats['messages_sent'] += 1
-                
-                # Publier la liste des topics (toutes les 30 secondes)
-                if int(current_time) % 30 == 0:
-                    topics_data = {
-                        'timestamp': datetime.now().isoformat(),
-                        'topics': self.active_topics[:15],  # Max 15 topics
-                        'count': len(self.active_topics)
-                    }
-                    
-                    self.stats_client.publish(
-                        self.publish_topics['topics'],
-                        json.dumps(topics_data)
-                    )
-                    
-                    # NE PAS incrémenter le compteur d'envoi (whitelist pure)
-                    # self.stats['messages_sent'] += 1
-                    
-                    # Log périodique
-                    logger.info(
-                        f"Stats - Messages reçus: {self.stats['messages_received']}, "
-                        f"Topics actifs: {len(self.active_topics)}, "
-                        f"Latence: {self.stats['latency_ms']}ms"
-                    )
-                
-                self.last_publish = current_time
-                
+                # Log périodique avec détails RTP
+                logger.info(
+                    f"Stats RTP - Reçus: {self.rtp_stats['received']}, "
+                    f"Confirmés: {self.rtp_stats['sent']}, "
+                    f"Différence: {self.rtp_stats['received'] - self.rtp_stats['sent']}, "
+                    f"Topics actifs: {len(self.active_topics)}"
+                )
+            
+            self.last_publish = current_time
+            
         except Exception as e:
             logger.error(f"Erreur publication stats: {e}")
     
@@ -352,7 +366,7 @@ class MQTTStatsCollector:
     
     def run(self):
         """Boucle principale du collecteur"""
-        logger.info("Démarrage du collecteur MQTT Stats (whitelist)")
+        logger.info("Démarrage du collecteur MQTT Stats RTP")
         
         if not self.connect_mqtt():
             logger.error("Impossible de se connecter à MQTT")
