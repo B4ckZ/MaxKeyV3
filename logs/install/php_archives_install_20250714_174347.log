@@ -1,0 +1,54 @@
+
+================================================================================
+DÉMARRAGE: php_archives_install
+Description: Installation Système PHP Archives
+Date: Mon 14 Jul 17:43:47 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-07-14 17:43:47] [INFO] [php_archives_install] Script php_archives_install initialisé
+[2025-07-14 17:43:47] [INFO] [php_archives_install] ========== DÉBUT DE L'INSTALLATION PHP Archives System ==========
+[2025-07-14 17:43:47] [INFO] [php_archives_install] Progression: 5% - Initialisation...
+[2025-07-14 17:43:48] [SUCCESS] [php_archives_install] Privilèges root confirmés
+[2025-07-14 17:43:48] [INFO] [php_archives_install] Progression: 10% - Vérification des prérequis...
+[2025-07-14 17:43:48] [INFO] [php_archives_install] Vérification des prérequis pour PHP Archives System
+[2025-07-14 17:43:48] [SUCCESS] [php_archives_install] Prérequis validés
+[2025-07-14 17:43:48] [INFO] [php_archives_install] Progression: 25% - Prérequis validés
+[2025-07-14 17:43:50] [INFO] [php_archives_install] Progression: 40% - Installation de PHP...
+[2025-07-14 17:43:50] [INFO] [php_archives_install] Installation de PHP depuis le cache local avec nouvelle méthode
+[2025-07-14 17:43:50] [INFO] [php_archives_install] Vérification complète du cache pour la catégorie: php
+[2025-07-14 17:43:50] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php
+[2025-07-14 17:43:51] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-cli
+[2025-07-14 17:43:51] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-zip
+[2025-07-14 17:43:51] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-fpm
+[2025-07-14 17:43:51] [SUCCESS] [php_archives_install] Cache complet pour php
+[2025-07-14 17:43:51] [INFO] [php_archives_install] Installation PHP complète nécessaire
+[2025-07-14 17:43:51] [INFO] [php_archives_install] Lancement de l'installation simultanée PHP
+[2025-07-14 17:43:51] [INFO] [php_archives_install] Installation simultanée des paquets de la catégorie: php
+[2025-07-14 17:43:51] [INFO] [php_archives_install] Fichiers .deb collectés pour installation:  /var/cache/maxlink/packages/php8.2-common_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2_8.2.28-1~deb12u1_all.deb
+/var/cache/maxlink/packages/php8.2-zip_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php-common_2%3a93_all.deb
+/var/cache/maxlink/packages/php8.2-opcache_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php-zip_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php8.2-cgi_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php8.2-readline_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-fpm_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-cli_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php-fpm_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php-cli_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-cli_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-zip_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-fpm_2%3a8.2+93_all.deb
+[2025-07-14 17:43:51] [INFO] [php_archives_install] Lancement installation dpkg simultanée
+[2025-07-14 17:44:02] [SUCCESS] [php_archives_install] Installation simultanée réussie pour php
+[2025-07-14 17:44:02] [SUCCESS] [php_archives_install] PHP installé avec succès depuis le cache via installation simultanée
+[2025-07-14 17:44:02] [SUCCESS] [php_archives_install] Vérification post-installation PHP réussie
+[2025-07-14 17:44:03] [ERROR] [php_archives_install] Extension PHP zip manquante après installation
+[2025-07-14 17:44:03] [INFO] [php_archives_install] Script php_archives_install terminé avec le code 1
+
+================================================================================
+FIN: php_archives_install
+Code de sortie: 1
+Durée: 16 secondes
+================================================================================
+
