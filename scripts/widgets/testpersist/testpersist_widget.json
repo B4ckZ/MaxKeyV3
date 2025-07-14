@@ -2,7 +2,7 @@
   "widget": {
     "id": "testpersist",
     "name": "Test Results Persistence CSV",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "Persiste les résultats de tests dans des fichiers CSV avec traçabilité hebdomadaire",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
@@ -68,40 +68,33 @@
       "note": "Traçabilité hebdomadaire automatique avec archivage"
     }
   },
-  "api": {
+  "download": {
     "enabled": true,
-    "port": 5001,
+    "backend": "php",
     "endpoints": {
-      "/api/archives": {
+      "/archives-list.php": {
         "method": "GET",
         "description": "Liste toutes les semaines archivées par année",
         "response_format": "json"
       },
-      "/api/download/{year}/{week}": {
+      "/download-archive.php": {
         "method": "GET", 
         "description": "Télécharge tous les fichiers CSV d'une semaine en ZIP",
+        "parameters": "year, week",
         "response_format": "application/zip"
-      },
-      "/api/current": {
-        "method": "GET",
-        "description": "Informations sur la semaine courante",
-        "response_format": "json"
-      },
-      "/api/status": {
-        "method": "GET",
-        "description": "Status de l'API et informations système",
-        "response_format": "json"
       }
     }
   },
   "dependencies": {
     "python_packages": [
-      "paho-mqtt",
-      "flask",
-      "flask-cors"
+      "paho-mqtt"
     ],
-    "system_packages": [],
-    "services": ["mosquitto"],
-    "python_version": ">=3.7"
+    "system_packages": [
+      "php-zip",
+      "php-cli"
+    ],
+    "services": ["mosquitto", "nginx"],
+    "python_version": ">=3.7",
+    "php_version": ">=7.4"
   }
 }
