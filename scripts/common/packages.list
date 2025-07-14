@@ -21,5 +21,8 @@ python:python3-psutil python3-paho-mqtt python3-pip python3-setuptools
 # Outils système et RTC
 system:i2c-tools
 
+# Système PHP pour archives (php_archives_install.sh)
+php:php php-cli php-zip php-fpm
+
 # Outils optionnels mais utiles
 tools:htop iotop net-tools dnsutils python3-pil

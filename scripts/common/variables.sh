@@ -122,7 +122,7 @@ SERVICES_LIST=(
     "nginx:NginX Web:inactive"
     "mqtt:MQTT BKR:inactive"
     "mqtt_wgs:MQTT WGS:inactive"
-	"php_archives:PHP Archives:inactive"
+    "php_archives:PHP Archives:inactive"
     "orchestrator:Orchestrateur:inactive"
 )
 

@@ -1,43 +1,48 @@
 #!/bin/bash
-#
-# Installation du système PHP pour téléchargement des archives
-# Service modulaire pour architecture MaxLink
-# Version 3.1 - Solution PHP Pure
-#
 
-set -e
+# ===============================================================================
+# MAXLINK - INSTALLATION SYSTÈME PHP ARCHIVES (VERSION CORRIGÉE)
+# Installation avec mise à jour du statut
+# ===============================================================================
+
+# Définir le répertoire de base
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+# Source des modules
+source "$SCRIPT_DIR/../common/variables.sh"
+source "$SCRIPT_DIR/../common/logging.sh"
+source "$SCRIPT_DIR/../common/packages.sh"
 
 # ===============================================================================
 # INITIALISATION
 # ===============================================================================
 
-# Déterminer le chemin de base du script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+# Initialiser le logging
+init_logging "Installation Système PHP Archives" "install"
 
-# Charger les fonctions communes
-source "$SCRIPT_DIR/../common/functions.sh"
-source "$SCRIPT_DIR/../common/variables.sh"
-
-# ===============================================================================
-# VARIABLES SPÉCIFIQUES AU SERVICE
-# ===============================================================================
-
+# Variables spécifiques au service
 SERVICE_ID="php_archives"
 SERVICE_NAME="PHP Archives System"
 SERVICE_DESCRIPTION="Système PHP pour téléchargement des archives de traçabilité"
 
 # ===============================================================================
-# FONCTIONS INTERNES
+# FONCTIONS
 # ===============================================================================
 
-function send_progress() {
-    local progress="$1"
-    local message="$2"
-    echo "PROGRESS:$progress:$message"
+# Envoyer la progression
+send_progress() {
+    echo "PROGRESS:$1:$2"
+    log_info "Progression: $1% - $2" false
 }
 
-function check_prerequisites() {
+# Attente simple
+wait_silently() {
+    sleep "$1"
+}
+
+# Vérifier les prérequis
+check_prerequisites() {
     log_info "Vérification des prérequis pour $SERVICE_NAME"
     
     # Vérifier que nginx est installé et actif
@@ -66,43 +71,38 @@ function check_prerequisites() {
     return 0
 }
 
-function install_php_packages() {
-    log_info "Installation des paquets PHP"
+# Installer PHP depuis le cache
+install_php_from_cache() {
+    echo "◦ Installation de PHP depuis le cache..."
+    log_info "Installation de PHP depuis le cache local"
     
-    # Vérifier si PHP est déjà installé
-    if command -v php >/dev/null 2>&1; then
-        PHP_VERSION=$(php -v | head -n1 | cut -d' ' -f2)
-        echo "   ✅ PHP déjà installé (version $PHP_VERSION)"
-        log_info "PHP déjà installé version $PHP_VERSION"
-    else
-        echo "   📦 Installation de PHP et modules..."
-        
-        # Installation via le système de paquets hybride
-        if hybrid_package_install "PHP" "php php-cli php-zip php-fpm"; then
-            PHP_VERSION=$(php -v | head -n1 | cut -d' ' -f2)
-            echo "   ✅ PHP installé avec succès (version $PHP_VERSION)"
-            log_success "PHP installé version $PHP_VERSION"
-        else
-            log_error "Échec de l'installation de PHP"
-            echo "   ❌ Échec de l'installation de PHP"
-            return 1
-        fi
-    fi
-    
-    # Vérifier l'extension ZIP
-    if php -m | grep -q zip; then
-        echo "   ✅ Extension PHP zip disponible"
-        log_success "Extension PHP zip vérifiée"
-    else
-        log_error "Extension PHP zip manquante"
-        echo "   ❌ Extension PHP zip manquante"
+    # Vérifier que le cache existe
+    if [ ! -d "$PACKAGE_CACHE_DIR" ]; then
+        echo "  ↦ Cache de paquets non trouvé ✗"
+        echo ""
+        echo "ERREUR: Le cache de paquets n'existe pas"
+        echo "Exécutez d'abord update_install.sh"
+        log_error "Cache de paquets manquant: $PACKAGE_CACHE_DIR"
         return 1
     fi
     
-    return 0
+    # Installer les paquets depuis le cache
+    if install_packages_by_category "php"; then
+        echo "  ↦ PHP installé depuis le cache ✓"
+        log_success "PHP installé avec succès depuis le cache"
+        return 0
+    else
+        echo "  ↦ Échec de l'installation de PHP ✗"
+        echo ""
+        echo "ERREUR: Impossible d'installer PHP depuis le cache"
+        echo "Vérifiez que le cache contient tous les paquets nécessaires"
+        log_error "Échec de l'installation de PHP depuis le cache"
+        return 1
+    fi
 }
 
-function install_php_files() {
+# Installer les fichiers PHP
+install_php_files() {
     log_info "Installation des fichiers PHP"
     
     # Vérifier que le dossier web_files existe
@@ -142,7 +142,8 @@ function install_php_files() {
     return 0
 }
 
-function configure_permissions() {
+# Configurer les permissions
+configure_permissions() {
     log_info "Configuration des permissions"
     
     # Ajouter www-data au groupe prod pour accès aux fichiers de traçabilité
@@ -169,7 +170,8 @@ function configure_permissions() {
     return 0
 }
 
-function test_php_system() {
+# Tests de validation
+test_php_system() {
     log_info "Tests de validation du système PHP"
     
     # Recharger nginx
@@ -211,10 +213,13 @@ function test_php_system() {
 
 log_info "========== DÉBUT DE L'INSTALLATION $SERVICE_NAME =========="
 
+echo ""
 echo "========================================================================"
 echo "INSTALLATION $SERVICE_NAME"
 echo "========================================================================"
 echo ""
+
+send_progress 5 "Initialisation..."
 
 # Vérifier les privilèges root
 if [ "$EUID" -ne 0 ]; then
@@ -245,35 +250,59 @@ fi
 
 echo "   ✅ Tous les prérequis sont satisfaits"
 
+send_progress 25 "Prérequis validés"
+echo ""
+sleep 2
+
 # ===============================================================================
 # ÉTAPE 2 : INSTALLATION PHP
 # ===============================================================================
 
-echo ""
 echo "========================================================================"
 echo "ÉTAPE 2 : INSTALLATION PHP"
 echo "========================================================================"
 echo ""
 
-send_progress 30 "Installation de PHP..."
+send_progress 40 "Installation de PHP..."
 
-if ! install_php_packages; then
-    log_error "Échec de l'installation PHP"
+# Vérifier si PHP est déjà installé
+if command -v php >/dev/null 2>&1; then
+    PHP_VERSION=$(php -v | head -n1 | cut -d' ' -f2)
+    echo "   ✅ PHP déjà installé (version $PHP_VERSION)"
+    log_info "PHP déjà installé version $PHP_VERSION"
+else
+    if ! install_php_from_cache; then
+        log_error "Échec de l'installation PHP"
+        update_service_status "$SERVICE_ID" "inactive"
+        exit 1
+    fi
+fi
+
+# Vérifier l'extension ZIP
+if php -m | grep -q zip; then
+    echo "   ✅ Extension PHP zip disponible"
+    log_success "Extension PHP zip vérifiée"
+else
+    log_error "Extension PHP zip manquante"
+    echo "   ❌ Extension PHP zip manquante"
     update_service_status "$SERVICE_ID" "inactive"
     exit 1
 fi
+
+send_progress 55 "PHP installé"
+echo ""
+sleep 2
 
 # ===============================================================================
 # ÉTAPE 3 : INSTALLATION DES FICHIERS PHP
 # ===============================================================================
 
-echo ""
 echo "========================================================================"
 echo "ÉTAPE 3 : INSTALLATION DES FICHIERS PHP"
 echo "========================================================================"
 echo ""
 
-send_progress 60 "Installation des fichiers PHP..."
+send_progress 70 "Installation des fichiers PHP..."
 
 if ! install_php_files; then
     log_error "Échec de l'installation des fichiers PHP"
@@ -281,17 +310,20 @@ if ! install_php_files; then
     exit 1
 fi
 
+send_progress 80 "Fichiers PHP installés"
+echo ""
+sleep 2
+
 # ===============================================================================
 # ÉTAPE 4 : CONFIGURATION DES PERMISSIONS
 # ===============================================================================
 
-echo ""
 echo "========================================================================"
 echo "ÉTAPE 4 : CONFIGURATION DES PERMISSIONS"
 echo "========================================================================"
 echo ""
 
-send_progress 80 "Configuration des permissions..."
+send_progress 85 "Configuration des permissions..."
 
 if ! configure_permissions; then
     log_error "Échec de la configuration des permissions"
@@ -299,17 +331,20 @@ if ! configure_permissions; then
     exit 1
 fi
 
+send_progress 90 "Permissions configurées"
+echo ""
+sleep 2
+
 # ===============================================================================
 # ÉTAPE 5 : TESTS ET VALIDATION
 # ===============================================================================
 
-echo ""
 echo "========================================================================"
 echo "ÉTAPE 5 : TESTS ET VALIDATION"
 echo "========================================================================"
 echo ""
 
-send_progress 90 "Tests de validation..."
+send_progress 95 "Tests de validation..."
 
 if ! test_php_system; then
     log_error "Échec des tests de validation"
@@ -332,7 +367,10 @@ echo "✅ INSTALLATION $SERVICE_NAME TERMINÉE"
 echo "========================================================================"
 echo ""
 echo "Composants installés :"
-echo "• ✅ PHP $(php -v | head -n1 | cut -d' ' -f2) avec extension zip"
+if command -v php >/dev/null 2>&1; then
+    PHP_VERSION=$(php -v | head -n1 | cut -d' ' -f2)
+    echo "• ✅ PHP $PHP_VERSION avec extension zip"
+fi
 echo "• ✅ archives-list.php opérationnel"
 echo "• ✅ download-archive.php opérationnel"
 echo "• ✅ Permissions configurées pour www-data"
