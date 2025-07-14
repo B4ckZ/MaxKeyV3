@@ -2,8 +2,8 @@
   "widget": {
     "id": "testpersist",
     "name": "Test Results Persistence CSV",
-    "version": "2.1.0",
-    "description": "Persiste les résultats de tests dans des fichiers CSV et publie une confirmation",
+    "version": "3.0.0",
+    "description": "Persiste les résultats de tests dans des fichiers CSV avec traçabilité hebdomadaire",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
   },
@@ -38,7 +38,7 @@
     "enabled": true,
     "script": "testpersist_collector.py",
     "service_name": "maxlink-widget-testpersist",
-    "service_description": "MaxLink Test Results Persistence CSV Service",
+    "service_description": "MaxLink Test Results Persistence CSV Service with Weekly Tracking",
     "update_intervals": {
       "default": 0,
       "note": "Event-driven, no polling"
@@ -58,11 +58,47 @@
       "start": 6,
       "length": 3,
       "note": "Positions 7,8,9 depuis la gauche (indices 6,7,8 en programmation)"
+    },
+    "weekly_tracking": {
+      "enabled": true,
+      "archives_folder": "Archives",
+      "filename_format": "S{week:02d}_{year}_{machine}.csv",
+      "auto_archive_previous_weeks": true,
+      "archive_by_year": true,
+      "note": "Traçabilité hebdomadaire automatique avec archivage"
+    }
+  },
+  "api": {
+    "enabled": true,
+    "port": 5001,
+    "endpoints": {
+      "/api/archives": {
+        "method": "GET",
+        "description": "Liste toutes les semaines archivées par année",
+        "response_format": "json"
+      },
+      "/api/download/{year}/{week}": {
+        "method": "GET", 
+        "description": "Télécharge tous les fichiers CSV d'une semaine en ZIP",
+        "response_format": "application/zip"
+      },
+      "/api/current": {
+        "method": "GET",
+        "description": "Informations sur la semaine courante",
+        "response_format": "json"
+      },
+      "/api/status": {
+        "method": "GET",
+        "description": "Status de l'API et informations système",
+        "response_format": "json"
+      }
     }
   },
   "dependencies": {
     "python_packages": [
-      "paho-mqtt"
+      "paho-mqtt",
+      "flask",
+      "flask-cors"
     ],
     "system_packages": [],
     "services": ["mosquitto"],
