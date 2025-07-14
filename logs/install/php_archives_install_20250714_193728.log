@@ -1,0 +1,72 @@
+
+================================================================================
+DÉMARRAGE: php_archives_install
+Description: Installation Système PHP Archives
+Date: Mon 14 Jul 19:37:28 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-07-14 19:37:28] [INFO] [php_archives_install] Script php_archives_install initialisé
+[2025-07-14 19:37:28] [INFO] [php_archives_install] ========== DÉBUT DE L'INSTALLATION PHP Archives System ==========
+[2025-07-14 19:37:28] [INFO] [php_archives_install] Progression: 5% - Initialisation...
+[2025-07-14 19:37:28] [SUCCESS] [php_archives_install] Privilèges root confirmés
+[2025-07-14 19:37:29] [INFO] [php_archives_install] Progression: 10% - Vérification des prérequis...
+[2025-07-14 19:37:29] [INFO] [php_archives_install] Vérification des prérequis pour PHP Archives System
+[2025-07-14 19:37:29] [SUCCESS] [php_archives_install] Prérequis validés
+[2025-07-14 19:37:29] [INFO] [php_archives_install] Progression: 25% - Prérequis validés
+[2025-07-14 19:37:31] [INFO] [php_archives_install] Progression: 40% - Installation de PHP...
+[2025-07-14 19:37:31] [INFO] [php_archives_install] Installation de PHP depuis le cache local
+[2025-07-14 19:37:31] [INFO] [php_archives_install] Vérification complète du cache pour la catégorie: php
+[2025-07-14 19:37:31] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php
+[2025-07-14 19:37:31] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-cli
+[2025-07-14 19:37:32] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-fpm
+[2025-07-14 19:37:32] [SUCCESS] [php_archives_install] Cache complet pour php
+[2025-07-14 19:37:32] [INFO] [php_archives_install] Installation PHP complète nécessaire
+[2025-07-14 19:37:32] [INFO] [php_archives_install] Lancement de l'installation simultanée PHP
+[2025-07-14 19:37:32] [INFO] [php_archives_install] Installation simultanée des paquets de la catégorie: php
+[2025-07-14 19:37:32] [INFO] [php_archives_install] Fichiers .deb collectés pour installation:  /var/cache/maxlink/packages/php8.2-common_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2_8.2.28-1~deb12u1_all.deb
+/var/cache/maxlink/packages/php-common_2%3a93_all.deb
+/var/cache/maxlink/packages/php8.2-opcache_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-cgi_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php8.2-readline_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-fpm_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-cli_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php-fpm_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php-cli_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-cli_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-fpm_2%3a8.2+93_all.deb
+[2025-07-14 19:37:32] [INFO] [php_archives_install] Lancement installation dpkg simultanée
+[2025-07-14 19:37:43] [SUCCESS] [php_archives_install] Installation simultanée réussie pour php
+[2025-07-14 19:37:43] [SUCCESS] [php_archives_install] PHP installé avec succès
+[2025-07-14 19:37:43] [SUCCESS] [php_archives_install] Vérification post-installation PHP réussie
+[2025-07-14 19:37:43] [INFO] [php_archives_install] Progression: 55% - PHP installé
+[2025-07-14 19:37:45] [INFO] [php_archives_install] Progression: 70% - Installation des fichiers...
+[2025-07-14 19:37:45] [INFO] [php_archives_install] Installation des fichiers PHP et JavaScript
+[2025-07-14 19:37:45] [SUCCESS] [php_archives_install] Fichier copié: archives-list.php
+[2025-07-14 19:37:46] [SUCCESS] [php_archives_install] Fichier copié: download-archive.php
+[2025-07-14 19:37:46] [SUCCESS] [php_archives_install] Fichier copié: download-manager.js
+[2025-07-14 19:37:46] [SUCCESS] [php_archives_install] Fichiers PHP et JavaScript installés
+[2025-07-14 19:37:46] [INFO] [php_archives_install] Progression: 80% - Fichiers installés
+[2025-07-14 19:37:48] [INFO] [php_archives_install] Progression: 85% - Configuration des permissions...
+[2025-07-14 19:37:48] [INFO] [php_archives_install] Configuration des permissions pour PHP Archives System
+[2025-07-14 19:37:48] [SUCCESS] [php_archives_install] Permissions configurées
+[2025-07-14 19:37:48] [INFO] [php_archives_install] Progression: 90% - Permissions configurées
+[2025-07-14 19:37:50] [INFO] [php_archives_install] Progression: 95% - Tests du service...
+[2025-07-14 19:37:51] [INFO] [php_archives_install] Test du service PHP
+[2025-07-14 19:37:51] [SUCCESS] [php_archives_install] PHP CLI vérifié: 8.2.28
+[2025-07-14 19:37:51] [INFO] [php_archives_install] PHP-FPM non activé
+[2025-07-14 19:37:51] [SUCCESS] [php_archives_install] archives-list.php opérationnel
+[2025-07-14 19:37:51] [SUCCESS] [php_archives_install] download-archive.php opérationnel
+[2025-07-14 19:37:51] [SUCCESS] [php_archives_install] download-manager.js accessible
+[2025-07-14 19:37:51] [INFO] [php_archives_install] Progression: 100% - Installation terminée
+[2025-07-14 19:37:51] [SUCCESS] [php_archives_install] Installation PHP Archives System terminée avec succès
+[2025-07-14 19:37:52] [INFO] [php_archives_install] Script php_archives terminé avec le code 0
+[2025-07-14 19:37:52] [INFO] [php_archives_install] Script php_archives_install terminé avec le code 0
+
+================================================================================
+FIN: php_archives_install
+Code de sortie: 0
+Durée: 24 secondes
+================================================================================
+
