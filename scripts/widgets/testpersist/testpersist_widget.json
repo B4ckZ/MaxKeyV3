@@ -45,7 +45,7 @@
     }
   },
   "storage": {
-    "base_path": "/home/prod/Documents/traçabilité",
+    "base_path": "/var/www/maxlink-dashboard/archives",
     "file_mapping": {
       "509": "509.csv",
       "511": "511.csv",
@@ -61,11 +61,11 @@
     },
     "weekly_tracking": {
       "enabled": true,
-      "archives_folder": "Archives",
+      "archives_folder": "",
       "filename_format": "S{week:02d}_{year}_{machine}.csv",
       "auto_archive_previous_weeks": true,
       "archive_by_year": true,
-      "note": "Traçabilité hebdomadaire automatique avec archivage"
+      "note": "Traçabilité hebdomadaire automatique avec archivage dans les sous-dossiers par année"
     }
   },
   "download_system": {

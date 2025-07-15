@@ -1,0 +1,94 @@
+prod@raspberrypi:~ $ sudo bash /media/prod/USBTOOL/diagphp.sh
+==========================================================================
+🔍 DIAGNOSTIC DOWNLOADBUTTON WIDGET - DROPDOWNS VIDES
+==========================================================================
+
+
+🔍 1. VÉRIFICATION DES FICHIERS CSV RÉELS
+----------------------------------------
+  • Répertoire principal Archives... ✅ PASS - Répertoire existe
+    ℹ️  Chemin: /home/prod/Documents/traçabilité/Archives
+    ℹ️  Permissions: 755 www-data:www-data
+  • Répertoire 2025... ✅ PASS - Répertoire 2025 existe
+    ℹ️  Chemin: /home/prod/Documents/traçabilité/Archives/2025
+    ℹ️  Permissions: 755 www-data:www-data
+  • Fichiers CSV dans 2025... ✅ PASS - 6 fichiers CSV trouvés
+    📁 Liste des fichiers :
+      • S01_2025_machine1.csv (634 bytes, 644 www-data:www-data)
+      • S03_2025_machine1.csv (634 bytes, 644 www-data:www-data)
+      • S01_2025_machine2.csv (634 bytes, 644 www-data:www-data)
+      • S02_2025_machine1.csv (634 bytes, 644 www-data:www-data)
+      • S02_2025_machine2.csv (634 bytes, 644 www-data:www-data)
+      • S03_2025_machine2.csv (634 bytes, 644 www-data:www-data)
+  • Pattern des noms de fichiers...       ✅ S01_2025_machine1.csv (pattern valide)
+      ✅ S03_2025_machine1.csv (pattern valide)
+      ✅ S01_2025_machine2.csv (pattern valide)
+      ✅ S02_2025_machine1.csv (pattern valide)
+      ✅ S02_2025_machine2.csv (pattern valide)
+      ✅ S03_2025_machine2.csv (pattern valide)
+⚠️  WARN - Certains fichiers ont un pattern invalide
+
+🔍 2. TEST DES PERMISSIONS D'ACCÈS
+----------------------------------------
+  • Permissions lecture pour www-data... ❌ FAIL - www-data ne peut pas lire le répertoire Archives
+❌ FAIL - www-data ne peut pas lire le répertoire 2025
+  • Accès aux fichiers CSV pour www-data...       ❌ S01_2025_machine1.csv - Non lisible par www-data
+      ❌ S03_2025_machine1.csv - Non lisible par www-data
+      ❌ S01_2025_machine2.csv - Non lisible par www-data
+      ❌ S02_2025_machine1.csv - Non lisible par www-data
+      ❌ S02_2025_machine2.csv - Non lisible par www-data
+      ❌ S03_2025_machine2.csv - Non lisible par www-data
+
+🔍 3. TEST DE L'API ARCHIVES-LIST.PHP
+----------------------------------------
+  • Accès HTTP à l'API... ✅ PASS - API accessible (HTTP 200)
+  • Validation JSON de la réponse... ✅ PASS - JSON valide retourné
+    📊 Analyse de la structure JSON :
+    ℹ️  Années trouvées: 0 (format array au lieu d'objet)
+    ℹ️  Données 2025: non trouvé
+    📄 Échantillon de la réponse (premiers 500 caractères) :
+[]
+
+
+🔍 4. COMPARAISON STRUCTURE DONNÉES
+----------------------------------------
+  📋 Structure ATTENDUE par le widget :
+    {
+      "2025": {
+        "week_1": {
+          "start_date": "2025-01-01",
+          "end_date": "2025-01-07", 
+          "file_count": 2,
+          "total_size": 1234
+        },
+        "week_2": { ... }
+      }
+    }
+
+  📋 Structure RETOURNÉE par l'API :
+[]
+    ... (tronqué)
+
+🔍 5. TEST DIRECT PHP (sans HTTP)
+----------------------------------------
+  • Exécution directe du script PHP... ✅ PASS - Script PHP s'exécute sans erreur
+✅ PASS - JSON valide en sortie directe
+    ℹ️  Années trouvées (direct): 0
+
+🔍 6. RECOMMANDATIONS DE CORRECTION
+----------------------------------------
+  🔧 Actions recommandées :
+
+  2. 🔄 PROBLÈME DE STRUCTURE DE DONNÉES :
+     • L'API retourne des données mais dans un format incompatible
+     • Modifier l'API pour retourner la structure attendue
+     • OU modifier le widget pour comprendre la structure actuelle
+
+  🛠️  SCRIPTS UTILES :
+     • Corriger permissions : sudo chmod -R 755 '/home/prod/Documents/traçabilité/Archives' && sudo chown -R www-data:www-data '/home/prod/Documents/traçabilité/Archives'
+     • Tester API : curl -s http://localhost/archives-list.php | python3 -m json.tool
+     • Logs PHP : sudo tail -f /var/log/nginx/error.log
+
+==========================================================================
+🏁 DIAGNOSTIC TERMINÉ
+==========================================================================

@@ -1,5 +1,5 @@
 <?php
-$archivesPath = '/home/prod/Documents/traçabilité/Archives';
+$archivesPath = '/var/www/maxlink-dashboard/archives';
 
 function isValidFilename($filename) {
     return preg_match('/^S\d+_\d{4}_[a-zA-Z0-9_\-]+\.csv$/', $filename);

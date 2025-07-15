@@ -414,7 +414,8 @@ configure_permissions_strict() {
 create_test_archives() {
     log_info "Création des archives de test"
     
-    local archives_dir="/home/prod/Documents/traçabilité/Archives"
+    # 🎯 CORRECTION UNIQUE : Nouveau chemin dans le dossier dashboard
+    local archives_dir="/var/www/maxlink-dashboard/archives"
     
     echo "  ↦ Vérification du répertoire de données..."
     
@@ -557,7 +558,7 @@ test_php_service() {
         return 1
     fi
     
-    echo "  ↦ Test de PHP-FPM..."
+    echo "  ↦ Test de PHP-FMP..."
     if systemctl is-active --quiet php8.2-fpm; then
         echo "    ✓ PHP-FPM actif et fonctionnel"
         log_success "PHP-FPM vérifié actif"

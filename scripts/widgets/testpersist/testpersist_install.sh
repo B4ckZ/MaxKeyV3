@@ -24,19 +24,19 @@ if ! check_mqtt_broker; then
 fi
 echo "  ↦ Broker MQTT actif ✓"
 
-# Créer le répertoire de stockage des données dans le home de prod
-STORAGE_DIR="/home/prod/Documents/traçabilité"
-ARCHIVES_DIR="$STORAGE_DIR/Archives"
+# 🎯 CORRECTION : Nouveau chemin unifié dans archives
+STORAGE_DIR="/var/www/maxlink-dashboard/archives"
+ARCHIVES_DIR="$STORAGE_DIR"
 
 echo ""
 echo "◦ Préparation du répertoire de stockage..."
 
-# Créer le répertoire Documents s'il n'existe pas
-if [ ! -d "/home/prod/Documents" ]; then
-    mkdir -p "/home/prod/Documents"
-    chown prod:prod "/home/prod/Documents"
-    chmod 755 "/home/prod/Documents"
-    log_info "Répertoire Documents créé"
+# Créer le répertoire de base MaxLink Dashboard s'il n'existe pas
+if [ ! -d "/var/www/maxlink-dashboard" ]; then
+    mkdir -p "/var/www/maxlink-dashboard"
+    chown www-data:www-data "/var/www/maxlink-dashboard"
+    chmod 755 "/var/www/maxlink-dashboard"
+    log_info "Répertoire dashboard créé"
 fi
 
 # Créer le répertoire de traçabilité
@@ -52,14 +52,14 @@ if [ ! -d "$ARCHIVES_DIR" ]; then
 fi
 
 # Définir les permissions pour permettre à root (le service) d'écrire
-# et à prod de lire/modifier via SSH
-chown -R prod:prod "$STORAGE_DIR"
+# et à www-data de lire via le dashboard
+chown -R www-data:www-data "$STORAGE_DIR"
 chmod 775 "$STORAGE_DIR"
 chmod 775 "$ARCHIVES_DIR"
 echo "  ↦ Répertoire principal: $STORAGE_DIR ✓"
-echo "  ↦ Répertoire archives: $ARCHIVES_DIR ✓"
-echo "  ↦ Propriétaire: prod:prod"
-echo "  ↦ Permissions: 775 (lecture/écriture pour prod et root)"
+echo "  ↦ Archives par année: $ARCHIVES_DIR/ANNÉE/ ✓"
+echo "  ↦ Propriétaire: www-data:www-data"
+echo "  ↦ Permissions: 775 (lecture/écriture pour www-data et root)"
 
 # Gestion des anciens fichiers CSV (migration douce)
 echo ""
@@ -87,7 +87,7 @@ if [ "$MIGRATION_NEEDED" = true ]; then
     echo ""
     echo "Structure après migration:"
     echo "  • S29_2025_509.csv, S29_2025_511.csv, S29_2025_RPDT.csv (semaine courante)"
-    echo "  • Archives/2025/[anciens fichiers] (archivés automatiquement)"
+    echo "  • 2025/[anciens fichiers] (archivés par année)"
     echo ""
     read -p "Continuer la migration automatique ? (o/N): " -n 1 -r
     echo
@@ -106,7 +106,7 @@ if [ "$MIGRATION_NEEDED" = true ]; then
     # Créer le répertoire d'archive pour l'année courante
     CURRENT_YEAR_ARCHIVE="$ARCHIVES_DIR/$CURRENT_YEAR"
     mkdir -p "$CURRENT_YEAR_ARCHIVE"
-    chown prod:prod "$CURRENT_YEAR_ARCHIVE"
+    chown www-data:www-data "$CURRENT_YEAR_ARCHIVE"
     chmod 775 "$CURRENT_YEAR_ARCHIVE"
     
     # Archiver les anciens fichiers CSV avec format de semaine
@@ -125,10 +125,10 @@ if [ "$MIGRATION_NEEDED" = true ]; then
             # Déplacer vers les archives
             archive_filepath="$CURRENT_YEAR_ARCHIVE/$new_name"
             mv "$csv_filepath" "$archive_filepath"
-            chown prod:prod "$archive_filepath"
+            chown www-data:www-data "$archive_filepath"
             chmod 664 "$archive_filepath"
             
-            echo "  ↦ $csvfile → Archives/$CURRENT_YEAR/$new_name"
+            echo "  ↦ $csvfile → $CURRENT_YEAR/$new_name"
             log_info "Fichier migré: $csvfile → $new_name"
         fi
     done
@@ -162,7 +162,7 @@ CURRENT_YEAR=$(date +%Y)
 CURRENT_YEAR_ARCHIVE="$ARCHIVES_DIR/$CURRENT_YEAR"
 if [ ! -d "$CURRENT_YEAR_ARCHIVE" ]; then
     mkdir -p "$CURRENT_YEAR_ARCHIVE"
-    chown prod:prod "$CURRENT_YEAR_ARCHIVE"
+    chown www-data:www-data "$CURRENT_YEAR_ARCHIVE"
     chmod 775 "$CURRENT_YEAR_ARCHIVE"
     echo ""
     echo "◦ Répertoire d'archive créé pour l'année $CURRENT_YEAR"
@@ -193,8 +193,8 @@ if widget_standard_install "$WIDGET_NAME"; then
     echo ""
     echo "◦ Archivage automatique:"
     echo "  • À chaque nouvelle semaine, les fichiers précédents sont"
-    echo "    automatiquement déplacés vers Archives/ANNÉE/"
-    echo "  • Structure: $STORAGE_DIR/Archives/2025/S24_2025_509.csv"
+    echo "    automatiquement déplacés vers les sous-dossiers par année"
+    echo "  • Structure: $STORAGE_DIR/2025/S24_2025_509.csv"
     echo ""
     echo "◦ Fonctionnalités avancées:"
     echo "  • Détection automatique de changement de semaine"
@@ -210,10 +210,10 @@ if widget_standard_install "$WIDGET_NAME"; then
     echo "  • Machine extraite des positions 7,8,9 du code-barres"
     echo "  • Routage automatique vers le bon fichier CSV de semaine"
     echo ""
-    echo "◦ Accès SSH: Les fichiers sont directement accessibles"
-    echo "  par l'utilisateur prod dans ~/Documents/traçabilité"
+    echo "◦ Accès Dashboard: Les fichiers sont directement accessibles"
+    echo "  via le dashboard MaxLink dans $STORAGE_DIR"
     echo "  • Fichiers courants dans le répertoire principal"
-    echo "  • Archives organisées par année dans Archives/"
+    echo "  • Archives organisées par année dans les sous-dossiers"
     echo ""
     echo "IMPORTANT: Les ESP32 n'ont AUCUNE modification à faire."
     echo "Le système est 100% compatible avec l'existant."
