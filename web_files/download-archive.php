@@ -1,4 +1,9 @@
 <?php
+// AJOUT : Support POST pour éviter le problème nginx avec &
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_GET = array_merge($_GET, $_POST);
+}
+
 $archivesPath = '/var/www/maxlink-dashboard/archives';
 
 function isValidFilename($filename) {
