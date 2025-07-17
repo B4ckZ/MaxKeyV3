@@ -333,7 +333,7 @@ class TestPersistCollector(BaseCollector):
                 
                 # Écriture en mode append
                 with open(filepath, 'a', encoding='utf-8', newline='') as f:
-                    f.write(csv_line + '\n')
+                    f.write(csv_line + '\r\n')
                     f.flush()
                     
                 return True

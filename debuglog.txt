@@ -1,12 +1,1 @@
-# Test sans paramètres (devrait marcher)
-curl "http://localhost/download-archive.php?help"
 
-prod@raspberrypi:~ $ curl "http://localhost/download-archive.php?help"
-{"usage":{"Fichier individuel":"download-archive.php?file=S01_2025_machine1.csv&year=2025","Semaine compl\u00e8te (liste)":"download-archive.php?week=1&year=2025"},"formats":{"Fichier individuel":"CSV direct","Semaine compl\u00e8te":"JSONprprod@raspberrypi:~ $ 
-
-
-# Test avec un seul paramètre (devrait marcher)  
-curl "http://localhost/download-archive.php?year=2025"
-
-prod@raspberrypi:~ $ curl "http://localhost/download-archive.php?year=2025"
-{"usage":{"Fichier individuel":"download-archive.php?file=S01_2025_machine1.csv&year=2025","Semaine compl\u00e8te (liste)":"download-archive.php?week=1&year=2025"},"formats":{"Fichier individuel":"CSV direct","Semaine compl\u00e8te":"JSONprod@raspberrypi:~ $
