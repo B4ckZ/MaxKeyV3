@@ -326,10 +326,10 @@ else
     if [ "$(is_already_installed "orchestrator_install.sh")" = "yes" ]; then
         echo "L'orchestrateur est installé, un redémarrage est recommandé."
         echo ""
-        echo "  ↦ Redémarrage du système dans 30 secondes..."
+        echo "  ↦ Redémarrage du système dans 120 secondes..."
         echo ""
         
-        sleep 60
+        sleep 120
         log_info "Redémarrage du système malgré les erreurs"
         reboot
     else

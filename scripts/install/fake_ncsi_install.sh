@@ -369,7 +369,7 @@ log_info "Surveillance de la stabilité (30 secondes)"
 
 echo "Surveillance de la stabilité MaxLink..."
 STABLE_COUNT=0
-for i in {1..15}; do
+for i in {1..5}; do
     if nmcli con show --active | grep -q "MaxLink-NETWORK"; then
         echo "  $(date '+%H:%M:%S'): Stable ✓"
         ((STABLE_COUNT++))
@@ -381,7 +381,7 @@ for i in {1..15}; do
     sleep 2
 done
 
-if [ $STABLE_COUNT -eq 15 ]; then
+if [ $STABLE_COUNT -eq 5 ]; then
     log_success "Surveillance complète - système stable"
 else
     log_warn "Surveillance interrompue - instabilité détectée"
