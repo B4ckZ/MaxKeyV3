@@ -436,30 +436,6 @@ RestartSec=30
 WantedBy=multi-user.target
 EOF
     
-    # Timer pour les vérifications périodiques
-    cat > /etc/systemd/system/maxlink-healthcheck.timer << EOF
-[Unit]
-Description=MaxLink Health Check Timer
-Requires=maxlink-healthcheck.service
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=5min
-
-[Install]
-WantedBy=timers.target
-EOF
-    
-    cat > /etc/systemd/system/maxlink-healthcheck.service << EOF
-[Unit]
-Description=MaxLink Health Check
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/maxlink-healthcheck
-EOF
-    
     echo "  ↦ Services systemd créés ✓"
     log_success "Services systemd créés"
     
@@ -612,7 +588,6 @@ case "$COMMAND" in
         systemctl enable maxlink-pre-network.target
         systemctl enable maxlink-network.target
         systemctl enable maxlink-post-network.target
-        systemctl enable maxlink-healthcheck.timer
         log "Services activés"
         ;;
     disable)
@@ -621,7 +596,6 @@ case "$COMMAND" in
         systemctl disable maxlink-pre-network.target
         systemctl disable maxlink-network.target
         systemctl disable maxlink-post-network.target
-        systemctl disable maxlink-healthcheck.timer
         log "Services désactivés"
         ;;
     *)

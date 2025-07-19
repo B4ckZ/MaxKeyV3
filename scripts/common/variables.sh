@@ -104,7 +104,7 @@ CONFIG_FILE="/boot/firmware/config.txt"
 
 # Répertoires pour les assets
 BG_IMAGE_SOURCE_DIR="assets"
-BG_IMAGE_FILENAME="bg.jpg"
+BG_IMAGE_FILENAME="bg.png"
 BG_IMAGE_DEST_DIR="/usr/share/backgrounds/maxlink"
 
 # ===============================================================================
