@@ -142,6 +142,7 @@ class VariablesLoader:
                 {"id": "update", "name": "Update RPI"},
                 {"id": "ap", "name": "Network AP"},
                 {"id": "nginx", "name": "NginX Web"},
+                {"id": "fake_ncsi", "name": "Fake NCSI"},
                 {"id": "mqtt", "name": "MQTT BKR"},
                 {"id": "mqtt_wgs", "name": "MQTT WGS"},
                 {"id": "php_archives", "name": "PHP Archives"},
@@ -158,7 +159,7 @@ class VariablesLoader:
         return self.variables.get(key, default)
     
     def get_window_title(self):
-        version = self.get('MAXLINK_VERSION', '1.0')
+        version = self.get('MAXLINK_VERSION', '3.0')
         copyright_text = self.get('MAXLINK_COPYRIGHT', '© 2025 WERIT')
         return f"MaxLink™ Admin Panel V{version} - {copyright_text}"
     
@@ -180,7 +181,7 @@ class MaxLinkApp:
         
         # Configuration de la fenêtre
         self.root.title(self.variables.get_window_title())
-        self.root.geometry("1350x750")
+        self.root.geometry("1350x800")
         self.root.configure(bg=COLORS["nord0"])
         
         self.center_window()
@@ -284,16 +285,6 @@ class MaxLinkApp:
             fg=COLORS["nord6"]
         )
         services_title.pack(pady=(0, 20))
-        
-        # Info texte
-        info_label = tk.Label(
-            services_frame,
-            text="Les services seront installés dans l'ordre",
-            font=("Arial", 11, "italic"),
-            bg=COLORS["nord1"],
-            fg=COLORS["nord5"]
-        )
-        info_label.pack(pady=(0, 15))
         
         # Créer les services (non cliquables)
         for service in self.services:

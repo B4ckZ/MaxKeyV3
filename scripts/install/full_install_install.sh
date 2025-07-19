@@ -27,6 +27,7 @@ INSTALL_SCRIPTS=(
     "update_install.sh:Mise à jour système et cache"
     "ap_install.sh:Point d'accès WiFi"
     "nginx_install.sh:Serveur Web et Dashboard"
+	"fake_ncsi_install.sh:Correctif NCSI Windows"
     "mqtt_install.sh:Broker MQTT"
     "mqtt_wgs_install.sh:Widgets MQTT"
 	"php_archives_install.sh:Systeme php"
@@ -94,7 +95,7 @@ with open('$SERVICES_STATUS_FILE', 'r') as f:
     data = json.load(f)
 
 for service_id, info in data.items():
-    if service_id in ['update', 'ap', 'nginx', 'mqtt', 'mqtt_wgs', 'php_archives', 'orchestrator']:
+    if service_id in ['update', 'ap', 'nginx', 'fake_ncsi', 'mqtt', 'mqtt_wgs', 'php_archives', 'orchestrator']:
         status = info.get('status', 'inactive')
         symbol = '✓' if status == 'active' else '✗'
         print(f'  {symbol} {service_id}: {status}')
@@ -172,7 +173,7 @@ for script_info in "${INSTALL_SCRIPTS[@]}"; do
 done
 
 echo ""
-echo "L'installation complète prendra environ 10-15 minutes."
+echo "L'installation complète prendra environ 10 minutes."
 echo ""
 echo "Démarrage de l'installation..."
 echo ""
