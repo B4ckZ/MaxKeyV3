@@ -1,0 +1,2001 @@
+Console prête - Mode Privilégié: ACTIF
+
+
+======================================================================
+DÉMARRAGE: Installation complète de MaxLink
+Script: /media/prod/USBTOOL/scripts/install/full_install_install.sh
+======================================================================
+
+[INFO] Script full_install_install initialisé
+[H[2J[3J
+========================================================================
+ MAXLINK™ - INSTALLATION COMPLÈTE V3
+ © 2025 WERIT. Tous droits réservés.
+========================================================================
+
+Installation automatique de tous les composants MaxLink :
+
+  • Mise à jour système et cache
+  • Point d'accès WiFi
+  • Serveur Web et Dashboard
+  • Correctif NCSI Windows
+  • Broker MQTT
+  • Widgets MQTT
+  • Systeme php
+  • Orchestrateur et finalisation
+
+L'installation complète prendra environ 10 minutes.
+
+Démarrage de l'installation...
+
+[INFO] ========== DÉBUT DE L'INSTALLATION COMPLÈTE MAXLINK ==========
+
+========================================================================
+ÉTAPE 1/8 : Mise à jour système et cache
+========================================================================
+
+◦ Exécution de update_install.sh...
+
+[INFO] Exécution de update_install.sh
+[INFO] Script update_install initialisé
+[INFO] ========== DÉBUT DE LA MISE À JOUR SYSTÈME V11 ==========
+========================================================================
+ÉTAPE 1 : PRÉPARATION DU SYSTÈME
+========================================================================
+
+◦ Stabilisation du système après démarrage...
+  ↦ Initialisation des services réseau...
+[INFO] Stabilisation du système - attente 10s pour OS frais
+
+◦ Désactivation temporaire des mises à jour automatiques...
+[INFO] Désactivation des mises à jour automatiques
+  ↦ Mises à jour automatiques suspendues ✓
+[INFO] Sauvegarde de l'état réseau actuel
+[INFO] Mode AP non actif
+
+◦ Vérification de l'interface WiFi...
+  ↦ Interface WiFi détectée ✓
+[INFO] Interface WiFi wlan0 détectée
+[CMD] Exécution: Activation WiFi
+[CMD] Commande: nmcli radio wifi on >/dev/null 2>&1
+[CMD] Code de sortie: 0
+  ↦ WiFi activé ✓
+
+========================================================================
+ÉTAPE 2 : CONNEXION RÉSEAU
+========================================================================
+
+[INFO] Vérification et établissement de la connexion internet
+[INFO] Sauvegarde de l'état réseau actuel
+[INFO] Mode AP non actif
+◦ Connexion automatique au réseau pour téléchargement...
+[INFO] Connexion automatique requise pour télécharger les paquets
+  ↦ Connexion au réseau "!"...
+[INFO] Tentative de connexion à !
+  ↦ Connexion établie ✓
+[SUCCESS] Connexion WiFi établie
+  ↦ Connectivité internet confirmée ✓
+[SUCCESS] Connectivité internet confirmée
+  ↦ Stabilisation de la connexion (5s)...
+[INFO] Stabilisation de la connexion - attente 5s
+
+========================================================================
+ÉTAPE 3 : SYNCHRONISATION HORLOGE
+========================================================================
+
+◦ Synchronisation de l'horloge système...
+[INFO] Synchronisation NTP
+[CMD] Exécution: Activation NTP
+[CMD] Commande: timedatectl set-ntp true
+[CMD] Code de sortie: 0
+  ↦ Attente de la synchronisation NTP...
+[INFO] Attente synchronisation NTP - 15s
+  ↦ Date/Heure: 19/07/2025 14:24:19
+[INFO] Heure synchronisée: Sat 19 Jul 14:24:19 CEST 2025
+
+========================================================================
+ÉTAPE 4 : MISE À JOUR DE SÉCURITÉ
+========================================================================
+
+◦ Nettoyage sécurisé du système de paquets...
+[INFO] Début du nettoyage APT sécurisé
+◦ Vérification de l'état d'APT...
+[INFO] Vérification de l'état d'APT
+  ↦ APT est occupé, attente qu'il termine...
+[INFO] APT occupé détecté, attente
+.............................
+  ↦ Timeout: APT toujours occupé après 300s ⚠
+[WARN] Timeout APT après 300s
+  ↦ Forçage du nettoyage APT...
+[WARN] Forçage du nettoyage APT nécessaire
+  ↦ Nettoyage des processus zombies...
+[INFO] Nettoyage des processus zombies
+  ↦ Vérification des verrous orphelins...
+[INFO] Vérification des verrous orphelins
+    • Suppression du verrou orphelin: /var/lib/dpkg/lock
+[INFO] Suppression verrou orphelin: /var/lib/dpkg/lock
+    • Suppression du verrou orphelin: /var/lib/dpkg/lock-frontend
+[INFO] Suppression verrou orphelin: /var/lib/dpkg/lock-frontend
+    • Suppression du verrou orphelin: /var/cache/apt/archives/lock
+[INFO] Suppression verrou orphelin: /var/cache/apt/archives/lock
+  ↦ Reconfiguration de dpkg...
+[CMD] Exécution: Configuration dpkg
+[CMD] Commande: dpkg --configure -a
+[CMD] Code de sortie: 0
+  ↦ Nettoyage des fichiers partiels corrompus (29 fichiers)...
+[INFO] Nettoyage de 29 fichiers partiels
+  ↦ Système de paquets nettoyé ✓
+[SUCCESS] Nettoyage APT terminé
+  ↦ Stabilisation après nettoyage (3s)...
+[INFO] Stabilisation après nettoyage - attente 3s
+◦ Mise à jour de la liste des paquets...
+[INFO] Début de la mise à jour APT
+  ↦ Tentative 1/3...
+[INFO] Tentative APT update 1/3
+    • Reconstruction complète du cache APT...
+[INFO] Reconstruction complète du cache APT
+Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+Get:2 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+Get:3 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+Get:4 http://archive.raspberrypi.com/debian bookworm InRelease [55.0 kB]
+Get:5 http://archive.raspberrypi.com/debian bookworm/main arm64 Packages [547 kB]
+Get:6 http://deb.debian.org/debian bookworm/main armhf Packages [8,508 kB]
+Get:7 http://archive.raspberrypi.com/debian bookworm/main armhf Packages [550 kB]
+Get:8 http://deb.debian.org/debian bookworm/main arm64 Packages [8,693 kB]
+Get:9 http://deb.debian.org/debian bookworm/main Translation-en [6,109 kB]
+Get:10 http://deb.debian.org/debian bookworm/contrib arm64 Packages [45.7 kB]
+Get:11 http://deb.debian.org/debian bookworm/contrib armhf Packages [42.9 kB]
+Get:11 http://deb.debian.org/debian bookworm/contrib armhf Packages [42.9 kB]
+Get:11 http://deb.debian.org/debian bookworm/contrib armhf Packages [42.9 kB]
+Get:14 http://deb.debian.org/debian bookworm/contrib Translation-en [48.4 kB]
+Get:15 http://deb.debian.org/debian bookworm/non-free armhf Packages [55.9 kB]
+Get:16 http://deb.debian.org/debian bookworm/non-free arm64 Packages [75.8 kB]
+Get:17 http://deb.debian.org/debian bookworm/non-free Translation-en [68.1 kB]
+Get:18 http://deb.debian.org/debian bookworm/non-free-firmware armhf Packages [5,480 B]
+Get:19 http://deb.debian.org/debian bookworm/non-free-firmware arm64 Packages [5,832 B]
+Get:20 http://deb.debian.org/debian bookworm/non-free-firmware Translation-en [20.9 kB]
+Get:21 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [268 kB]
+Get:22 http://deb.debian.org/debian-security bookworm-security/contrib armhf Packages [504 B]
+Get:23 http://deb.debian.org/debian-security bookworm-security/contrib arm64 Packages [508 B]
+Get:24 http://deb.debian.org/debian-security bookworm-security/contrib Translation-en [652 B]
+Get:25 http://deb.debian.org/debian-security bookworm-security/non-free-firmware Translation-en [472 B]
+Hit:26 http://deb.debian.org/debian bookworm-updates/main arm64 Packages
+Hit:27 http://deb.debian.org/debian bookworm-updates/main armhf Packages
+Hit:28 http://deb.debian.org/debian bookworm-updates/main Translation-en
+Fetched 25.4 MB in 1min 9s (367 kB/s)
+Reading package lists...
+E: Failed to stat /var/lib/apt/lists/partial/deb.debian.org_debian_dists_bookworm_InRelease - pkgAcqTransactionItem::TransactionState-stat (2: No such file or directory)
+E: Failed to stat /var/lib/apt/lists/partial/deb.debian.org_debian_dists_bookworm-updates_InRelease - pkgAcqTransactionItem::TransactionState-stat (2: No such file or directory)
+E: Failed to stat /var/lib/apt/lists/partial/archive.raspberrypi.com_debian_dists_bookworm_InRelease - pkgAcqTransactionItem::TransactionState-stat (2: No such file or directory)
+E: Failed to stat /var/lib/apt/lists/partial/archive.raspberrypi.com_debian_dists_bookworm_main_binary-arm64_Packages - pkgAcqTransactionItem::TransactionState-stat (2: No such file or directory)
+  ↦ Des erreurs ont été détectées dans la mise à jour ⚠
+[WARN] Erreurs détectées dans APT update
+  ↦ Échec, nouvelle tentative dans 10 secondes...
+[INFO] Échec APT update, attente avant retry
+  ↦ Tentative 2/3...
+[INFO] Tentative APT update 2/3
+    • Reconstruction complète du cache APT...
+[INFO] Reconstruction complète du cache APT
+Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+Get:2 http://archive.raspberrypi.com/debian bookworm InRelease [55.0 kB]
+Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+Get:4 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+Get:5 http://deb.debian.org/debian bookworm/main armhf Packages [8,508 kB]
+Get:6 http://archive.raspberrypi.com/debian bookworm/main armhf Packages [550 kB]
+Get:7 http://archive.raspberrypi.com/debian bookworm/main arm64 Packages [547 kB]
+Get:8 http://deb.debian.org/debian bookworm/main arm64 Packages [8,693 kB]
+Get:9 http://deb.debian.org/debian bookworm/main Translation-en [6,109 kB]
+Get:10 http://deb.debian.org/debian bookworm/contrib arm64 Packages [45.7 kB]
+Get:11 http://deb.debian.org/debian bookworm/contrib armhf Packages [42.9 kB]
+Get:12 http://deb.debian.org/debian bookworm/contrib Translation-en [48.4 kB]
+Get:13 http://deb.debian.org/debian bookworm/non-free arm64 Packages [75.8 kB]
+Get:14 http://deb.debian.org/debian bookworm/non-free armhf Packages [55.9 kB]
+Get:15 http://deb.debian.org/debian bookworm/non-free Translation-en [68.1 kB]
+Get:16 http://deb.debian.org/debian bookworm/non-free-firmware arm64 Packages [5,832 B]
+Get:17 http://deb.debian.org/debian bookworm/non-free-firmware armhf Packages [5,480 B]
+Get:18 http://deb.debian.org/debian bookworm/non-free-firmware Translation-en [20.9 kB]
+Get:19 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [268 kB]
+Get:20 http://deb.debian.org/debian-security bookworm-security/main armhf Packages [253 kB]
+Get:21 http://deb.debian.org/debian-security bookworm-security/main Translation-en [163 kB]
+Get:22 http://deb.debian.org/debian-security bookworm-security/contrib arm64 Packages [508 B]
+Get:23 http://deb.debian.org/debian-security bookworm-security/contrib armhf Packages [504 B]
+Get:24 http://deb.debian.org/debian-security bookworm-security/contrib Translation-en [652 B]
+Get:25 http://deb.debian.org/debian-security bookworm-security/non-free-firmware Translation-en [472 B]
+Get:26 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [756 B]
+Get:27 http://deb.debian.org/debian bookworm-updates/main armhf Packages [756 B]
+Get:28 http://deb.debian.org/debian bookworm-updates/main Translation-en [664 B]
+Fetched 25.8 MB in 26s (983 kB/s)
+Reading package lists...
+  ↦ Liste des paquets mise à jour ✓
+[SUCCESS] APT update réussi
+
+◦ Installation des mises à jour de sécurité critiques...
+[INFO] Installation des paquets critiques uniquement
+[CMD] Exécution: Mise à jour sécurité
+[CMD] Commande: DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade --allow-unauthenticated openssl libssl* sudo systemd apt dpkg libc6 libpam* ca-certificates tzdata
+[OUT] Reading package lists...
+[OUT] Building dependency tree...
+[OUT] Reading state information...
+[OUT] openssl is already the newest version (3.0.16-1~deb12u1+rpt1).
+[OUT] libssl3 is already the newest version (3.0.16-1~deb12u1+rpt1).
+[OUT] Skipping libssl-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl-ocaml, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl-ocaml-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl-doc, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl-utils-clojure, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl-ocaml:armhf, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl-ocaml-dev:armhf, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl1.1, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl1.1-dbgsym, it is not installed and only upgrades are requested.
+[OUT] Skipping libssl3-dbgsym, it is not installed and only upgrades are requested.
+[OUT] apt is already the newest version (2.6.1).
+[OUT] dpkg is already the newest version (1.22.6~bpo12+rpt3).
+[OUT] libpam0g is already the newest version (1.5.2-6+rpt2+deb12u1).
+[OUT] Skipping libpam-apparmor, it is not installed and only upgrades are requested.
+[OUT] libpam-runtime is already the newest version (1.5.2-6+rpt2+deb12u1).
+[OUT] libpam-modules is already the newest version (1.5.2-6+rpt2+deb12u1).
+[OUT] Skipping libpam-barada, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-sss, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-gnome-keyring, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-tmpdir, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-krb5, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ccreds, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-mount, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-mklocaluser, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-python, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-duo, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-fprintd, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam0g-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-elogind, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ldapd, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-abl, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-fscrypt, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-pkcs11, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-google-authenticator, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-kwallet-common, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-kwallet5, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-mount-bin, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-cap, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-cgroup, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-afs-session, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-heimdal, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-alreadyloggedin, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-chroot, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-encfs, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-freerdp2, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-freerdp2-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-net, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-pwdfile, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-radius-auth, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-script, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ufpidentity, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-x2go, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-x2go-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-pwquality, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-cgfs, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-malcontent, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-oath, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ocaml, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ocaml-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-otpw, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-doc, it is not installed and only upgrades are requested.
+[OUT] libpam-modules-bin is already the newest version (1.5.2-6+rpt2+deb12u1).
+[OUT] Skipping libpam-geoip, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-krb5-migrate-heimdal, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-krb5-migrate-mit, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-mysql, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-p11, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-python-doc, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-shield, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ssh-agent-auth, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-u2f, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-wrapper, it is not installed and only upgrades are requested.
+[OUT] Skipping libpamtest0, it is not installed and only upgrades are requested.
+[OUT] Skipping libpamtest0-dev, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-passwdqc, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-poldi, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-winbind, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-shishi, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-slurm, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-slurm-adopt, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-snapper, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-biometric, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-yubico, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ocaml:armhf, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-ocaml-dev:armhf, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-zfs, it is not installed and only upgrades are requested.
+[OUT] libpam-chksshpwd is already the newest version (1.5.2-6+rpt2+deb12u1).
+[OUT] Skipping libpam-chksshpwd-dbgsym, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-cracklib, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-cracklib-dbgsym, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-modules-bin-dbgsym, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-modules-dbgsym, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam-zfs-dbgsym, it is not installed and only upgrades are requested.
+[OUT] Skipping libpam0g-dbgsym, it is not installed and only upgrades are requested.
+[OUT] tzdata is already the newest version (2025b-0+deb12u1).
+[OUT] The following additional packages will be installed:
+[OUT]   libc-bin libc-dev-bin libc-devtools libc-l10n libc6-dbg libc6-dev
+[OUT]   libsystemd-shared libsystemd0 libudev1 locales systemd-sysv
+[OUT]   systemd-timesyncd udev
+[OUT] Suggested packages:
+[OUT]   glibc-doc libnss-nis libnss-nisplus systemd-container systemd-homed
+[OUT]   systemd-userdbd systemd-boot systemd-resolved libtss2-esys-3.0.2-0
+[OUT]   libtss2-mu0 libtss2-rc0
+[OUT] Recommended packages:
+[OUT]   libnss-systemd
+[OUT] The following packages will be upgraded:
+[OUT]   ca-certificates libc-bin libc-dev-bin libc-devtools libc-l10n libc6
+[OUT]   libc6-dbg libc6-dev libpam-systemd libsystemd-shared libsystemd0 libudev1
+[OUT]   locales sudo systemd systemd-sysv systemd-timesyncd udev
+[OUT] 18 upgraded, 0 newly installed, 0 to remove and 168 not upgraded.
+[OUT] Need to get 31.4 MB of archives.
+[OUT] After this operation, 242 kB of additional disk space will be used.
+[OUT] Get:1 http://deb.debian.org/debian-security bookworm-security/main arm64 systemd-timesyncd arm64 252.38-1~deb12u1 [61.8 kB]
+[OUT] Get:2 http://deb.debian.org/debian-security bookworm-security/main arm64 libpam-systemd arm64 252.38-1~deb12u1 [209 kB]
+[OUT] Get:3 http://deb.debian.org/debian-security bookworm-security/main arm64 systemd arm64 252.38-1~deb12u1 [2,839 kB]
+[OUT] Get:4 http://archive.raspberrypi.com/debian bookworm/main arm64 libc6-dbg arm64 2.36-9+rpt2+deb12u12 [8,131 kB]
+[OUT] Get:5 http://deb.debian.org/debian-security bookworm-security/main arm64 libsystemd-shared arm64 252.38-1~deb12u1 [1,507 kB]
+[OUT] Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 systemd-sysv arm64 252.38-1~deb12u1 [42.6 kB]
+[OUT] Get:7 http://deb.debian.org/debian-security bookworm-security/main arm64 libsystemd0 arm64 252.38-1~deb12u1 [308 kB]
+[OUT] Get:8 http://deb.debian.org/debian-security bookworm-security/main arm64 sudo arm64 1.9.13p3-1+deb12u2 [1,827 kB]
+[OUT] Get:9 http://deb.debian.org/debian-security bookworm-security/main arm64 udev arm64 252.38-1~deb12u1 [1,641 kB]
+[OUT] Get:10 http://deb.debian.org/debian-security bookworm-security/main arm64 libudev1 arm64 252.38-1~deb12u1 [103 kB]
+[OUT] Get:11 http://deb.debian.org/debian bookworm-updates/main arm64 ca-certificates all 20230311+deb12u1 [155 kB]
+[OUT] Get:12 http://archive.raspberrypi.com/debian bookworm/main arm64 libc-devtools arm64 2.36-9+rpt2+deb12u12 [61.4 kB]
+[OUT] Get:13 http://archive.raspberrypi.com/debian bookworm/main arm64 libc6-dev arm64 2.36-9+rpt2+deb12u12 [2,102 kB]
+[OUT] Get:14 http://archive.raspberrypi.com/debian bookworm/main arm64 libc-dev-bin arm64 2.36-9+rpt2+deb12u12 [49.9 kB]
+[OUT] Get:15 http://archive.raspberrypi.com/debian bookworm/main arm64 libc6 arm64 2.36-9+rpt2+deb12u12 [5,001 kB]
+[OUT] Get:16 http://archive.raspberrypi.com/debian bookworm/main arm64 libc-bin arm64 2.36-9+rpt2+deb12u12 [753 kB]
+[OUT] Get:17 http://archive.raspberrypi.com/debian bookworm/main arm64 libc-l10n all 2.36-9+rpt2+deb12u12 [1,541 kB]
+[OUT] Get:18 http://archive.raspberrypi.com/debian bookworm/main arm64 locales all 2.36-9+rpt2+deb12u12 [5,086 kB]
+[OUT] apt-listchanges: Reading changelogs...
+[OUT] Preconfiguring packages ...
+[OUT] Fetched 31.4 MB in 44s (706 kB/s)
+[OUT] (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 129085 files and directories currently installed.)
+[OUT] Preparing to unpack .../libc6-dbg_2.36-9+rpt2+deb12u12_arm64.deb ...
+[OUT] Unpacking libc6-dbg:arm64 (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Preparing to unpack .../libc-devtools_2.36-9+rpt2+deb12u12_arm64.deb ...
+[OUT] Unpacking libc-devtools (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Preparing to unpack .../libc6-dev_2.36-9+rpt2+deb12u12_arm64.deb ...
+[OUT] Unpacking libc6-dev:arm64 (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Preparing to unpack .../libc-dev-bin_2.36-9+rpt2+deb12u12_arm64.deb ...
+[OUT] Unpacking libc-dev-bin (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Preparing to unpack .../libc6_2.36-9+rpt2+deb12u12_arm64.deb ...
+[OUT] Unpacking libc6:arm64 (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Setting up libc6:arm64 (2.36-9+rpt2+deb12u12) ...
+[OUT] (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 129084 files and directories currently installed.)
+[OUT] Preparing to unpack .../libc-bin_2.36-9+rpt2+deb12u12_arm64.deb ...
+[OUT] Unpacking libc-bin (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Setting up libc-bin (2.36-9+rpt2+deb12u12) ...
+[OUT] (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 129084 files and directories currently installed.)
+[OUT] Preparing to unpack .../systemd-timesyncd_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking systemd-timesyncd (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Preparing to unpack .../libpam-systemd_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking libpam-systemd:arm64 (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Preparing to unpack .../systemd_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking systemd (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Preparing to unpack .../libsystemd-shared_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking libsystemd-shared:arm64 (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Preparing to unpack .../libsystemd0_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking libsystemd0:arm64 (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Setting up libsystemd0:arm64 (252.38-1~deb12u1) ...
+[OUT] Setting up libsystemd-shared:arm64 (252.38-1~deb12u1) ...
+[OUT] Setting up systemd (252.38-1~deb12u1) ...
+[OUT] (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 129085 files and directories currently installed.)
+[OUT] Preparing to unpack .../systemd-sysv_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking systemd-sysv (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Preparing to unpack .../sudo_1.9.13p3-1+deb12u2_arm64.deb ...
+[OUT] Unpacking sudo (1.9.13p3-1+deb12u2) over (1.9.13p3-1+deb12u1) ...
+[OUT] Preparing to unpack .../udev_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking udev (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Preparing to unpack .../libudev1_252.38-1~deb12u1_arm64.deb ...
+[OUT] Unpacking libudev1:arm64 (252.38-1~deb12u1) over (252.36-1~deb12u1) ...
+[OUT] Setting up libudev1:arm64 (252.38-1~deb12u1) ...
+[OUT] (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 129085 files and directories currently installed.)
+[OUT] Preparing to unpack .../ca-certificates_20230311+deb12u1_all.deb ...
+[OUT] Unpacking ca-certificates (20230311+deb12u1) over (20230311) ...
+[OUT] Preparing to unpack .../libc-l10n_2.36-9+rpt2+deb12u12_all.deb ...
+[OUT] Unpacking libc-l10n (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Preparing to unpack .../locales_2.36-9+rpt2+deb12u12_all.deb ...
+[OUT] Unpacking locales (2.36-9+rpt2+deb12u12) over (2.36-9+rpt2+deb12u10) ...
+[OUT] Setting up systemd-sysv (252.38-1~deb12u1) ...
+[OUT] Setting up libc-l10n (2.36-9+rpt2+deb12u12) ...
+[OUT] Setting up locales (2.36-9+rpt2+deb12u12) ...
+[OUT] Generating locales (this might take a while)...
+[OUT]   en_GB.UTF-8... done
+[OUT] Generation complete.
+[OUT] Setting up libc6-dbg:arm64 (2.36-9+rpt2+deb12u12) ...
+[OUT] Setting up ca-certificates (20230311+deb12u1) ...
+[OUT] Updating certificates in /etc/ssl/certs...
+[OUT] rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+[OUT] 2 added, 0 removed; done.
+[OUT] Setting up systemd-timesyncd (252.38-1~deb12u1) ...
+[OUT] Setting up udev (252.38-1~deb12u1) ...
+[OUT] Setting up sudo (1.9.13p3-1+deb12u2) ...
+[OUT] Setting up libpam-systemd:arm64 (252.38-1~deb12u1) ...
+[OUT] Setting up libc-dev-bin (2.36-9+rpt2+deb12u12) ...
+[OUT] Setting up libc-devtools (2.36-9+rpt2+deb12u12) ...
+[OUT] Setting up libc6-dev:arm64 (2.36-9+rpt2+deb12u12) ...
+[OUT] Processing triggers for libc-bin (2.36-9+rpt2+deb12u12) ...
+[OUT] Processing triggers for man-db (2.11.2-2) ...
+[OUT] Processing triggers for dbus (1.14.10-1~deb12u1) ...
+[OUT] Processing triggers for initramfs-tools (0.142+rpt3+deb12u3) ...
+[OUT] update-initramfs: Generating /boot/initrd.img-6.12.25+rpt-rpi-v8
+[OUT] '/boot/initrd.img-6.12.25+rpt-rpi-v8' -> '/boot/firmware/initramfs8'
+[OUT] update-initramfs: Generating /boot/initrd.img-6.12.25+rpt-rpi-2712
+[OUT] '/boot/initrd.img-6.12.25+rpt-rpi-2712' -> '/boot/firmware/initramfs_2712'
+[OUT] Processing triggers for ca-certificates (20230311+deb12u1) ...
+[OUT] Updating certificates in /etc/ssl/certs...
+[OUT] 0 added, 0 removed; done.
+[OUT] Running hooks in /etc/ca-certificates/update.d...
+[OUT] done.
+[CMD] Code de sortie: 0
+  ↦ Mises à jour de sécurité installées ✓
+[SUCCESS] Mises à jour de sécurité installées
+  ↦ Stabilisation après mises à jour (5s)...
+[INFO] Stabilisation après mises à jour - attente 5s
+
+========================================================================
+ÉTAPE 5 : CRÉATION DU CACHE DE PAQUETS
+========================================================================
+
+◦ Initialisation du système de cache...
+[INFO] Initialisation du cache de paquets
+[INFO] Initialisation du cache des paquets
+[SUCCESS] Cache initialisé: /var/cache/maxlink/packages
+  ↦ Cache initialisé ✓
+[SUCCESS] Cache initialisé avec succès
+  ↦ Préparation du téléchargement (3s)...
+[INFO] Préparation du téléchargement - attente 3s
+
+◦ Téléchargement de tous les paquets MaxLink...
+  ↦ Cette opération peut prendre quelques minutes...
+[INFO] Téléchargement de tous les paquets requis
+[INFO] Mise à jour des listes de paquets APT
+◦ Téléchargement [1/28]: git
+[INFO] Téléchargement du paquet: git (catégorie: base)
+  ↦ git téléchargé ✓
+[SUCCESS] Paquet téléchargé: git
+◦ Téléchargement [2/28]: curl
+[INFO] Téléchargement du paquet: curl (catégorie: base)
+  ↦ curl téléchargé ✓
+[SUCCESS] Paquet téléchargé: curl
+◦ Téléchargement [3/28]: wget
+[INFO] Téléchargement du paquet: wget (catégorie: base)
+  ↦ wget téléchargé ✓
+[SUCCESS] Paquet téléchargé: wget
+◦ Téléchargement [4/28]: ca-certificates
+[INFO] Téléchargement du paquet: ca-certificates (catégorie: base)
+  ↦ ca-certificates téléchargé ✓
+[SUCCESS] Paquet téléchargé: ca-certificates
+◦ Téléchargement [5/28]: apt-transport-https
+[INFO] Téléchargement du paquet: apt-transport-https (catégorie: base)
+  ↦ apt-transport-https téléchargé ✓
+[SUCCESS] Paquet téléchargé: apt-transport-https
+◦ Téléchargement [6/28]: gnupg
+[INFO] Téléchargement du paquet: gnupg (catégorie: base)
+  ↦ gnupg téléchargé ✓
+[SUCCESS] Paquet téléchargé: gnupg
+◦ Téléchargement [7/28]: lsb-release
+[INFO] Téléchargement du paquet: lsb-release (catégorie: base)
+  ↦ lsb-release téléchargé ✓
+[SUCCESS] Paquet téléchargé: lsb-release
+◦ Téléchargement [8/28]: nginx
+[INFO] Téléchargement du paquet: nginx (catégorie: nginx)
+  ↦ nginx téléchargé ✓
+[SUCCESS] Paquet téléchargé: nginx
+◦ Téléchargement [9/28]: nginx-common
+[INFO] Téléchargement du paquet: nginx-common (catégorie: nginx)
+  ↦ nginx-common téléchargé ✓
+[SUCCESS] Paquet téléchargé: nginx-common
+◦ Téléchargement [10/28]: mosquitto
+[INFO] Téléchargement du paquet: mosquitto (catégorie: mqtt)
+  ↦ mosquitto téléchargé ✓
+[SUCCESS] Paquet téléchargé: mosquitto
+◦ Téléchargement [11/28]: mosquitto-clients
+[INFO] Téléchargement du paquet: mosquitto-clients (catégorie: mqtt)
+  ↦ mosquitto-clients téléchargé ✓
+[SUCCESS] Paquet téléchargé: mosquitto-clients
+◦ Téléchargement [12/28]: libmosquitto1
+[INFO] Téléchargement du paquet: libmosquitto1 (catégorie: mqtt)
+  ↦ libmosquitto1 téléchargé ✓
+[SUCCESS] Paquet téléchargé: libmosquitto1
+◦ Téléchargement [13/28]: libdlt2
+[INFO] Téléchargement du paquet: libdlt2 (catégorie: mqtt)
+  ↦ libdlt2 téléchargé ✓
+[SUCCESS] Paquet téléchargé: libdlt2
+◦ Téléchargement [14/28]: dnsmasq
+[INFO] Téléchargement du paquet: dnsmasq (catégorie: ap)
+  ↦ dnsmasq téléchargé ✓
+[SUCCESS] Paquet téléchargé: dnsmasq
+◦ Téléchargement [15/28]: iptables
+[INFO] Téléchargement du paquet: iptables (catégorie: ap)
+  ↦ iptables téléchargé ✓
+[SUCCESS] Paquet téléchargé: iptables
+◦ Téléchargement [16/28]: python3-psutil
+[INFO] Téléchargement du paquet: python3-psutil (catégorie: python)
+  ↦ python3-psutil téléchargé ✓
+[SUCCESS] Paquet téléchargé: python3-psutil
+◦ Téléchargement [17/28]: python3-paho-mqtt
+[INFO] Téléchargement du paquet: python3-paho-mqtt (catégorie: python)
+  ↦ python3-paho-mqtt téléchargé ✓
+[SUCCESS] Paquet téléchargé: python3-paho-mqtt
+◦ Téléchargement [18/28]: python3-pip
+[INFO] Téléchargement du paquet: python3-pip (catégorie: python)
+  ↦ python3-pip téléchargé ✓
+[SUCCESS] Paquet téléchargé: python3-pip
+◦ Téléchargement [19/28]: python3-setuptools
+[INFO] Téléchargement du paquet: python3-setuptools (catégorie: python)
+  ↦ python3-setuptools téléchargé ✓
+[SUCCESS] Paquet téléchargé: python3-setuptools
+◦ Téléchargement [20/28]: i2c-tools
+[INFO] Téléchargement du paquet: i2c-tools (catégorie: system)
+  ↦ i2c-tools téléchargé ✓
+[SUCCESS] Paquet téléchargé: i2c-tools
+◦ Téléchargement [21/28]: php
+[INFO] Téléchargement du paquet: php (catégorie: php)
+  ↦ php téléchargé ✓
+[SUCCESS] Paquet téléchargé: php
+◦ Téléchargement [22/28]: php-cli
+[INFO] Téléchargement du paquet: php-cli (catégorie: php)
+  ↦ php-cli téléchargé ✓
+[SUCCESS] Paquet téléchargé: php-cli
+◦ Téléchargement [23/28]: php-fpm
+[INFO] Téléchargement du paquet: php-fpm (catégorie: php)
+  ↦ php-fpm téléchargé ✓
+[SUCCESS] Paquet téléchargé: php-fpm
+◦ Téléchargement [24/28]: htop
+[INFO] Téléchargement du paquet: htop (catégorie: tools)
+  ↦ htop téléchargé ✓
+[SUCCESS] Paquet téléchargé: htop
+◦ Téléchargement [25/28]: iotop
+[INFO] Téléchargement du paquet: iotop (catégorie: tools)
+  ↦ iotop téléchargé ✓
+[SUCCESS] Paquet téléchargé: iotop
+◦ Téléchargement [26/28]: net-tools
+[INFO] Téléchargement du paquet: net-tools (catégorie: tools)
+  ↦ net-tools téléchargé ✓
+[SUCCESS] Paquet téléchargé: net-tools
+◦ Téléchargement [27/28]: dnsutils
+[INFO] Téléchargement du paquet: dnsutils (catégorie: tools)
+  ↦ dnsutils téléchargé ✓
+[SUCCESS] Paquet téléchargé: dnsutils
+◦ Téléchargement [28/28]: python3-pil
+[INFO] Téléchargement du paquet: python3-pil (catégorie: tools)
+  ↦ python3-pil téléchargé ✓
+[SUCCESS] Paquet téléchargé: python3-pil
+
+◦ Téléchargement terminé
+  ↦ Paquets téléchargés: 694
+[INFO] Total paquets téléchargés: 694
+
+  ↦ Cache de paquets créé avec succès ✓
+[SUCCESS] Tous les paquets ont été téléchargés
+=== Statistiques du cache ===
+Emplacement : /var/cache/maxlink/packages
+Taille      : 356M
+Paquets     : 694
+Âge         : 0 jours
+==========================
+
+◦ Téléchargement du dashboard MaxLink V3...
+[INFO] Début du téléchargement du dashboard V3
+  ↦ Tentative 1/3...
+[INFO] Tentative téléchargement dashboard 1/3
+    • Téléchargement terminé (curl)
+[INFO] Téléchargement curl terminé
+    • Taille du fichier: 114 KB
+    • Vérification de l'archive...
+  ↦ Archive dashboard valide ✓
+[SUCCESS] Archive dashboard valide
+  ↦ Dashboard téléchargé avec succès ✓
+[SUCCESS] Dashboard téléchargé après 1 tentative(s)
+
+◦ Nettoyage du système...
+[CMD] Exécution: APT autoremove
+[CMD] Commande: apt-get autoremove -y >/dev/null 2>&1
+[CMD] Code de sortie: 0
+[CMD] Exécution: APT autoclean
+[CMD] Commande: apt-get autoclean >/dev/null 2>&1
+[CMD] Code de sortie: 0
+  ↦ Système nettoyé ✓
+
+========================================================================
+ÉTAPE 6 : CONFIGURATION DU SYSTÈME
+========================================================================
+
+◦ Configuration du ventilateur...
+[INFO] Configuration du ventilateur
+  ↦ Configuration ajoutée ✓
+[SUCCESS] Configuration ventilateur ajoutée
+
+◦ Personnalisation de l'interface...
+[INFO] Installation du fond d'écran personnalisé
+[INFO] Ajout de la version MaxLink v3 sur l'image de fond
+Erreur: name 'dest_image' is not defined
+[SUCCESS] Version ajoutée sur l'image
+  ↦ Fond d'écran installé ✓
+  ↦ Bureau configuré ✓
+[SUCCESS] Configuration bureau LXDE appliquée
+
+========================================================================
+ÉTAPE 7 : FINALISATION
+========================================================================
+
+◦ Réactivation des mises à jour automatiques...
+  ↦ Services de mise à jour réactivés ✓
+[INFO] Services de mise à jour réactivés
+
+◦ Restauration de l'état réseau...
+[INFO] Restauration de l'état réseau
+[INFO] Déconnexion du WiFi !
+  ↦ État réseau restauré ✓
+
+◦ Mise à jour du statut du service...
+Statut update mis à jour: active
+  ↦ Statut du service update mis à jour: active
+  ↦ Statut du service mis à jour ✓
+[INFO] Statut du service update mis à jour: active
+
+◦ Mise à jour terminée avec succès !
+  ↦ Version: v3
+  ↦ Système à jour et configuré
+  ↦ Cache de paquets créé pour installation offline
+  ↦ Dashboard V3 téléchargé
+[SUCCESS] Mise à jour système terminée - Version: v3
+
+◦ Résumé du cache créé :
+=== Statistiques du cache ===
+Emplacement : /var/cache/maxlink/packages
+Taille      : 356M
+Paquets     : 694
+Âge         : 0 jours
+==========================
+
+  ↦ Redémarrage différé (installation complète en cours)
+
+[INFO] Redémarrage différé - SKIP_REBOOT=true
+[INFO] Script update_install terminé avec le code 0
+
+[SUCCESS] update_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 2/8 : Point d'accès WiFi
+========================================================================
+
+◦ Exécution de ap_install.sh...
+
+[INFO] Exécution de ap_install.sh
+[INFO] Script ap_install initialisé
+[INFO] ========== DÉBUT DE L'INSTALLATION AP ==========
+========================================================================
+ÉTAPE 1 : VÉRIFICATIONS
+========================================================================
+
+[INFO] Privilèges root confirmés
+◦ Vérification de l'interface WiFi...
+  ↦ Interface wlan0 disponible ✓
+[INFO] Interface wlan0 disponible
+
+◦ Vérification de NetworkManager...
+  ↦ NetworkManager actif ✓
+[INFO] NetworkManager actif
+
+========================================================================
+ÉTAPE 2 : INSTALLATION DES PAQUETS
+========================================================================
+
+◦ Installation de Point d'accès...
+[INFO] Installation hybride de Point d'accès
+  ↦ Déjà installé ✓
+[INFO] Point d'accès déjà installé
+
+[SUCCESS] Tous les paquets AP installés
+
+========================================================================
+ÉTAPE 3 : PRÉPARATION DU SYSTÈME
+========================================================================
+
+◦ Configuration du resolv.conf...
+[INFO] Configuration du resolv.conf
+[CMD] Exécution: Protection du resolv.conf
+[CMD] Commande: chattr +i /etc/resolv.conf 2>/dev/null || true
+[CMD] Code de sortie: 0
+  ↦ resolv.conf configuré et protégé ✓
+[INFO] resolv.conf configuré avec succès
+
+◦ Nettoyage des services DNS conflictuels...
+[INFO] Désactivation des services DNS conflictuels
+
+◦ Désactivation des connexions WiFi existantes...
+[INFO] Nettoyage des connexions WiFi existantes
+[CMD] Exécution: Déconnexion interface
+[CMD] Commande: nmcli device disconnect wlan0 2>/dev/null || true
+[CMD] Code de sortie: 0
+[CMD] Exécution: Suppression ancienne config AP
+[CMD] Commande: nmcli connection delete 'MaxLink-NETWORK' 2>/dev/null || true
+[CMD] Code de sortie: 0
+  ↦ Connexions nettoyées ✓
+
+◦ Configuration de NetworkManager...
+[INFO] Configuration de NetworkManager pour dnsmasq
+[CMD] Exécution: Sauvegarde config NetworkManager
+[CMD] Commande: cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf.original
+[CMD] Code de sortie: 0
+  ↦ NetworkManager configuré pour dnsmasq ✓
+[INFO] NetworkManager configuré avec succès
+
+========================================================================
+ÉTAPE 4 : CONFIGURATION DU POINT D'ACCÈS
+========================================================================
+
+◦ Création du profil Access Point...
+  ↦ SSID: MaxLink-NETWORK
+  ↦ IP: 192.168.4.1/24
+  ↦ Canal: 6 (2.4GHz)
+[INFO] Configuration AP - SSID: MaxLink-NETWORK, IP: 192.168.4.1/24, Canal: 6
+[CMD] Exécution: Création profil AP
+[CMD] Commande: nmcli connection add     type wifi     ifname wlan0     con-name 'MaxLink-NETWORK'     autoconnect yes     ssid 'MaxLink-NETWORK'     mode ap     802-11-wireless.band bg     802-11-wireless.channel 6     802-11-wireless-security.key-mgmt wpa-psk 	802-11-wireless-security.proto rsn 	802-11-wireless-security.pairwise ccmp 	802-11-wireless-security.group ccmp     802-11-wireless-security.psk 'MDPsupersecret007'     ipv4.method shared     ipv4.addresses '192.168.4.1/24'     ipv6.method disabled
+[OUT] Connection 'MaxLink-NETWORK' (ecade7a2-256c-4f2d-9af7-95595df6f33c) successfully added.
+[CMD] Code de sortie: 0
+  ↦ Profil AP créé ✓
+[SUCCESS] Profil AP créé avec succès
+
+◦ Configuration DHCP et DNS...
+[INFO] Configuration DHCP/DNS pour l'AP
+  ↦ Configuration DHCP/DNS créée ✓
+[INFO] Configuration dnsmasq créée dans /etc/NetworkManager/dnsmasq-shared.d/
+  ↦ Configuration DNS supplémentaire ajoutée ✓
+[INFO] Configuration DNS supplémentaire créée
+
+========================================================================
+ÉTAPE 5 : CONFIGURATION DU PARE-FEU
+========================================================================
+
+◦ Configuration des règles de pare-feu...
+[INFO] Configuration des règles iptables
+
+========================================================================
+ÉTAPE 6 : ACTIVATION DU POINT D'ACCÈS
+========================================================================
+
+◦ Démarrage du point d'accès...
+[INFO] Activation du point d'accès
+[CMD] Exécution: Redémarrage NetworkManager
+[CMD] Commande: systemctl restart NetworkManager
+[CMD] Code de sortie: 0
+[CMD] Exécution: Activation connexion AP
+[CMD] Commande: nmcli connection up 'MaxLink-NETWORK'
+[OUT] Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/3)
+[CMD] Code de sortie: 0
+  ↦ Point d'accès activé ✓
+[SUCCESS] Point d'accès activé avec succès
+
+◦ Vérification de l'état...
+[INFO] Vérification de l'état du point d'accès
+  ↦ Point d'accès opérationnel ✓
+[SUCCESS] Point d'accès opérationnel
+  ↦ Service DNS actif ✓
+[INFO] Service dnsmasq actif
+
+========================================================================
+ÉTAPE 7 : FINALISATION
+========================================================================
+
+◦ Configuration de démarrage automatique...
+  ↦ Le point d'accès démarrera automatiquement ✓
+[INFO] Configuration de démarrage automatique activée
+
+◦ Mise à jour du statut du service...
+Statut ap mis à jour: active
+  ↦ Statut du service ap mis à jour: active
+  ↦ Statut du service mis à jour ✓
+[INFO] Statut du service ap mis à jour: active
+
+◦ Informations de connexion :
+  ↦ Nom du réseau : MaxLink-NETWORK
+  ↦ Mot de passe  : MDPsupersecret007
+  ↦ Adresse IP    : 192.168.4.1
+  ↦ Plage DHCP    : 192.168.4.10 - 192.168.4.100
+
+◦ Accès au dashboard :
+  ↦ http://192.168.4.1
+  ↦ http://maxlink-dashboard.local
+  ↦ http://dashboard.local
+[INFO] Configuration finale:
+[INFO]   - SSID: MaxLink-NETWORK
+[INFO]   - IP: 192.168.4.1
+[INFO]   - DHCP: 192.168.4.10 - 192.168.4.100
+
+◦ Installation terminée avec succès !
+
+◦ IMPORTANT : L'orchestrateur doit être installé pour gérer le démarrage ordonné
+
+◦ Test rapide de la résolution DNS...
+  ↦ DNS non fonctionnel - Un redémarrage peut être nécessaire ⚠
+[WARN] Test DNS final échoué - redémarrage recommandé
+
+  ↦ Redémarrage différé (installation complète en cours)
+
+[INFO] Redémarrage différé - SKIP_REBOOT=true
+[INFO] Script ap_install terminé avec le code 0
+
+[SUCCESS] ap_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 3/8 : Serveur Web et Dashboard
+========================================================================
+
+◦ Exécution de nginx_install.sh...
+
+[INFO] Exécution de nginx_install.sh
+[INFO] Script nginx_install initialisé
+[INFO] ========== DÉBUT DE L'INSTALLATION NGINX ET DASHBOARD (OFFLINE) ==========
+========================================================================
+ÉTAPE 1 : VÉRIFICATIONS
+========================================================================
+
+[INFO] Privilèges root confirmés
+  ↦ Privilèges root confirmés ✓
+
+◦ Vérification du cache local...
+[INFO] Vérification du cache dashboard
+  ↦ Dashboard trouvé dans le cache ✓
+[INFO] Dashboard valide trouvé dans le cache
+
+========================================================================
+ÉTAPE 2 : INSTALLATION DE NGINX
+========================================================================
+
+◦ Installation de Nginx depuis le cache...
+[INFO] Installation de Nginx depuis le cache local
+[INFO] Installation des paquets de la catégorie: nginx
+  ↦ Installation de nginx...
+[INFO] Installation du paquet depuis le cache: nginx
+[INFO] Fichiers .deb trouvés pour nginx: 2 fichier(s)
+[INFO] Fichiers: /var/cache/maxlink/packages/nginx-common_1.22.1-9+deb12u2_all.deb
+/var/cache/maxlink/packages/nginx_1.22.1-9+deb12u2_arm64.deb
+[SUCCESS] Paquet installé depuis le cache: nginx
+    ✓ nginx installé
+  ↦ Installation de nginx-common...
+[INFO] Installation du paquet depuis le cache: nginx-common
+[INFO] Fichiers .deb trouvés pour nginx-common: 1 fichier(s)
+[INFO] Fichiers: /var/cache/maxlink/packages/nginx-common_1.22.1-9+deb12u2_all.deb
+[SUCCESS] Paquet installé depuis le cache: nginx-common
+    ✓ nginx-common installé
+  ↦ Nginx installé depuis le cache ✓
+[SUCCESS] Nginx installé avec succès depuis le cache
+
+◦ Préparation de Nginx...
+[CMD] Exécution: Arrêt Nginx
+[CMD] Commande: systemctl stop nginx >/dev/null 2>&1
+[CMD] Code de sortie: 0
+  ↦ Service Nginx arrêté ✓
+
+========================================================================
+ÉTAPE 3 : INSTALLATION DU DASHBOARD
+========================================================================
+
+
+◦ Extraction du dashboard depuis le cache...
+[INFO] Répertoire temporaire: /tmp/maxlink-dashboard-1752928836
+  ↦ Extraction de l'archive...
+[CMD] Exécution: Extraction archive
+[CMD] Commande: tar -xzf '/var/cache/maxlink/dashboard/dashboard.tar.gz' -C '/tmp/maxlink-dashboard-1752928836'
+[CMD] Code de sortie: 0
+  ↦ Archive extraite ✓
+[SUCCESS] Archive extraite avec succès
+[INFO] Dossier racine de l'archive: /tmp/maxlink-dashboard-1752928836/DashboardV3-main
+[INFO] Recherche du dashboard dans: /tmp/maxlink-dashboard-1752928836/DashboardV3-main
+  ↦ Dossier dashboard trouvé ✓
+[INFO] Dossier dashboard trouvé: /tmp/maxlink-dashboard-1752928836/DashboardV3-main
+  ↦ Création du répertoire destination...
+[INFO] Répertoire destination créé: /var/www/maxlink-dashboard
+[CMD] Exécution: Copie dashboard
+[CMD] Commande: cp -r '/tmp/maxlink-dashboard-1752928836/DashboardV3-main'/* '/var/www/maxlink-dashboard'/
+[CMD] Code de sortie: 0
+  ↦ Dashboard installé ✓
+[SUCCESS] Dashboard installé avec succès
+[INFO] Nettoyage du répertoire temporaire
+
+◦ Configuration des permissions...
+[CMD] Exécution: Application propriétaire
+[CMD] Commande: chown -R www-data:www-data '/var/www/maxlink-dashboard'
+[CMD] Code de sortie: 0
+[CMD] Exécution: Permissions standard
+[CMD] Commande: chmod -R 755 '/var/www/maxlink-dashboard'
+[CMD] Code de sortie: 0
+  ↦ Permissions configurées ✓
+[INFO] Permissions appliquées au dashboard
+
+========================================================================
+ÉTAPE 4 : CONFIGURATION DE NGINX
+========================================================================
+
+◦ Création de la configuration du site...
+[INFO] Création de la configuration Nginx
+  ↦ Configuration créée ✓
+[SUCCESS] Configuration Nginx créée
+
+◦ Activation du site...
+[CMD] Exécution: Suppression site par défaut
+[CMD] Commande: rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+[CMD] Code de sortie: 0
+[CMD] Exécution: Suppression ancien lien
+[CMD] Commande: rm -f /etc/nginx/sites-enabled/maxlink-dashboard 2>/dev/null || true
+[CMD] Code de sortie: 0
+[CMD] Exécution: Création lien symbolique
+[CMD] Commande: ln -s /etc/nginx/sites-available/maxlink-dashboard /etc/nginx/sites-enabled/
+[CMD] Code de sortie: 0
+  ↦ Site activé ✓
+[INFO] Site Nginx activé
+[CMD] Exécution: Test configuration Nginx
+[CMD] Commande: nginx -t >/dev/null 2>&1
+[CMD] Code de sortie: 0
+  ↦ Configuration validée ✓
+[SUCCESS] Configuration Nginx valide
+
+◦ Démarrage de Nginx...
+[CMD] Exécution: Activation au démarrage
+[CMD] Commande: systemctl enable nginx >/dev/null 2>&1
+[CMD] Code de sortie: 0
+[CMD] Exécution: Démarrage Nginx
+[CMD] Commande: systemctl start nginx >/dev/null 2>&1
+[CMD] Code de sortie: 0
+  ↦ Nginx démarré et activé ✓
+[SUCCESS] Nginx démarré avec succès
+
+========================================================================
+ÉTAPE 5 : CONFIGURATION DNS
+========================================================================
+
+[INFO] Vérification de la configuration AP existante
+◦ Mode AP détecté, mise à jour de la configuration DNS...
+[INFO] Mode AP détecté, mise à jour DNS nécessaire
+  ↦ Configuration DNS déjà présente ✓
+[INFO] Configuration DNS déjà présente
+
+◦ Mise à jour du statut du service...
+Statut nginx mis à jour: active
+  ↦ Statut du service nginx mis à jour: active
+  ↦ Statut du service mis à jour ✓
+[INFO] Statut du service nginx mis à jour: active
+
+◦ Installation terminée avec succès !
+  ↦ Dashboard installé dans : /var/www/maxlink-dashboard
+  ↦ Accessible via :
+    • http://192.168.4.1
+    • http://maxlink-dashboard.local
+    • http://maxlink-dashboard.local
+    • http://dashboard.local
+[INFO] Installation terminée avec succès
+[INFO] Dashboard accessible à: http://192.168.4.1 et http://maxlink-dashboard.local
+
+  ↦ Redémarrage différé (installation complète en cours)
+
+[INFO] Redémarrage différé - SKIP_REBOOT=true
+[INFO] Script nginx_install terminé avec le code 0
+
+[SUCCESS] nginx_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 4/8 : Correctif NCSI Windows
+========================================================================
+
+◦ Exécution de fake_ncsi_install.sh...
+
+[INFO] Exécution de fake_ncsi_install.sh
+[INFO] Script fake_ncsi_install initialisé
+[INFO] ========== DÉBUT DE L'INSTALLATION FAKE NCSI ==========
+========================================================================
+INSTALLATION FAKE NCSI - CORRECTIF WINDOWS
+========================================================================
+
+[INFO] Privilèges root confirmés
+Cette correction utilise UNIQUEMENT nginx, AUCUNE modification DNS
+
+========================================================================
+ÉTAPE 1 : VÉRIFICATION DE L'ÉTAT MAXLINK
+========================================================================
+
+[INFO] Vérification de l'état MaxLink
+  ↦ MaxLink-NETWORK actif ✓
+[INFO] MaxLink-NETWORK actif
+  ↦ dnsmasq NetworkManager actif ✓
+[INFO] dnsmasq NetworkManager actif
+  ↦ nginx actif ✓
+[INFO] nginx actif
+  ↦ IP AP 192.168.4.1 configurée ✓
+  ↦ État MaxLink validé ✓
+[SUCCESS] État MaxLink validé avec succès
+
+========================================================================
+ÉTAPE 2 : CONFIGURATION NGINX POUR WINDOWS NCSI
+========================================================================
+
+[INFO] Configuration nginx pour Windows NCSI
+  ↦ Sauvegarde nginx créée: maxlink-dashboard.backup.20250719_144058 ✓
+[INFO] Sauvegarde nginx créée: /etc/nginx/sites-available/maxlink-dashboard.backup.20250719_144058
+  ↦ Ajout des endpoints Windows NCSI...
+[INFO] Ajout des endpoints Windows NCSI
+  ↦ Endpoints Windows NCSI ajoutés ✓
+[SUCCESS] Endpoints Windows NCSI ajoutés avec succès
+
+========================================================================
+ÉTAPE 3 : CONFIGURATION DHCP POUR GUIDER WINDOWS
+========================================================================
+
+[INFO] Configuration DHCP pour guider Windows
+  ↦ Création du fichier d'aide Windows...
+[INFO] Création du fichier d'aide Windows
+  ↦ Fichier d'aide Windows créé ✓
+[SUCCESS] Fichier d'aide Windows créé
+
+========================================================================
+ÉTAPE 4 : TESTS ET APPLICATION
+========================================================================
+
+[INFO] Tests et application des configurations
+  ↦ Test de la configuration nginx...
+  ↦ Configuration nginx valide ✓
+[SUCCESS] Configuration nginx valide
+  ↦ Rechargement nginx...
+  ↦ Nginx rechargé ✓
+[SUCCESS] Nginx rechargé avec succès
+  ↦ Rechargement de la configuration dnsmasq...
+  ↦ Configuration dnsmasq rechargée ✓
+[SUCCESS] Configuration dnsmasq rechargée
+
+========================================================================
+ÉTAPE 5 : TESTS DE VALIDATION
+========================================================================
+
+[INFO] Tests de validation
+  ↦ Vérification AP après modifications...
+  ↦ MaxLink-NETWORK toujours actif ✓
+[SUCCESS] MaxLink-NETWORK toujours actif
+  ↦ Test des endpoints Windows...
+[INFO] Test des endpoints Windows
+  ↦ Endpoint connecttest.txt fonctionnel ✓
+[SUCCESS] Endpoint connecttest.txt fonctionnel
+  ↦ Endpoint generate_204 fonctionnel ✓
+[SUCCESS] Endpoint generate_204 fonctionnel
+  ↦ Service dnsmasq toujours actif ✓
+[SUCCESS] Service dnsmasq toujours actif
+
+========================================================================
+ÉTAPE 6 : SURVEILLANCE DE LA STABILITÉ
+========================================================================
+
+[INFO] Surveillance de la stabilité (30 secondes)
+Surveillance de la stabilité MaxLink...
+  14:41:06: Stable ✓
+  14:41:08: Stable ✓
+  14:41:10: Stable ✓
+  14:41:12: Stable ✓
+  14:41:14: Stable ✓
+  14:41:16: Stable ✓
+  14:41:18: Stable ✓
+  14:41:20: Stable ✓
+  14:41:22: Stable ✓
+  14:41:24: Stable ✓
+  14:41:26: Stable ✓
+  14:41:28: Stable ✓
+  14:41:30: Stable ✓
+  14:41:32: Stable ✓
+  14:41:34: Stable ✓
+[SUCCESS] Surveillance complète - système stable
+
+========================================================================
+CORRECTION WINDOWS NCSI APPLIQUÉE AVEC SUCCÈS
+========================================================================
+
+✓ Endpoints nginx Windows NCSI configurés
+✓ Message personnalisé appliqué
+✓ Options DHCP d'aide ajoutées
+✓ Configuration MaxLink préservée
+✓ Aucune modification DNS (pas de boucle)
+
+PRINCIPE DE FONCTIONNEMENT:
+  → Windows teste la connectivité
+  → DHCP lui suggère d'utiliser 192.168.4.1
+  → nginx répond avec votre message personnalisé
+  → Windows considère le réseau comme 'Connecté'
+  → Raspberry Pi reste stable (pas de redirection DNS)
+
+TESTS MANUELS:
+  → curl http://192.168.4.1/connecttest.txt
+  → curl http://192.168.4.1/generate_204
+  → Connecter un PC Windows et observer le statut
+
+SURVEILLANCE:
+  → Surveillez pendant 5-10 minutes
+  → Redémarrage test: sudo reboot
+
+Sauvegarde disponible: /etc/nginx/sites-available/maxlink-dashboard.backup.20250719_144058
+
+[SUCCESS] Installation Fake NCSI terminée avec succès
+[INFO] ========== FIN DE L'INSTALLATION FAKE NCSI ==========
+[INFO] Redémarrage ignoré (SKIP_REBOOT=true)
+[INFO] Script fake_ncsi_install terminé avec le code 0
+
+[SUCCESS] fake_ncsi_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 5/8 : Broker MQTT
+========================================================================
+
+◦ Exécution de mqtt_install.sh...
+
+[INFO] Exécution de mqtt_install.sh
+[INFO] Script mqtt_install initialisé
+[INFO] ========== DÉBUT DE L'INSTALLATION MQTT BROKER ==========
+
+========================================================================
+INSTALLATION DU BROKER MQTT (MOSQUITTO)
+========================================================================
+
+Configuration : utilisateur 'mosquitto' / mot de passe 'mqtt'
+
+[INFO] Privilèges root confirmés
+ÉTAPE 1 : PRÉPARATION DU SYSTÈME
+========================================================================
+
+◦ Nettoyage du système de paquets...
+  ↦ Système de paquets prêt ✓
+[INFO] Système de paquets nettoyé
+
+========================================================================
+ÉTAPE 2 : INSTALLATION DES PAQUETS
+========================================================================
+
+◦ Installation de Mosquitto et dépendances...
+[INFO] Installation hybride de Mosquitto et dépendances
+  ↦ Recherche dans le cache local...
+[INFO] Tentative d'installation depuis le cache
+  ↦ Installé depuis le cache ✓
+[SUCCESS] Mosquitto et dépendances installé depuis le cache
+
+[SUCCESS] Tous les paquets installés avec succès
+  ↦ Mosquitto installé ✓
+[INFO] Mosquitto installé avec succès
+
+========================================================================
+ÉTAPE 3 : CONFIGURATION SYSTÈME
+========================================================================
+
+◦ Vérification de l'utilisateur système...
+  ↦ Utilisateur système existant ✓
+
+◦ Création des répertoires...
+  ↦ Répertoires créés et permissions appliquées ✓
+[INFO] Répertoires Mosquitto créés
+
+◦ Mise à jour du cache des bibliothèques...
+  ↦ Cache des bibliothèques mis à jour ✓
+[INFO] ldconfig exécuté
+
+========================================================================
+ÉTAPE 4 : CONFIGURATION DE MOSQUITTO
+========================================================================
+
+◦ Création de l'utilisateur MQTT...
+[CMD] Exécution: Création utilisateur MQTT
+[CMD] Commande: /usr/bin/mosquitto_passwd -b -c '/etc/mosquitto/passwords' 'mosquitto' 'mqtt'
+[CMD] Code de sortie: 0
+  ↦ Utilisateur 'mosquitto' créé ✓
+[INFO] Utilisateur MQTT créé: mosquitto
+
+◦ Création du fichier de configuration avec statistiques...
+[INFO] Ancienne configuration sauvegardée
+  ↦ Configuration créée avec statistiques activées ✓
+[SUCCESS] Configuration Mosquitto créée avec topics système
+
+◦ Configuration des permissions ACL...
+  ↦ Permissions ACL configurées ✓
+[INFO] Fichier ACL créé
+
+========================================================================
+ÉTAPE 5 : DÉMARRAGE DU SERVICE
+========================================================================
+
+◦ Activation du service au démarrage...
+[CMD] Exécution: Activation au démarrage
+[CMD] Commande: systemctl enable mosquitto >/dev/null 2>&1
+[CMD] Code de sortie: 0
+  ↦ Service activé ✓
+
+◦ Démarrage de Mosquitto...
+[CMD] Exécution: Démarrage Mosquitto
+[CMD] Commande: systemctl start mosquitto
+[CMD] Code de sortie: 0
+  ↦ Mosquitto démarré ✓
+[SUCCESS] Mosquitto démarré avec succès
+  ↦ Service actif et fonctionnel ✓
+[INFO] Service Mosquitto actif
+
+========================================================================
+ÉTAPE 6 : TESTS DE CONNEXION
+========================================================================
+
+◦ Test de connexion MQTT (port 1883)...
+  ↦ Connexion MQTT réussie ✓
+[SUCCESS] Test de connexion MQTT réussi
+
+◦ Test du port WebSocket (9001)...
+  ↦ Port WebSocket non accessible ⚠
+[WARN] Port WebSocket non accessible immédiatement
+
+◦ Test des topics système ()...
+mosquitto version 2.0.11
+  ↦ Topics système accessibles ✓
+[SUCCESS] Topics système  accessibles
+
+◦ Mise à jour du statut du service...
+Statut mqtt mis à jour: active
+  ↦ Statut du service mqtt mis à jour: active
+  ↦ Statut du service mis à jour ✓
+[INFO] Statut du service mqtt mis à jour: active
+
+========================================================================
+INSTALLATION TERMINÉE AVEC SUCCÈS !
+========================================================================
+
+◦ Broker MQTT Mosquitto installé et configuré
+◦ Topics système () activés pour les statistiques
+
+◦ Informations de connexion :
+  • Serveur      : localhost (ou IP du Raspberry Pi)
+  • Port MQTT    : 1883
+  • Port WebSocket : 9001
+  • Utilisateur  : mosquitto
+  • Mot de passe : mqtt
+
+◦ Commandes utiles :
+  • État : systemctl status mosquitto
+  • Logs : journalctl -u mosquitto -f
+  • Test : mosquitto_sub -h localhost -u mosquitto -P mqtt -t '#' -v
+
+◦ IMPORTANT : L'orchestrateur doit être installé pour gérer le démarrage
+
+[SUCCESS] Installation MQTT Broker terminée
+[INFO] Configuration: mosquitto/mqtt sur ports 1883 et 9001
+
+  ↦ Redémarrage différé (installation complète en cours)
+
+[INFO] Redémarrage différé - SKIP_REBOOT=true
+[INFO] Script mqtt_install terminé avec le code 0
+
+[SUCCESS] mqtt_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 6/8 : Widgets MQTT
+========================================================================
+
+◦ Exécution de mqtt_wgs_install.sh...
+
+[INFO] Exécution de mqtt_wgs_install.sh
+[INFO] Script mqtt_wgs_install initialisé
+[INFO] ========== DÉBUT DE L'INSTALLATION DES WIDGETS MQTT ==========
+
+========================================================================
+INSTALLATION DES WIDGETS MQTT (WGS)
+========================================================================
+
+◦ Vérification du broker MQTT...
+  ↦ Broker MQTT actif ✓
+
+◦ Recherche des widgets disponibles...
+  ↦ 7 widget(s) trouvé(s) ✓
+
+Widgets disponibles :
+  • mqttstats
+  • rebootbutton
+  • servermonitoring
+  • testpersist
+  • timesync
+  • uptime
+  • wifistats
+
+[INFO] Installation des dépendances Python
+◦ Vérification des paquets Python...
+  ↦ Installation des paquets manquants...
+[INFO] Installation des paquets de la catégorie: python
+  ↦ Installation de python3-psutil...
+[INFO] Installation du paquet depuis le cache: python3-psutil
+[INFO] Fichiers .deb trouvés pour python3-psutil: 1 fichier(s)
+[INFO] Fichiers: /var/cache/maxlink/packages/python3-psutil_5.9.4-1+b1_arm64.deb
+[SUCCESS] Paquet installé depuis le cache: python3-psutil
+    ✓ python3-psutil installé
+  ↦ Installation de python3-paho-mqtt...
+[INFO] Installation du paquet depuis le cache: python3-paho-mqtt
+[INFO] Fichiers .deb trouvés pour python3-paho-mqtt: 1 fichier(s)
+[INFO] Fichiers: /var/cache/maxlink/packages/python3-paho-mqtt_1.6.1-1_all.deb
+[SUCCESS] Paquet installé depuis le cache: python3-paho-mqtt
+    ✓ python3-paho-mqtt installé
+  ↦ Installation de python3-pip...
+[INFO] Installation du paquet depuis le cache: python3-pip
+[INFO] Fichiers .deb trouvés pour python3-pip: 1 fichier(s)
+[INFO] Fichiers: /var/cache/maxlink/packages/python3-pip_23.0.1+dfsg-1+rpt1_all.deb
+[SUCCESS] Paquet installé depuis le cache: python3-pip
+    ✓ python3-pip installé
+  ↦ Installation de python3-setuptools...
+[INFO] Installation du paquet depuis le cache: python3-setuptools
+[INFO] Fichiers .deb trouvés pour python3-setuptools: 1 fichier(s)
+[INFO] Fichiers: /var/cache/maxlink/packages/python3-setuptools_66.1.1-1+deb12u1_all.deb
+[SUCCESS] Paquet installé depuis le cache: python3-setuptools
+    ✓ python3-setuptools installé
+  ↦ Dépendances Python installées ✓
+
+========================================================================
+INSTALLATION DES WIDGETS
+========================================================================
+
+Installation du widget: mqttstats
+------------------------------------
+[SUCCESS] Widget mqttstats validé
+  ↦ Copie du core des widgets...
+[INFO] Vérification des dépendances Python pour mqttstats
+[INFO] Dépendances Python vérifiées (installées via le cache)
+[INFO] Création du service maxlink-widget-mqttstats
+[INFO] Copie des fichiers du widget vers /opt/maxlink
+[INFO] Service créé : maxlink-widget-mqttstats.service
+[SUCCESS] Service activé: maxlink-widget-mqttstats
+[SUCCESS] Service démarré: maxlink-widget-mqttstats
+[SUCCESS] Widget mqttstats enregistré
+  ↦ Widget mqttstats installé ✓
+  ↦ Note : L'orchestrateur gère le démarrage ordonné
+
+Installation du widget: rebootbutton
+------------------------------------
+[SUCCESS] Widget rebootbutton validé
+[INFO] Vérification des dépendances Python pour rebootbutton
+[INFO] Dépendances Python vérifiées (installées via le cache)
+[INFO] Création du service maxlink-widget-rebootbutton
+[INFO] Copie des fichiers du widget vers /opt/maxlink
+[INFO] Service créé : maxlink-widget-rebootbutton.service
+[SUCCESS] Service activé: maxlink-widget-rebootbutton
+[SUCCESS] Service démarré: maxlink-widget-rebootbutton
+[SUCCESS] Widget rebootbutton enregistré
+  ↦ Widget rebootbutton installé ✓
+  ↦ Note : L'orchestrateur gère le démarrage ordonné
+
+Installation du widget: servermonitoring
+------------------------------------
+[SUCCESS] Widget servermonitoring validé
+[INFO] Vérification des dépendances Python pour servermonitoring
+[INFO] Dépendances Python vérifiées (installées via le cache)
+[INFO] Création du service maxlink-widget-servermonitoring
+[INFO] Copie des fichiers du widget vers /opt/maxlink
+[INFO] Service créé : maxlink-widget-servermonitoring.service
+[SUCCESS] Service activé: maxlink-widget-servermonitoring
+[SUCCESS] Service démarré: maxlink-widget-servermonitoring
+[SUCCESS] Widget servermonitoring enregistré
+  ↦ Widget servermonitoring installé ✓
+  ↦ Note : L'orchestrateur gère le démarrage ordonné
+
+Installation du widget: testpersist
+------------------------------------
+[SUCCESS] Widget testpersist validé
+[INFO] Vérification des dépendances Python pour testpersist
+[INFO] Dépendances Python vérifiées (installées via le cache)
+[INFO] Création du service maxlink-widget-testpersist
+[INFO] Copie des fichiers du widget vers /opt/maxlink
+[INFO] Service créé : maxlink-widget-testpersist.service
+[SUCCESS] Service activé: maxlink-widget-testpersist
+[SUCCESS] Service démarré: maxlink-widget-testpersist
+[SUCCESS] Widget testpersist enregistré
+  ↦ Widget testpersist installé ✓
+  ↦ Note : L'orchestrateur gère le démarrage ordonné
+
+Installation du widget: timesync
+------------------------------------
+[SUCCESS] Widget timesync validé
+[INFO] Vérification des dépendances Python pour timesync
+[INFO] Dépendances Python vérifiées (installées via le cache)
+[INFO] Création du service maxlink-widget-timesync
+[INFO] Copie des fichiers du widget vers /opt/maxlink
+[INFO] Service créé : maxlink-widget-timesync.service
+[SUCCESS] Service activé: maxlink-widget-timesync
+[SUCCESS] Service démarré: maxlink-widget-timesync
+[SUCCESS] Widget timesync enregistré
+  ↦ Widget timesync installé ✓
+  ↦ Note : L'orchestrateur gère le démarrage ordonné
+
+Installation du widget: uptime
+------------------------------------
+[SUCCESS] Widget uptime validé
+[INFO] Vérification des dépendances Python pour uptime
+[INFO] Aucune dépendance Python pour uptime
+  ↦ Widget passif (pas de collector)
+[SUCCESS] Widget uptime enregistré
+  ↦ Widget uptime installé ✓
+
+Installation du widget: wifistats
+------------------------------------
+[SUCCESS] Widget wifistats validé
+[INFO] Vérification des dépendances Python pour wifistats
+[INFO] Dépendances Python vérifiées (installées via le cache)
+[INFO] Création du service maxlink-widget-wifistats
+[INFO] Copie des fichiers du widget vers /opt/maxlink
+[INFO] Service créé : maxlink-widget-wifistats.service
+[SUCCESS] Service activé: maxlink-widget-wifistats
+[SUCCESS] Service démarré: maxlink-widget-wifistats
+[SUCCESS] Widget wifistats enregistré
+  ↦ Widget wifistats installé ✓
+  ↦ Note : L'orchestrateur gère le démarrage ordonné
+
+========================================================================
+VÉRIFICATION FINALE
+========================================================================
+
+◦ État des services :
+  ↦ mqttstats : ✓ actif
+  ↦ rebootbutton : ✓ actif
+  ↦ servermonitoring : ✓ actif
+  ↦ testpersist : ✓ actif
+  ↦ timesync : ✓ actif
+  ↦ uptime : ✗ inactif
+  ↦ wifistats : ✓ actif
+
+◦ Test de réception MQTT...
+  ↦ Messages MQTT reçus ✓
+
+◦ Mise à jour du statut du service...
+Statut mqtt_wgs mis à jour: active
+  ↦ Statut du service mqtt_wgs mis à jour: active
+  ↦ Statut du service mis à jour : active ✓
+[INFO] Statut du service mqtt_wgs mis à jour: active
+
+========================================================================
+RÉSUMÉ
+========================================================================
+
+◦ Widgets trouvés    : 7
+◦ Widgets installés  : 7
+◦ Widgets échoués    : 0
+
+✓ Installation terminée avec succès !
+[SUCCESS] Tous les widgets installés avec succès
+Commandes utiles :
+  • Voir tous les logs    : journalctl -u 'maxlink-widget-*' -f
+  • Voir tous les topics  : mosquitto_sub -h localhost -u mosquitto -P mqtt -t '#' -v
+  • État des services     : systemctl status 'maxlink-widget-*'
+
+[INFO] Installation terminée - Installés: 7/7
+
+  ↦ Redémarrage différé (installation complète en cours)
+
+[INFO] Redémarrage différé - SKIP_REBOOT=true
+[INFO] Script mqtt_wgs_install terminé avec le code 0
+
+[SUCCESS] mqtt_wgs_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 7/8 : Systeme php
+========================================================================
+
+◦ Exécution de php_archives_install.sh...
+
+[INFO] Exécution de php_archives_install.sh
+[INFO] Script php_archives_install initialisé
+[INFO] ========== DÉBUT DE L'INSTALLATION PHP Archives System ==========
+
+========================================================================
+INSTALLATION PHP Archives System (VERSION FINALE 100%)
+========================================================================
+
+🔍 Vérifications initiales...
+   ✅ Privilèges root confirmés
+[SUCCESS] Privilèges root confirmés
+
+========================================================================
+ÉTAPE 1 : VÉRIFICATION DES PRÉREQUIS
+========================================================================
+
+[INFO] Vérification des prérequis pour PHP Archives System
+[SUCCESS] Prérequis validés
+   ✅ Tous les prérequis sont satisfaits
+
+========================================================================
+ÉTAPE 2 : INSTALLATION PHP
+========================================================================
+
+   ↦ PHP non installé - installation complète nécessaire
+◦ Installation de PHP depuis le cache...
+[INFO] Installation de PHP depuis le cache local
+  ↦ Vérification du cache PHP...
+[INFO] Vérification complète du cache pour la catégorie: php
+  ↦ Vérification de la présence de tous les paquets php...
+    ✓ Présent: php (11 fichier(s))
+[SUCCESS] Paquet trouvé dans cache: php
+    ✓ Présent: php-cli (1 fichier(s))
+[SUCCESS] Paquet trouvé dans cache: php-cli
+    ✓ Présent: php-fpm (1 fichier(s))
+[SUCCESS] Paquet trouvé dans cache: php-fpm
+  ↦ Résumé: 3/3 paquets présents
+  ↦ ✅ Tous les paquets php sont présents dans le cache
+[SUCCESS] Cache complet pour php
+  ↦ ✅ Cache PHP vérifié et complet
+  ↦ Vérification des installations existantes...
+  ↦ Installation PHP complète nécessaire
+[INFO] Installation PHP complète nécessaire
+  ↦ Installation simultanée de tous les paquets PHP...
+[INFO] Lancement de l'installation simultanée PHP
+[INFO] Installation simultanée des paquets de la catégorie: php
+  ↦ Collecte des fichiers .deb pour installation simultanée...
+    ✓ Fichier trouvé: php
+    ✓ Fichier trouvé: php-cli
+    ✓ Fichier trouvé: php-fpm
+  ↦ Fichiers collectés: 3 paquets prêts
+[INFO] Fichiers .deb collectés pour installation:  /var/cache/maxlink/packages/php8.2-common_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2_8.2.28-1~deb12u1_all.deb
+/var/cache/maxlink/packages/php-common_2%3a93_all.deb
+/var/cache/maxlink/packages/php8.2-opcache_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-cgi_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php8.2-readline_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-fpm_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php8.2-cli_8.2.28-1~deb12u1_arm64.deb
+/var/cache/maxlink/packages/php-fpm_2%3a8.2+93_all.deb
+/var/cache/maxlink/packages/php-cli_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-cli_2%3a8.2+93_all.deb /var/cache/maxlink/packages/php-fpm_2%3a8.2+93_all.deb
+  ↦ Installation simultanée de tous les paquets php...
+[INFO] Lancement installation dpkg simultanée
+    ✓ Tous les paquets php installés simultanément
+[SUCCESS] Installation simultanée réussie pour php
+  ↦ ✅ PHP installé avec succès depuis le cache
+[SUCCESS] PHP installé avec succès
+  ↦ Vérification post-installation...
+    ✓ php vérifié
+    ✓ php-cli vérifié
+    ✓ php-fpm vérifié
+  ↦ ✅ Vérification post-installation réussie
+[SUCCESS] Vérification post-installation PHP réussie
+   ✅ PHP installé avec succès
+
+========================================================================
+ÉTAPE 3 : ACTIVATION PHP-FPM
+========================================================================
+
+[INFO] Activation du service PHP-FPM
+  ↦ Activation de PHP-FPM...
+    ✓ PHP-FPM déjà actif
+[INFO] PHP-FPM déjà actif
+   ✅ PHP-FPM activé avec succès
+
+========================================================================
+ÉTAPE 4 : INSTALLATION DES FICHIERS
+========================================================================
+
+[INFO] Installation des fichiers PHP et JavaScript
+  ↦ Copie des fichiers PHP et JavaScript...
+    ✓ archives-list.php copié
+[SUCCESS] Fichier copié: archives-list.php
+    ✓ download-archive.php copié
+[SUCCESS] Fichier copié: download-archive.php
+    ✓ download-manager.js copié
+[SUCCESS] Fichier copié: download-manager.js
+[SUCCESS] Fichiers PHP et JavaScript installés
+
+========================================================================
+ÉTAPE 5 : CONFIGURATION NGINX SÉCURISÉE POUR PHP
+========================================================================
+
+[INFO] Configuration nginx pour PHP avec sécurité renforcée
+  ↦ Vérification de la configuration nginx...
+  ↦ Ajout de la configuration PHP sécurisée à nginx...
+[INFO] Modification de la configuration nginx pour PHP
+    ✓ Backup créé: maxlink-dashboard.backup.php.20250719_144334
+[INFO] Backup configuration nginx créé
+    ✓ Configuration PHP sécurisée ajoutée
+[SUCCESS] Configuration PHP sécurisée ajoutée à nginx
+  ↦ Test de la configuration nginx...
+    ✓ Configuration nginx validée
+[SUCCESS] Configuration nginx valide
+  ↦ Redémarrage de nginx...
+    ✓ Nginx redémarré avec succès
+[SUCCESS] Nginx redémarré avec configuration PHP sécurisée
+   ✅ Nginx configuré avec sécurité renforcée
+
+========================================================================
+ÉTAPE 6 : PERMISSIONS STRICTES (644 FORCÉ)
+========================================================================
+
+[INFO] Configuration STRICTE des permissions (644 forcé)
+  ↦ Arrêt temporaire nginx pour permissions strictes...
+  ↦ Application FORCÉE des permissions sécurisées...
+    → Sécurisation de archives-list.php...
+    ✓ archives-list.php sécurisé (644)
+[SUCCESS] Permissions strictes: archives-list.php (644)
+    → Sécurisation de download-archive.php...
+    ✓ download-archive.php sécurisé (644)
+[SUCCESS] Permissions strictes: download-archive.php (644)
+    → Sécurisation de download-manager.js...
+    ✓ download-manager.js sécurisé (644)
+[SUCCESS] Permissions strictes: download-manager.js (644)
+    ✓ Répertoire archives configuré (755)
+  ↦ Redémarrage nginx...
+[SUCCESS] Permissions strictes configurées
+   ✅ Permissions strictes (644) appliquées
+
+========================================================================
+ÉTAPE 7 : OPTIMISATION SÉCURITÉ PHP
+========================================================================
+
+[INFO] Optimisation de la sécurité PHP
+  ↦ Configuration de la sécurité PHP...
+    ✓ Configuration sécurité PHP créée
+    ✓ PHP-FPM redémarré avec nouvelle configuration
+[SUCCESS] Sécurité PHP optimisée
+   ✅ Sécurité PHP optimisée
+
+========================================================================
+ÉTAPE 8 : CRÉATION ARCHIVES DE TEST
+========================================================================
+
+[INFO] Création des archives de test
+  ↦ Vérification du répertoire de données...
+  ↦ Archives existantes trouvées (3 fichiers CSV) ✓
+[INFO] Archives existantes: 3 fichiers
+   ✅ Archives de test créées
+
+========================================================================
+ÉTAPE 9 : PRÉPARATION DIAGNOSTIC
+========================================================================
+
+[INFO] Création du lien pour diagnostic
+  ↦ Création du lien symbolique pour le log d'installation...
+   ✅ Diagnostic préparé
+
+========================================================================
+ÉTAPE 10 : VALIDATION FINALE COMPLÈTE
+========================================================================
+
+[INFO] Test complet du service PHP
+  ↦ Test de PHP CLI...
+    ✓ PHP CLI fonctionnel (version 8.2.28)
+[SUCCESS] PHP CLI vérifié: 8.2.28
+  ↦ Test de PHP-FMP...
+    ✓ PHP-FPM actif et fonctionnel
+[SUCCESS] PHP-FPM vérifié actif
+  ↦ Test HTTP et JSON des scripts...
+    ✓ archives-list.php → JSON valide (HTTP 200)
+[SUCCESS] archives-list.php opérationnel
+    ✓ download-archive.php → JSON valide (HTTP 200)
+[SUCCESS] download-archive.php opérationnel
+    ✓ download-manager.js → accessible (HTTP 200)
+[SUCCESS] download-manager.js accessible
+  ↦ Test de protection injection SQL...
+    ✓ Protection injection SQL → Bloqué (HTTP 400)
+[SUCCESS] Sécurité injection SQL validée
+
+========================================================================
+INSTALLATION TERMINÉE - OPTIMISATION MAXIMALE 100%
+========================================================================
+
+Statut php_archives mis à jour: active
+  ↦ Statut du service php_archives mis à jour: active
+🎉 PHP Archives System installé avec optimisation MAXIMALE !
+
+🔗 URLs disponibles :
+  • Liste des archives : http://localhost/archives-list.php
+  • Téléchargement fichier : http://localhost/download-archive.php?file=S01_2025_machine1.csv&year=2025
+  • Liste semaine : http://localhost/download-archive.php?week=1&year=2025
+  • Gestionnaire JavaScript : http://localhost/download-manager.js
+
+🛡️ Sécurité appliquée :
+  • ✅ Permissions strictes (644 pour fichiers)
+  • ✅ Protection injection SQL nginx
+  • ✅ Configuration PHP sécurisée
+  • ✅ Headers sécurité HTTP
+  • ✅ Validation JSON stricte
+
+📊 Test recommandé :
+  sudo ./diagnostic_php_archives.sh
+
+🎯 Score attendu: 100% !
+[SUCCESS] Installation PHP Archives System terminée avec succès - OPTIMISATION MAXIMALE
+[INFO] Script php_archives terminé avec le code 0
+[INFO] Script php_archives_install terminé avec le code 0
+
+[SUCCESS] php_archives_install.sh installé avec succès
+
+  ↦ Pause avant l'étape suivante... 10 9 8 7 6 5 4 3 2 1 ✓
+
+========================================================================
+ÉTAPE 8/8 : Orchestrateur et finalisation
+========================================================================
+
+◦ Exécution de orchestrator_install.sh...
+
+[INFO] Exécution de orchestrator_install.sh
+[INFO] Script orchestrator_install initialisé
+
+========================================================================
+ORCHESTRATEUR MAXLINK - INSTALLATION
+========================================================================
+
+◦ Première installation détectée
+[INFO] Première installation de l'orchestrateur
+
+========================================================================
+COPIE DES WIDGETS
+========================================================================
+⚠ Répertoire des widgets non trouvé : /media/prod/USBTOOL/widgets
+[ERROR] Répertoire widgets non trouvé
+⚠ Erreur lors de la copie des widgets
+[ERROR] Échec de la copie des widgets
+
+========================================================================
+CONFIGURATION DES PERMISSIONS SSH POUR L'UTILISATEUR PROD
+========================================================================
+◦ Activation du support ACL sur le système de fichiers...
+  ↦ ACL activé ✓
+◦ Configuration des permissions ACL pour l'utilisateur prod...
+◦ Réinitialisation du masque ACL...
+  ↦ Masque ACL réinitialisé à rwx ✓
+  ↦ Permissions ACL configurées ✓
+  ↦ Script de maintenance créé : /usr/local/bin/maxlink-fix-prod-permissions
+
+◦ Vérification des permissions...
+  ↦ Permissions ACL vérifiées ✓
+  ⚠ Masque ACL incorrect (r-x), correction...
+  ↦ Masque corrigé ✓
+[SUCCESS] Permissions SSH configurées pour l'utilisateur prod
+
+========================================================================
+CONFIGURATION DU MODULE RTC
+========================================================================
+◦ Détection du module RTC...
+  ↦ Module RTC déjà configuré ✓
+  ↦ RTC fonctionnel : 2025-07-19 14:44:04.002257+02:00
+  ↦ Type détecté/supposé : ds3231
+  ↦ Module RTC détecté : ds3231 ✓
+[INFO] Module RTC ds3231 détecté
+◦ Configuration du device tree overlay...
+  ↦ Overlay ajouté au fichier de configuration ✓
+[SUCCESS] Overlay RTC configuré dans /boot/firmware/config.txt
+◦ Vérification des outils RTC...
+  ↦ Outils RTC disponibles ✓
+◦ Création du service de synchronisation RTC...
+  ↦ Service de synchronisation créé ✓
+[SUCCESS] Service RTC configuré
+◦ Désactivation de fake-hwclock...
+  ↦ fake-hwclock désactivé ✓
+◦ Désactivation des services NTP (serveur hors ligne)...
+  ↦ systemd-timesyncd désactivé ✓
+  ↦ Synchronisation temps réseau complètement désactivée ✓
+
+✓ Configuration RTC terminée
+  Module : ds3231
+  Service : maxlink-rtc-sync.service
+  Services NTP : désactivés
+[SUCCESS] Configuration RTC complète pour module ds3231 avec NTP désactivé
+
+========================================================================
+INFRASTRUCTURE D'ORCHESTRATION
+========================================================================
+◦ Création des scripts de vérification...
+  ↦ Scripts de vérification créés ✓
+[SUCCESS] Scripts healthcheck créés
+◦ Création des services systemd...
+  ↦ Services systemd créés ✓
+[SUCCESS] Services systemd créés
+◦ Création des targets systemd...
+  ↦ Targets systemd créés ✓
+[SUCCESS] Targets systemd créés
+◦ Configuration des dépendances des services...
+  ↦ Dépendances configurées ✓
+[SUCCESS] Overrides systemd configurés
+◦ Création du script orchestrateur...
+  ↦ Script orchestrateur créé ✓
+[SUCCESS] Script de gestion créé
+
+========================================================================
+CONFIGURATION SYSTEMD
+========================================================================
+◦ Rechargement de la configuration systemd...
+  ↦ Configuration rechargée ✓
+[SUCCESS] Systemd daemon-reload effectué
+
+========================================================================
+CORRECTION FINALE DES PERMISSIONS
+========================================================================
+◦ Correction du masque ACL après les installations...
+  ↦ Dashboard détecté, correction des permissions...
+  ↦ Permissions du dashboard corrigées ✓
+[SUCCESS] Permissions du dashboard corrigées après installation
+  ↦ Masque ACL global corrigé ✓
+
+◦ État final des permissions:
+# owner: www-data
+# group: www-data
+user:prod:rwx
+group::r-x
+mask::rwx
+default:user:prod:rwx
+default:group::r-x
+default:mask::rwx
+
+========================================================================
+ACTIVATION DE L'ORCHESTRATEUR
+========================================================================
+[2025-07-19 14:44:10] Activation des services MaxLink...
+[2025-07-19 14:44:11] Services activés
+[SUCCESS] Services de l'orchestrateur activés
+
+========================================================================
+INSTALLATION TERMINÉE
+========================================================================
+
+✓ L'orchestrateur MaxLink a été installé avec succès !
+
+Commandes disponibles :
+  maxlink-orchestrator start    - Démarrer tous les services
+  maxlink-orchestrator stop     - Arrêter tous les services
+  maxlink-orchestrator status   - Voir l'état des services
+  maxlink-orchestrator restart  - Redémarrer tous les services
+
+Script de maintenance des permissions :
+  /usr/local/bin/maxlink-fix-prod-permissions
+[SUCCESS] Installation de l'orchestrateur terminée
+[INFO] Script orchestrator_install terminé avec le code 0
+
+[SUCCESS] orchestrator_install.sh installé avec succès
+
+========================================================================
+INSTALLATION TERMINÉE
+========================================================================
+
+Durée totale : 20m 44s
+
+
+========================================================================
+STATUT DE L'INSTALLATION
+========================================================================
+  ✓ update: active
+  ✓ ap: active
+  ✓ nginx: active
+  ✓ fake_ncsi: active
+  ✓ mqtt: active
+  ✓ mqtt_wgs: active
+  ✓ php_archives: active
+  ✓ orchestrator: active
+========================================================================
+
+✓ Tous les composants ont été installés avec succès !
+
+MaxLink est maintenant opérationnel. Les fonctionnalités suivantes sont disponibles :
+  • Point d'accès WiFi : MaxLink-NETWORK
+  • Dashboard Web : http://192.168.4.1 ou http://maxlink-dashboard.local
+  • Broker MQTT : mosquitto@localhost:1883
+  • Widgets de monitoring actifs
+  • Orchestrateur pour la gestion des services
+
+Commandes utiles :
+  • État du système : sudo /usr/local/bin/maxlink-orchestrator status
+  • Vérification : sudo /usr/local/bin/maxlink-orchestrator check
+  • Diagnostic : sudo /media/prod/USBTOOL/diag.sh
+
+[SUCCESS] Installation complète réussie - 0 erreur
+
+Un redémarrage est nécessaire pour finaliser l'installation.
+
+  ↦ Redémarrage du système dans 30 secondes...
