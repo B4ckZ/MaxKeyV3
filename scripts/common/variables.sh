@@ -41,10 +41,9 @@ SYSTEM_USER_HOME="/home/$SYSTEM_USER"
 # ===============================================================================
 
 # Réseau WiFi pour les mises à jour
-#WIFI_SSID="Max"
-#WIFI_PASSWORD="1234567890"
-WIFI_SSID="!"
-WIFI_PASSWORD="kwery360"
+WIFI_SSID="Max"
+WIFI_PASSWORD="1234567890"
+
 
 # Configuration du point d'accès WiFi
 AP_SSID="MaxLink-NETWORK"
