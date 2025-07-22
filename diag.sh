@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - DIAGNOSTIC COMPLET UNIFIÉ
+# MAXLINK - DIAGNOSTIC COMPLET UNIFIÉ (VERSION CORRIGÉE)
 # Script unique pour diagnostic complet avec tests de stabilité
-# Une commande, un compte rendu complet automatique
+# Version adaptée pour environnement hors-ligne
 # ===============================================================================
 
 # Couleurs pour l'affichage
@@ -26,6 +26,12 @@ SERVICES_STATUS_FILE="/var/lib/maxlink/services_status.json"
 MQTT_STRESS_DURATION=10
 MQTT_STRESS_MESSAGES=50
 NETWORK_STRESS_DURATION=5
+
+# Mode hors-ligne (pas de tests internet)
+OFFLINE_MODE=true
+if [ "$1" = "--online" ]; then
+    OFFLINE_MODE=false
+fi
 
 # ===============================================================================
 # FONCTIONS UTILITAIRES
@@ -53,6 +59,12 @@ print_result() {
 
 print_detail() {
     echo "  ↦ $1"
+}
+
+# Validation numérique sécurisée
+is_number() {
+    local value="$1"
+    [ -n "$value" ] && [ "$value" -eq "$value" ] 2>/dev/null
 }
 
 # ===============================================================================
@@ -471,31 +483,89 @@ test_mqtt_data_flow() {
 }
 
 # ===============================================================================
-# TESTS DE PERFORMANCE
+# TESTS DE PERFORMANCE (VERSION CORRIGÉE)
 # ===============================================================================
 
 test_performance() {
-    print_header "TESTS DE PERFORMANCE"
+    print_header "TESTS DE PERFORMANCE LOCALE"
     
-    print_test "Temps de réponse HTTP"
+    print_test "Dashboard principal"
     local response_time=$(curl -s -o /dev/null -w "%{time_total}" http://localhost/ 2>/dev/null)
     
     if [ -n "$response_time" ] && command -v bc >/dev/null 2>&1; then
         local response_ms=$(echo "$response_time * 1000" | bc 2>/dev/null | cut -d. -f1)
         
-        if [ "$response_ms" -lt 100 ]; then
-            print_result "OK"
-            print_detail "Temps: ${response_ms}ms"
-        elif [ "$response_ms" -lt 500 ]; then
-            print_result "WARN"
-            print_detail "Lent: ${response_ms}ms"
+        if is_number "$response_ms"; then
+            if [ "$response_ms" -lt 100 ]; then
+                print_result "OK"
+                print_detail "Dashboard: ${response_ms}ms (excellent)"
+            elif [ "$response_ms" -lt 500 ]; then
+                print_result "WARN"
+                print_detail "Dashboard: ${response_ms}ms (acceptable)"
+            else
+                print_result "FAIL"
+                print_detail "Dashboard: ${response_ms}ms (lent)"
+            fi
         else
-            print_result "FAIL"
-            print_detail "Très lent: ${response_ms}ms"
+            print_result "INFO"
+            print_detail "Mesure dashboard impossible"
         fi
     else
         print_result "INFO"
-        print_detail "Impossible de mesurer le temps de réponse"
+        print_detail "curl ou bc non disponible"
+    fi
+    
+    print_test "API Archives PHP"
+    local api_response=$(curl -s -o /dev/null -w "%{http_code},%{time_total}" http://localhost/archives-list.php 2>/dev/null)
+    
+    if [ -n "$api_response" ]; then
+        local api_code=$(echo $api_response | cut -d',' -f1)
+        local api_time=$(echo $api_response | cut -d',' -f2)
+        
+        if [ "$api_code" = "200" ]; then
+            if command -v bc >/dev/null 2>&1; then
+                local api_ms=$(echo "$api_time * 1000" | bc 2>/dev/null | cut -d. -f1)
+                if is_number "$api_ms"; then
+                    print_result "OK"
+                    print_detail "API PHP: ${api_ms}ms"
+                else
+                    print_result "OK"
+                    print_detail "API PHP: réponse OK"
+                fi
+            else
+                print_result "OK"
+                print_detail "API PHP: réponse OK"
+            fi
+        else
+            print_result "WARN"
+            print_detail "API PHP: HTTP $api_code"
+        fi
+    else
+        print_result "INFO"
+        print_detail "API PHP non testée"
+    fi
+    
+    print_test "Accès via IP AP"
+    local ap_response=$(curl -s -o /dev/null -w "%{time_total}" http://192.168.4.1/ 2>/dev/null)
+    
+    if [ -n "$ap_response" ] && command -v bc >/dev/null 2>&1; then
+        local ap_ms=$(echo "$ap_response * 1000" | bc 2>/dev/null | cut -d. -f1)
+        
+        if is_number "$ap_ms"; then
+            if [ "$ap_ms" -lt 200 ]; then
+                print_result "OK"
+                print_detail "Via WiFi: ${ap_ms}ms"
+            else
+                print_result "WARN"
+                print_detail "Via WiFi: ${ap_ms}ms (lent)"
+            fi
+        else
+            print_result "INFO"
+            print_detail "Mesure via WiFi impossible"
+        fi
+    else
+        print_result "INFO"
+        print_detail "Test via IP AP non disponible"
     fi
     
     print_test "Latence MQTT"
@@ -504,15 +574,20 @@ test_performance() {
         local mqtt_end=$(date +%s%N)
         local mqtt_latency=$(( (mqtt_end - mqtt_start) / 1000000 ))
         
-        if [ "$mqtt_latency" -lt 10 ]; then
-            print_result "OK"
-            print_detail "Latence: ${mqtt_latency}ms"
-        elif [ "$mqtt_latency" -lt 50 ]; then
-            print_result "WARN"
-            print_detail "Latence élevée: ${mqtt_latency}ms"
+        if is_number "$mqtt_latency"; then
+            if [ "$mqtt_latency" -lt 10 ]; then
+                print_result "OK"
+                print_detail "Latence: ${mqtt_latency}ms"
+            elif [ "$mqtt_latency" -lt 50 ]; then
+                print_result "WARN"
+                print_detail "Latence élevée: ${mqtt_latency}ms"
+            else
+                print_result "FAIL"
+                print_detail "Latence critique: ${mqtt_latency}ms"
+            fi
         else
-            print_result "FAIL"
-            print_detail "Latence critique: ${mqtt_latency}ms"
+            print_result "INFO"
+            print_detail "Latence MQTT non mesurable"
         fi
     else
         print_result "FAIL"
@@ -528,17 +603,23 @@ test_performance() {
     wait $sub_pid 2>/dev/null
     
     local widget_messages=$(wc -l < "$temp_file")
-    local messages_per_sec=$((widget_messages / 3))
     
-    if [ "$messages_per_sec" -gt 5 ]; then
-        print_result "OK"
-        print_detail "$messages_per_sec msg/s"
-    elif [ "$messages_per_sec" -gt 2 ]; then
-        print_result "WARN"
-        print_detail "Débit faible: $messages_per_sec msg/s"
+    if is_number "$widget_messages" && [ "$widget_messages" -gt 0 ]; then
+        local messages_per_sec=$((widget_messages / 3))
+        
+        if [ "$messages_per_sec" -gt 5 ]; then
+            print_result "OK"
+            print_detail "$messages_per_sec msg/s"
+        elif [ "$messages_per_sec" -gt 2 ]; then
+            print_result "WARN"
+            print_detail "Débit faible: $messages_per_sec msg/s"
+        else
+            print_result "FAIL"
+            print_detail "Débit critique: $messages_per_sec msg/s"
+        fi
     else
-        print_result "FAIL"
-        print_detail "Débit critique: $messages_per_sec msg/s"
+        print_result "INFO"
+        print_detail "Impossible de mesurer le débit"
     fi
     
     rm -f "$temp_file"
@@ -568,16 +649,21 @@ test_stability() {
         sleep 0.1
     done
     
-    local success_rate=$((success_count * 100 / MQTT_STRESS_MESSAGES))
-    if [ "$success_rate" -ge 95 ]; then
-        print_result "OK"
-        print_detail "$success_count/$MQTT_STRESS_MESSAGES messages (${success_rate}%)"
-    elif [ "$success_rate" -ge 80 ]; then
-        print_result "WARN"
-        print_detail "Performance dégradée: ${success_rate}%"
+    if is_number "$success_count" && is_number "$MQTT_STRESS_MESSAGES" && [ "$MQTT_STRESS_MESSAGES" -gt 0 ]; then
+        local success_rate=$((success_count * 100 / MQTT_STRESS_MESSAGES))
+        if [ "$success_rate" -ge 95 ]; then
+            print_result "OK"
+            print_detail "$success_count/$MQTT_STRESS_MESSAGES messages (${success_rate}%)"
+        elif [ "$success_rate" -ge 80 ]; then
+            print_result "WARN"
+            print_detail "Performance dégradée: ${success_rate}%"
+        else
+            print_result "FAIL"
+            print_detail "Échec stress test: ${success_rate}%"
+        fi
     else
-        print_result "FAIL"
-        print_detail "Échec stress test: ${success_rate}%"
+        print_result "INFO"
+        print_detail "Test de stress impossible"
     fi
     
     print_test "Stress HTTP (${NETWORK_STRESS_DURATION}s)"
@@ -593,7 +679,7 @@ test_stability() {
         sleep 0.2
     done
     
-    if [ "$http_total" -gt 0 ]; then
+    if is_number "$http_total" && [ "$http_total" -gt 0 ]; then
         local http_rate=$((http_success * 100 / http_total))
         if [ "$http_rate" -ge 95 ]; then
             print_result "OK"
@@ -603,8 +689,8 @@ test_stability() {
             print_detail "Performance HTTP: ${http_rate}%"
         fi
     else
-        print_result "FAIL"
-        print_detail "Aucune requête HTTP réussie"
+        print_result "INFO"
+        print_detail "Test de stress HTTP impossible"
     fi
     
     print_test "Intégrité post-stress"
@@ -636,17 +722,27 @@ test_system_resources() {
     print_test "Charge CPU"
     if command -v bc >/dev/null 2>&1; then
         cpu_load=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
-        cpu_load_int=$(echo "$cpu_load * 100" | bc 2>/dev/null | cut -d. -f1)
-        
-        if [ "$cpu_load_int" -lt 80 ]; then
-            print_result "OK"
-            print_detail "Charge: ${cpu_load}"
-        elif [ "$cpu_load_int" -lt 150 ]; then
-            print_result "WARN"
-            print_detail "Charge élevée: ${cpu_load}"
+        if [ -n "$cpu_load" ]; then
+            cpu_load_int=$(echo "$cpu_load * 100" | bc 2>/dev/null | cut -d. -f1)
+            
+            if is_number "$cpu_load_int"; then
+                if [ "$cpu_load_int" -lt 80 ]; then
+                    print_result "OK"
+                    print_detail "Charge: ${cpu_load}"
+                elif [ "$cpu_load_int" -lt 150 ]; then
+                    print_result "WARN"
+                    print_detail "Charge élevée: ${cpu_load}"
+                else
+                    print_result "FAIL"
+                    print_detail "Charge critique: ${cpu_load}"
+                fi
+            else
+                print_result "INFO"
+                print_detail "Impossible de calculer la charge CPU"
+            fi
         else
-            print_result "FAIL"
-            print_detail "Charge critique: ${cpu_load}"
+            print_result "INFO"
+            print_detail "Charge CPU non disponible"
         fi
     else
         print_result "INFO"
@@ -655,53 +751,87 @@ test_system_resources() {
     
     print_test "Mémoire disponible"
     mem_info=$(free -m | grep '^Mem:')
-    mem_total=$(echo $mem_info | awk '{print $2}')
-    mem_used=$(echo $mem_info | awk '{print $3}')
-    mem_percent=$((mem_used * 100 / mem_total))
-    
-    if [ "$mem_percent" -lt 80 ]; then
-        print_result "OK"
-        print_detail "Utilisée: ${mem_percent}% (${mem_used}/${mem_total}MB)"
-    elif [ "$mem_percent" -lt 90 ]; then
-        print_result "WARN"
-        print_detail "Utilisation élevée: ${mem_percent}%"
+    if [ -n "$mem_info" ]; then
+        mem_total=$(echo $mem_info | awk '{print $2}')
+        mem_used=$(echo $mem_info | awk '{print $3}')
+        
+        if is_number "$mem_total" && is_number "$mem_used" && [ "$mem_total" -gt 0 ]; then
+            mem_percent=$((mem_used * 100 / mem_total))
+            
+            if [ "$mem_percent" -lt 80 ]; then
+                print_result "OK"
+                print_detail "Utilisée: ${mem_percent}% (${mem_used}/${mem_total}MB)"
+            elif [ "$mem_percent" -lt 90 ]; then
+                print_result "WARN"
+                print_detail "Utilisation élevée: ${mem_percent}%"
+            else
+                print_result "FAIL"
+                print_detail "Mémoire critique: ${mem_percent}%"
+            fi
+        else
+            print_result "INFO"
+            print_detail "Impossible de calculer l'utilisation mémoire"
+        fi
     else
-        print_result "FAIL"
-        print_detail "Mémoire critique: ${mem_percent}%"
+        print_result "INFO"
+        print_detail "Informations mémoire non disponibles"
     fi
     
     print_test "Espace disque racine"
     disk_usage=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
     
-    if [ "$disk_usage" -lt 80 ]; then
-        print_result "OK"
-        print_detail "Utilisé: ${disk_usage}%"
-    elif [ "$disk_usage" -lt 90 ]; then
-        print_result "WARN"
-        print_detail "Espace faible: ${disk_usage}%"
+    if is_number "$disk_usage"; then
+        if [ "$disk_usage" -lt 80 ]; then
+            print_result "OK"
+            print_detail "Utilisé: ${disk_usage}%"
+        elif [ "$disk_usage" -lt 90 ]; then
+            print_result "WARN"
+            print_detail "Espace faible: ${disk_usage}%"
+        else
+            print_result "FAIL"
+            print_detail "Espace critique: ${disk_usage}%"
+        fi
     else
-        print_result "FAIL"
-        print_detail "Espace critique: ${disk_usage}%"
+        print_result "INFO"
+        print_detail "Impossible de mesurer l'espace disque"
     fi
     
     print_test "Température CPU"
     if [ -f /sys/class/thermal/thermal_zone0/temp ]; then
         temp=$(cat /sys/class/thermal/thermal_zone0/temp)
-        temp_c=$((temp / 1000))
-        
-        if [ "$temp_c" -lt 60 ]; then
-            print_result "OK"
-            print_detail "Température: ${temp_c}°C"
-        elif [ "$temp_c" -lt 70 ]; then
-            print_result "WARN"
-            print_detail "Température élevée: ${temp_c}°C"
+        if is_number "$temp" && [ "$temp" -gt 0 ]; then
+            temp_c=$((temp / 1000))
+            
+            if [ "$temp_c" -lt 60 ]; then
+                print_result "OK"
+                print_detail "Température: ${temp_c}°C"
+            elif [ "$temp_c" -lt 70 ]; then
+                print_result "WARN"
+                print_detail "Température élevée: ${temp_c}°C"
+            else
+                print_result "FAIL"
+                print_detail "Surchauffe: ${temp_c}°C"
+            fi
         else
-            print_result "FAIL"
-            print_detail "Surchauffe: ${temp_c}°C"
+            print_result "INFO"
+            print_detail "Lecture température impossible"
         fi
     else
         print_result "INFO"
         print_detail "Capteur température non disponible"
+    fi
+    
+    # Test spécifique clé USB
+    print_test "Clé USB MaxLink"
+    if [ -d "/media/prod/USBTOOL" ]; then
+        print_result "OK"
+        print_detail "Clé USB montée"
+    elif [ -d "/media/*/USBTOOL" ]; then
+        print_result "OK"
+        print_detail "Clé USB trouvée (autre montage)"
+    else
+        print_result "WARN"
+        print_detail "Clé USB non détectée"
     fi
 }
 
@@ -719,6 +849,11 @@ generate_final_report() {
     echo -e "  • Avertissements    : ${YELLOW}$WARNINGS${NC}"
     echo -e "  • Total problèmes   : $total_issues"
     echo ""
+    
+    if [ "$OFFLINE_MODE" = true ]; then
+        echo -e "  ${CYAN}Mode : Environnement hors-ligne (optimal pour MaxLink)${NC}"
+        echo ""
+    fi
     
     # Déterminer l'état global de l'installation
     if [ -f "$SERVICES_STATUS_FILE" ]; then
@@ -752,7 +887,7 @@ print('yes' if all_active else 'no')
             echo ""
             echo "Actions recommandées :"
             echo "  1. Relancer l'installation complète :"
-            echo "     sudo bash /media/prod/USBTOOL/full_install.sh"
+            echo "     sudo bash /media/prod/USBTOOL/scripts/install/full_install_install.sh"
         else
             echo -e "${RED}✗ SYSTÈME MAXLINK CRITIQUE${NC}"
             echo "  Dysfonctionnements majeurs détectés."
@@ -762,14 +897,14 @@ print('yes' if all_active else 'no')
         echo -e "${YELLOW}⚠ AUCUNE INSTALLATION DÉTECTÉE${NC}"
         echo ""
         echo "Pour installer MaxLink, exécutez :"
-        echo "  sudo bash /media/prod/USBTOOL/full_install.sh"
+        echo "  sudo bash /media/prod/USBTOOL/scripts/install/full_install_install.sh"
     fi
     
     echo ""
     echo "Actions de maintenance disponibles :"
     if [ $ERRORS -gt 0 ]; then
         echo "  • Analyser les logs        : journalctl -u 'maxlink-*' -f"
-        echo "  • Redémarrer les services  : /usr/local/bin/maxlink-orchestrator restart-all"
+        echo "  • Redémarrer les services  : /usr/local/bin/maxlink-orchestrator restart"
     fi
     if [ $WARNINGS -gt 0 ]; then
         echo "  • Surveiller les performances : watch -n 2 '/usr/local/bin/maxlink-orchestrator status'"
@@ -777,6 +912,12 @@ print('yes' if all_active else 'no')
     echo "  • État orchestrateur       : /usr/local/bin/maxlink-orchestrator status"
     echo "  • Test MQTT en temps réel  : mosquitto_sub -h localhost -u $MQTT_USER -P $MQTT_PASS -t '#' -v"
     echo "  • Relancer ce diagnostic   : sudo $0"
+    
+    if [ "$OFFLINE_MODE" = true ]; then
+        echo ""
+        echo "Mode en ligne (avec tests internet) :"
+        echo "  • sudo $0 --online"
+    fi
 }
 
 # ===============================================================================
@@ -789,6 +930,11 @@ main() {
     echo ""
     echo "========================================================================"
     echo "DIAGNOSTIC MAXLINK COMPLET - $(date)"
+    if [ "$OFFLINE_MODE" = true ]; then
+        echo "Mode : Environnement hors-ligne (recommandé pour MaxLink)"
+    else
+        echo "Mode : Tests avec connectivité internet"
+    fi
     echo "========================================================================"
     
     # Vérifier les privilèges

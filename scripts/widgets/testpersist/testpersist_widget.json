@@ -2,8 +2,8 @@
   "widget": {
     "id": "testpersist",
     "name": "Test Results Persistence CSV",
-    "version": "3.1.0",
-    "description": "Persiste les résultats de tests dans des fichiers CSV avec traçabilité hebdomadaire - Version service modulaire",
+    "version": "3.2.0",
+    "description": "Persiste les résultats de tests dans des fichiers CSV avec traçabilité hebdomadaire + sauvegarde USB automatique - Version service modulaire",
     "author": "MaxLink Team",
     "dashboard_compatibility": "1.0+"
   },
@@ -38,7 +38,7 @@
     "enabled": true,
     "script": "testpersist_collector.py",
     "service_name": "maxlink-widget-testpersist",
-    "service_description": "MaxLink Test Results Persistence CSV Service with Weekly Tracking",
+    "service_description": "MaxLink Test Results Persistence CSV Service with Weekly Tracking + USB Backup",
     "update_intervals": {
       "default": 0,
       "note": "Event-driven, no polling"
@@ -66,6 +66,16 @@
       "auto_archive_previous_weeks": true,
       "archive_by_year": true,
       "note": "Traçabilité hebdomadaire automatique avec archivage dans les sous-dossiers par année"
+    },
+    "usb_backup": {
+      "enabled": true,
+      "usb_path": "/media/prod/MAXLINKSAVE",
+      "usb_label": "MAXLINKSAVE",
+      "backup_structure": "archives/YEAR/",
+      "auto_backup_on_archive": true,
+      "silent_on_unavailable": true,
+      "space_check": true,
+      "note": "Sauvegarde automatique sur clé USB après chaque archivage hebdomadaire - Fonctionnement transparent"
     }
   },
   "download_system": {
@@ -85,15 +95,44 @@
       "php_archives"
     ],
     "python_version": ">=3.7",
+    "hardware_requirements": {
+      "usb_port": "Port USB disponible pour clé MAXLINKSAVE (optionnel)",
+      "usb_filesystem": "Compatible ext4, NTFS, FAT32"
+    },
     "notes": {
       "php_archives_service": "Le service php_archives doit être installé via l'interface MaxKey ou scripts/install/php_archives_install.sh",
-      "no_flask_api": "L'API Flask a été supprimée au profit du service php_archives plus simple et intégré"
+      "no_flask_api": "L'API Flask a été supprimée au profit du service php_archives plus simple et intégré",
+      "usb_optional": "La fonctionnalité USB est complètement optionnelle - le système fonctionne normalement sans clé USB"
     }
   },
   "installation_notes": {
     "service_order": "Ce widget nécessite que le service php_archives soit installé en premier",
     "modular_architecture": "Intégré dans l'architecture modulaire MaxLink avec indicateur de statut",
     "ultra_simple": "Solution ultra-simple sans complexité API - juste PHP pur",
-    "maintenance": "Le service php_archives apparaît dans l'interface MaxKey avec indicateur visuel"
+    "maintenance": "Le service php_archives apparaît dans l'interface MaxKey avec indicateur visuel",
+    "usb_backup_features": [
+      "Détection automatique de la clé USB MAXLINKSAVE",
+      "Sauvegarde transparente - n'interrompt jamais le système principal",
+      "Structure identique aux archives locales (archives/2025/, archives/2024/, etc.)",
+      "Gestion d'erreur silencieuse - pas de plantage si clé USB défaillante",
+      "Vérification d'espace disque automatique",
+      "Threading sécurisé pour éviter les conflits d'écriture",
+      "Logs informatifs pour diagnostic sans pollution"
+    ]
+  },
+  "changelog": {
+    "3.2.0": {
+      "date": "2025-07-22",
+      "changes": [
+        "Ajout sauvegarde USB automatique sur clé MAXLINKSAVE",
+        "Détection automatique présence/absence clé USB",
+        "Sauvegarde transparente après chaque archivage hebdomadaire",
+        "Structure archives identique : USB/archives/YEAR/",
+        "Gestion d'erreurs robuste - n'affecte jamais le système principal",
+        "Threading et verrous pour sécurité maximale",
+        "Logs dédiés pour suivi sauvegarde USB"
+      ],
+      "compatibility": "100% compatible avec version précédente - aucune migration requise"
+    }
   }
 }
