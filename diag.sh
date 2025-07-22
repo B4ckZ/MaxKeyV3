@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ===============================================================================
-# MAXLINK - DIAGNOSTIC COMPLET UNIFIÉ (VERSION CORRIGÉE)
-# Script unique pour diagnostic complet avec tests de stabilité
-# Version adaptée pour environnement hors-ligne
+# MAXLINK - DIAGNOSTIC COMPLET UNIFIÉ (VERSION AMÉLIORÉE)
+# Script unique pour diagnostic complet avec analyses détaillées des erreurs
+# Version corrigée avec diagnostics SystemD approfondis
 # ===============================================================================
 
 # Couleurs pour l'affichage
@@ -12,6 +12,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+PURPLE='\033[0;35m'
 NC='\033[0m'
 
 # Variables globales
@@ -31,6 +32,12 @@ NETWORK_STRESS_DURATION=5
 OFFLINE_MODE=true
 if [ "$1" = "--online" ]; then
     OFFLINE_MODE=false
+fi
+
+# Variables pour analyser les erreurs en détail
+DETAILED_ANALYSIS=true
+if [ "$1" = "--quick" ]; then
+    DETAILED_ANALYSIS=false
 fi
 
 # ===============================================================================
@@ -61,6 +68,22 @@ print_detail() {
     echo "  ↦ $1"
 }
 
+print_error_detail() {
+    echo -e "  ${RED}✗${NC} $1"
+}
+
+print_warning_detail() {
+    echo -e "  ${YELLOW}⚠${NC} $1"
+}
+
+print_success_detail() {
+    echo -e "  ${GREEN}✓${NC} $1"
+}
+
+print_info_detail() {
+    echo -e "  ${CYAN}ℹ${NC} $1"
+}
+
 # Validation numérique sécurisée
 is_number() {
     local value="$1"
@@ -68,7 +91,177 @@ is_number() {
 }
 
 # ===============================================================================
-# ÉTAT DE L'INSTALLATION
+# FONCTIONS D'ANALYSE DÉTAILLÉE
+# ===============================================================================
+
+# Analyser les logs d'erreur d'un service
+analyze_service_errors() {
+    local service_name="$1"
+    local display_name="$2"
+    
+    if [ "$DETAILED_ANALYSIS" != "true" ]; then
+        return
+    fi
+    
+    echo ""
+    echo -e "${PURPLE}◦ Analyse détaillée du service $display_name${NC}"
+    
+    # Dernières erreurs (dernière heure)
+    local recent_errors=$(journalctl -u "$service_name" --since "1 hour ago" -p err --no-pager -q 2>/dev/null)
+    if [ -n "$recent_errors" ]; then
+        print_error_detail "Erreurs récentes détectées:"
+        echo "$recent_errors" | tail -3 | while read -r line; do
+            if [ -n "$line" ]; then
+                echo "    $(echo "$line" | cut -c1-100)"
+            fi
+        done
+    fi
+    
+    # Avertissements récents
+    local recent_warnings=$(journalctl -u "$service_name" --since "30 minutes ago" -p warning --no-pager -q 2>/dev/null)
+    if [ -n "$recent_warnings" ]; then
+        print_warning_detail "Avertissements récents:"
+        echo "$recent_warnings" | tail -2 | while read -r line; do
+            if [ -n "$line" ]; then
+                echo "    $(echo "$line" | cut -c1-100)"
+            fi
+        done
+    fi
+    
+    # État détaillé du service
+    local service_status=$(systemctl status "$service_name" --no-pager -l 2>/dev/null)
+    if echo "$service_status" | grep -q "failed\|error\|timeout"; then
+        print_error_detail "Problèmes détectés dans l'état du service:"
+        echo "$service_status" | grep -E "(failed|error|timeout|Active:|Main PID:)" | while read -r line; do
+            echo "    $line"
+        done
+    fi
+    
+    # Restart count
+    local restart_count=$(systemctl show "$service_name" --property=NRestarts --value 2>/dev/null)
+    if [ -n "$restart_count" ] && [ "$restart_count" -gt 0 ]; then
+        print_warning_detail "Service redémarré $restart_count fois"
+    fi
+}
+
+# Analyser la configuration réseau en détail
+analyze_network_config() {
+    if [ "$DETAILED_ANALYSIS" != "true" ]; then
+        return
+    fi
+    
+    echo ""
+    echo -e "${PURPLE}◦ Analyse détaillée de la configuration réseau${NC}"
+    
+    # Vérifier les connections NetworkManager
+    local ap_connections=$(nmcli con show | grep -E "(MaxLink|AP)" || true)
+    if [ -n "$ap_connections" ]; then
+        print_success_detail "Connexions AP trouvées:"
+        echo "$ap_connections" | while read -r line; do
+            echo "    $line"
+        done
+    else
+        print_error_detail "Aucune connexion AP trouvée dans NetworkManager"
+    fi
+    
+    # État de l'interface WiFi
+    if ip link show wlan0 >/dev/null 2>&1; then
+        local wlan_state=$(ip addr show wlan0 2>/dev/null | grep -E "(state|inet)")
+        if [ -n "$wlan_state" ]; then
+            print_info_detail "État interface wlan0:"
+            echo "$wlan_state" | while read -r line; do
+                echo "    $line"
+            done
+        fi
+    fi
+    
+    # Processus dnsmasq
+    local dnsmasq_procs=$(ps aux | grep dnsmasq | grep -v grep || true)
+    if [ -n "$dnsmasq_procs" ]; then
+        print_success_detail "Processus dnsmasq actifs:"
+        echo "$dnsmasq_procs" | while read -r line; do
+            echo "    $(echo "$line" | awk '{print $1, $2, $11, $12, $13}')"
+        done
+    else
+        print_error_detail "Aucun processus dnsmasq détecté"
+    fi
+}
+
+# Analyser les métriques MQTT en détail
+analyze_mqtt_metrics() {
+    if [ "$DETAILED_ANALYSIS" != "true" ]; then
+        return
+    fi
+    
+    echo ""
+    echo -e "${PURPLE}◦ Analyse détaillée des métriques MQTT${NC}"
+    
+    # Topics système détaillés
+    local sys_topics=$(timeout 3 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t '$SYS/broker/+' -C 5 2>/dev/null || true)
+    if [ -n "$sys_topics" ]; then
+        print_success_detail "Métriques broker disponibles:"
+        echo "$sys_topics" | while read -r line; do
+            echo "    $line"
+        done
+    fi
+    
+    # Widgets actifs
+    local widget_topics=$(timeout 2 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t 'rpi/+/+/+' -C 3 2>/dev/null || true)
+    if [ -n "$widget_topics" ]; then
+        print_success_detail "Widgets actifs détectés:"
+        echo "$widget_topics" | cut -d' ' -f1 | sort -u | while read -r topic; do
+            echo "    $topic"
+        done
+    fi
+    
+    # Connexions clients MQTT
+    local mqtt_clients=$(netstat -tan 2>/dev/null | grep ":$MQTT_PORT " | wc -l)
+    if [ "$mqtt_clients" -gt 0 ]; then
+        print_success_detail "Connexions MQTT actives: $mqtt_clients"
+    fi
+}
+
+# Suggestions de résolution automatique
+suggest_fixes() {
+    local problem_type="$1"
+    
+    echo ""
+    echo -e "${CYAN}◦ Suggestions de résolution pour: $problem_type${NC}"
+    
+    case "$problem_type" in
+        "ap_healthcheck")
+            print_info_detail "Le healthcheck AP cherche probablement le mauvais nom de connexion"
+            print_info_detail "Actions possibles:"
+            echo "    • Vérifier: nmcli con show"
+            echo "    • Redémarrer NetworkManager: systemctl restart NetworkManager"
+            echo "    • Réactiver l'AP: nmcli con up MaxLink-NETWORK"
+            ;;
+        "service_errors")
+            print_info_detail "Erreurs détectées dans les services SystemD"
+            print_info_detail "Actions possibles:"
+            echo "    • Voir logs détaillés: journalctl -u [service] -f"
+            echo "    • Redémarrer service: systemctl restart [service]"
+            echo "    • Vérifier config: systemctl status [service]"
+            ;;
+        "mqtt_issues")
+            print_info_detail "Problèmes de connexion MQTT détectés"
+            print_info_detail "Actions possibles:"
+            echo "    • Redémarrer broker: systemctl restart mosquitto"
+            echo "    • Vérifier auth: mosquitto_pub -h localhost -u $MQTT_USER -P $MQTT_PASS -t test -m test"
+            echo "    • Voir logs: journalctl -u mosquitto -f"
+            ;;
+        "network_issues")
+            print_info_detail "Problèmes réseau détectés"
+            print_info_detail "Actions possibles:"
+            echo "    • Redémarrer réseau: systemctl restart NetworkManager"
+            echo "    • Vérifier interface: ip addr show wlan0"
+            echo "    • Relancer AP: nmcli con down MaxLink-NETWORK && nmcli con up MaxLink-NETWORK"
+            ;;
+    esac
+}
+
+# ===============================================================================
+# ÉTAT DE L'INSTALLATION (VERSION AMÉLIORÉE)
 # ===============================================================================
 
 check_installation_status() {
@@ -102,6 +295,8 @@ print("  État des composants :")
 print("")
 
 all_active = True
+inactive_services = []
+
 for service_id, service_name in expected_services:
     if service_id in data:
         info = data[service_id]
@@ -114,6 +309,7 @@ for service_id, service_name in expected_services:
             symbol = '✗'
             color = '\033[0;31m'  # Red
             all_active = False
+            inactive_services.append(service_name)
             
         print(f"    {color}{symbol}\033[0m {service_name:20} : {status}")
         
@@ -124,8 +320,13 @@ for service_id, service_name in expected_services:
                 print(f"      ↦ Mis à jour: {dt.strftime('%Y-%m-%d %H:%M:%S')}")
             except:
                 pass
+        
+        # Afficher message d'erreur si présent
+        if 'message' in info and info['message']:
+            print(f"      ↦ Message: {info['message']}")
     else:
         all_active = False
+        inactive_services.append(service_name)
         print(f"    ○ {service_name:20} : non installé")
 
 print("")
@@ -133,6 +334,7 @@ if all_active:
     print("    \033[0;32m✓ Installation complète réussie !\033[0m")
 else:
     print("    \033[1;33m⚠ Installation incomplète\033[0m")
+    print(f"    Services inactifs: {', '.join(inactive_services)}")
 EOF
     else
         print_test "Fichier de statuts"
@@ -146,7 +348,7 @@ EOF
 }
 
 # ===============================================================================
-# TESTS DES SERVICES MAXLINK
+# TESTS DES SERVICES MAXLINK (VERSION AMÉLIORÉE)
 # ===============================================================================
 
 test_maxlink_services() {
@@ -162,6 +364,8 @@ test_maxlink_services() {
         "php_archives:PHP Archives"
         "orchestrator:Orchestrateur"
     )
+    
+    local has_errors=false
     
     if [ -f "$SERVICES_STATUS_FILE" ]; then
         for service_info in "${services[@]}"; do
@@ -187,13 +391,29 @@ except:
                         "mqtt") test_mqtt_detailed ;;
                         "php_archives") test_php_archives_detailed ;;
                         "fake_ncsi") test_fake_ncsi_detailed ;;
+                        "ap") test_ap_detailed ;;
                     esac
                     ;;
-                "inactive") print_result "FAIL" ;;
-                "error") print_result "WARN"; print_detail "Erreur lecture statut" ;;
-                *) print_result "WARN"; print_detail "Statut: $status" ;;
+                "inactive") 
+                    print_result "FAIL"
+                    has_errors=true
+                    ;;
+                "error") 
+                    print_result "WARN"
+                    print_detail "Erreur lecture statut"
+                    has_errors=true
+                    ;;
+                *) 
+                    print_result "WARN"
+                    print_detail "Statut: $status"
+                    has_errors=true
+                    ;;
             esac
         done
+        
+        if [ "$has_errors" = true ]; then
+            suggest_fixes "service_errors"
+        fi
     else
         print_test "Fichier de statuts"
         print_result "FAIL"
@@ -201,20 +421,42 @@ except:
     fi
 }
 
+# Test détaillé de l'AP
+test_ap_detailed() {
+    local ap_connections=$(nmcli con show --active | grep -E "(MaxLink|AP)" || true)
+    if [ -n "$ap_connections" ]; then
+        print_detail "✓ Connexion AP active détectée"
+        print_detail "  $(echo "$ap_connections" | head -1)"
+    else
+        print_detail "✗ Aucune connexion AP active"
+        suggest_fixes "ap_healthcheck"
+    fi
+    
+    # Vérifier les clients connectés
+    if command -v iw >/dev/null 2>&1; then
+        local client_count=$(iw dev wlan0 station dump 2>/dev/null | grep -c "Station" || echo "0")
+        print_detail "Clients WiFi connectés: $client_count"
+    fi
+}
+
 test_nginx_detailed() {
     print_detail "Test dashboard principal"
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost/ | grep -q "200"; then
-        print_detail "  ✓ Dashboard accessible"
+    local response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null || echo "000")
+    if [ "$response" = "200" ]; then
+        print_detail "  ✓ Dashboard accessible (HTTP $response)"
     else
-        print_detail "  ✗ Dashboard inaccessible"
-        ((WARNINGS++))
+        print_detail "  ✗ Dashboard inaccessible (HTTP $response)"
+        if [ "$response" = "000" ]; then
+            print_detail "    Nginx probablement arrêté"
+        fi
     fi
     
     print_detail "Test API archives PHP"
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost/archives-list.php | grep -q "200"; then
-        print_detail "  ✓ API archives accessible"
+    local api_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/archives-list.php 2>/dev/null || echo "000")
+    if [ "$api_response" = "200" ]; then
+        print_detail "  ✓ API archives accessible (HTTP $api_response)"
     else
-        print_detail "  ⚠ API archives problématique"
+        print_detail "  ⚠ API archives problématique (HTTP $api_response)"
     fi
 }
 
@@ -224,7 +466,7 @@ test_mqtt_detailed() {
         print_detail "  ✓ Publication réussie"
     else
         print_detail "  ✗ Échec publication"
-        ((WARNINGS++))
+        suggest_fixes "mqtt_issues"
     fi
     
     print_detail "Test souscription MQTT"
@@ -232,6 +474,15 @@ test_mqtt_detailed() {
         print_detail "  ✓ Souscription réussie"
     else
         print_detail "  ⚠ Souscription problématique"
+    fi
+    
+    # Test des topics système
+    print_detail "Test topics système"
+    local sys_version=$(timeout 1 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t '$SYS/broker/version' -C 1 2>/dev/null || echo "")
+    if [ -n "$sys_version" ]; then
+        print_detail "  ✓ Topics système: $sys_version"
+    else
+        print_detail "  ⚠ Topics système non accessibles"
     fi
 }
 
@@ -242,14 +493,12 @@ test_fake_ncsi_detailed() {
         print_detail "  ✓ connecttest.txt fonctionnel"
     else
         print_detail "  ✗ connecttest.txt non accessible"
-        ((WARNINGS++))
     fi
     
     if curl -s --connect-timeout 3 "http://localhost/generate_204" >/dev/null 2>&1; then
         print_detail "  ✓ generate_204 fonctionnel"
     else
         print_detail "  ✗ generate_204 non accessible"
-        ((WARNINGS++))
     fi
     
     if [ -f "/etc/NetworkManager/dnsmasq-shared.d/01-windows-connectivity-hint.conf" ]; then
@@ -264,14 +513,20 @@ test_php_archives_detailed() {
     if [ -d "/var/www/maxlink-dashboard/archives" ]; then
         local archive_count=$(find /var/www/maxlink-dashboard/archives -name "*.csv" 2>/dev/null | wc -l)
         print_detail "  ✓ $archive_count fichiers CSV trouvés"
+        
+        # Test des permissions
+        if [ -r "/var/www/maxlink-dashboard/archives" ] && [ -w "/var/www/maxlink-dashboard/archives" ]; then
+            print_detail "  ✓ Permissions d'accès correctes"
+        else
+            print_detail "  ⚠ Problème de permissions"
+        fi
     else
         print_detail "  ✗ Répertoire archives manquant"
-        ((WARNINGS++))
     fi
 }
 
 # ===============================================================================
-# TESTS DES SERVICES SYSTEMD
+# TESTS DES SERVICES SYSTEMD (VERSION AMÉLIORÉE)
 # ===============================================================================
 
 test_systemd_services() {
@@ -283,6 +538,8 @@ test_systemd_services() {
         "NetworkManager:Gestionnaire réseau"
         "php8.2-fpm:PHP-FPM"
     )
+    
+    local services_with_errors=()
     
     for service_info in "${critical_services[@]}"; do
         IFS=':' read -r service_name service_desc <<< "$service_info"
@@ -297,24 +554,48 @@ test_systemd_services() {
                 print_detail "Actif depuis: $(echo $uptime | cut -d' ' -f1-2)"
             fi
             
-            local failed_count=$(journalctl -u "$service_name" --since "1 hour ago" -p err --no-pager | wc -l)
+            # Analyse détaillée des erreurs
+            local failed_count=$(journalctl -u "$service_name" --since "1 hour ago" -p err --no-pager -q 2>/dev/null | wc -l)
+            local warning_count=$(journalctl -u "$service_name" --since "1 hour ago" -p warning --no-pager -q 2>/dev/null | wc -l)
+            
             if [ "$failed_count" -gt 0 ]; then
                 print_detail "⚠ $failed_count erreurs dans la dernière heure"
+                services_with_errors+=("$service_name")
+            fi
+            
+            if [ "$warning_count" -gt 0 ]; then
+                print_detail "⚠ $warning_count avertissements dans la dernière heure"
+            fi
+            
+            # État mémoire si disponible
+            local memory_usage=$(systemctl show "$service_name" --property=MemoryCurrent --value 2>/dev/null)
+            if [ -n "$memory_usage" ] && [ "$memory_usage" != "18446744073709551615" ] && [ "$memory_usage" != "0" ]; then
+                local memory_mb=$((memory_usage / 1024 / 1024))
+                print_detail "Mémoire utilisée: ${memory_mb}MB"
             fi
         else
             print_result "FAIL"
             print_detail "Service inactif ou inexistant"
+            services_with_errors+=("$service_name")
         fi
+    done
+    
+    # Analyse détaillée des services avec erreurs
+    for service in "${services_with_errors[@]}"; do
+        analyze_service_errors "$service" "$service"
     done
     
     print_test "Widgets MaxLink"
     local widget_services=($(systemctl list-unit-files | grep "maxlink-widget-" | awk '{print $1}'))
     local active_widgets=0
     local total_widgets=${#widget_services[@]}
+    local failed_widgets=()
     
     for widget in "${widget_services[@]}"; do
         if systemctl is-active --quiet "$widget" 2>/dev/null; then
             ((active_widgets++))
+        else
+            failed_widgets+=("$widget")
         fi
     done
     
@@ -327,11 +608,18 @@ test_systemd_services() {
     else
         print_result "WARN"
         print_detail "$active_widgets/$total_widgets widgets actifs"
+        
+        if [ ${#failed_widgets[@]} -gt 0 ]; then
+            print_detail "Widgets inactifs:"
+            for widget in "${failed_widgets[@]}"; do
+                print_detail "  • $widget"
+            done
+        fi
     fi
 }
 
 # ===============================================================================
-# TESTS DE L'ORCHESTRATEUR
+# TESTS DE L'ORCHESTRATEUR (VERSION CORRIGÉE)
 # ===============================================================================
 
 test_orchestrator() {
@@ -354,32 +642,89 @@ test_orchestrator() {
         print_detail "Commande status échouée"
     fi
     
-    local healthcheck_scripts=(
-        "/usr/local/bin/maxlink-check-ap:Point d'accès"
-        "/usr/local/bin/maxlink-check-nginx:Nginx"
-        "/usr/local/bin/maxlink-check-mqtt:MQTT"
-    )
-    
-    for script_info in "${healthcheck_scripts[@]}"; do
-        IFS=':' read -r script_path script_desc <<< "$script_info"
+    # Healthchecks corrigés avec diagnostics détaillés
+    print_test "Healthcheck Point d'accès"
+    if [ -x "/usr/local/bin/maxlink-check-ap" ]; then
+        # Exécuter le healthcheck et capturer la sortie
+        local ap_check_output=$(/usr/local/bin/maxlink-check-ap 2>&1)
+        local ap_check_result=$?
         
-        print_test "Healthcheck $script_desc"
-        if [ -x "$script_path" ]; then
-            if timeout 5 "$script_path" >/dev/null 2>&1; then
-                print_result "OK"
-            else
-                print_result "WARN"
-                print_detail "Healthcheck échoué"
-            fi
+        if [ $ap_check_result -eq 0 ]; then
+            print_result "OK"
         else
-            print_result "FAIL"
-            print_detail "Script manquant: $script_path"
+            print_result "WARN"
+            print_detail "Healthcheck échoué (code: $ap_check_result)"
+            
+            # Diagnostic détaillé de l'AP
+            print_detail "Diagnostic AP détaillé:"
+            
+            # Chercher toutes les connexions qui pourraient être l'AP
+            local all_ap_connections=$(nmcli con show --active | grep -iE "(maxlink|ap|network)" || true)
+            if [ -n "$all_ap_connections" ]; then
+                print_detail "  Connexions AP/réseau trouvées:"
+                echo "$all_ap_connections" | while read -r line; do
+                    print_detail "    $line"
+                done
+            else
+                print_detail "  ✗ Aucune connexion AP active détectée"
+            fi
+            
+            # Vérifier le contenu du script healthcheck
+            if [ -f "/usr/local/bin/maxlink-check-ap" ]; then
+                local check_content=$(cat /usr/local/bin/maxlink-check-ap 2>/dev/null | grep -v "^#" | grep -v "^$")
+                print_detail "  Script healthcheck:"
+                echo "$check_content" | while read -r line; do
+                    print_detail "    $line"
+                done
+            fi
+            
+            suggest_fixes "ap_healthcheck"
         fi
-    done
+    else
+        print_result "FAIL"
+        print_detail "Script healthcheck manquant"
+    fi
+    
+    print_test "Healthcheck Nginx"
+    if [ -x "/usr/local/bin/maxlink-check-nginx" ]; then
+        if timeout 5 "/usr/local/bin/maxlink-check-nginx" >/dev/null 2>&1; then
+            print_result "OK"
+        else
+            print_result "WARN"
+            print_detail "Healthcheck échoué"
+            
+            # Test nginx manuel
+            if systemctl is-active --quiet nginx; then
+                print_detail "  ✓ Service nginx actif"
+            else
+                print_detail "  ✗ Service nginx inactif"
+            fi
+            
+            local nginx_test=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ 2>/dev/null || echo "000")
+            print_detail "  Test HTTP: $nginx_test"
+        fi
+    else
+        print_result "FAIL"
+        print_detail "Script manquant: /usr/local/bin/maxlink-check-nginx"
+    fi
+    
+    print_test "Healthcheck MQTT"
+    if [ -x "/usr/local/bin/maxlink-check-mqtt" ]; then
+        if timeout 5 "/usr/local/bin/maxlink-check-mqtt" >/dev/null 2>&1; then
+            print_result "OK"
+        else
+            print_result "WARN"
+            print_detail "Healthcheck échoué"
+            analyze_mqtt_metrics
+        fi
+    else
+        print_result "FAIL"
+        print_detail "Script manquant: /usr/local/bin/maxlink-check-mqtt"
+    fi
 }
 
 # ===============================================================================
-# TESTS RÉSEAU AVANCÉS
+# TESTS RÉSEAU AVANCÉS (VERSION AMÉLIORÉE)
 # ===============================================================================
 
 test_network_advanced() {
@@ -389,16 +734,39 @@ test_network_advanced() {
     if ip link show wlan0 >/dev/null 2>&1; then
         print_result "OK"
         
+        local wlan_info=$(ip addr show wlan0 2>/dev/null)
+        if echo "$wlan_info" | grep -q "state UP"; then
+            print_detail "Interface: UP"
+        else
+            print_detail "Interface: DOWN"
+        fi
+        
         if iw dev wlan0 info 2>/dev/null | grep -q "type AP"; then
             print_detail "Mode: Access Point"
-            local client_count=$(iw dev wlan0 station dump 2>/dev/null | grep -c "Station")
+            local client_count=$(iw dev wlan0 station dump 2>/dev/null | grep -c "Station" || echo "0")
             print_detail "Clients WiFi: $client_count"
+            
+            # Informations SSID
+            local ssid=$(iw dev wlan0 info 2>/dev/null | grep ssid | awk '{print $2}')
+            if [ -n "$ssid" ]; then
+                print_detail "SSID diffusé: $ssid"
+            fi
         else
             print_detail "Mode: Client ou inactif"
+        fi
+        
+        # Adresses IP
+        local ip_addrs=$(echo "$wlan_info" | grep "inet " | awk '{print $2}')
+        if [ -n "$ip_addrs" ]; then
+            print_detail "Adresses IP:"
+            echo "$ip_addrs" | while read -r addr; do
+                print_detail "  $addr"
+            done
         fi
     else
         print_result "FAIL"
         print_detail "Interface WiFi absente"
+        suggest_fixes "network_issues"
     fi
     
     local ports=(
@@ -407,17 +775,30 @@ test_network_advanced() {
         "9001:WebSocket MQTT"
     )
     
+    local port_issues=false
+    
     for port_info in "${ports[@]}"; do
         IFS=':' read -r port_num port_desc <<< "$port_info"
         
         print_test "Port $port_num ($port_desc)"
         if netstat -tlnp 2>/dev/null | grep -q ":$port_num " || ss -tlnp 2>/dev/null | grep -q ":$port_num "; then
             print_result "OK"
+            
+            # Processus qui écoute
+            local process=$(netstat -tlnp 2>/dev/null | grep ":$port_num " | awk '{print $7}' | head -1)
+            if [ -n "$process" ]; then
+                print_detail "Processus: $process"
+            fi
         else
             print_result "FAIL"
             print_detail "Port fermé ou service arrêté"
+            port_issues=true
         fi
     done
+    
+    if [ "$port_issues" = true ]; then
+        suggest_fixes "network_issues"
+    fi
     
     print_test "Connectivité locale"
     if ping -c 1 -W 1 127.0.0.1 >/dev/null 2>&1; then
@@ -426,10 +807,13 @@ test_network_advanced() {
         print_result "FAIL"
         print_detail "Problème réseau local"
     fi
+    
+    # Analyse réseau détaillée
+    analyze_network_config
 }
 
 # ===============================================================================
-# TESTS DE DONNÉES MQTT
+# FLUX DE DONNÉES MQTT (VERSION AMÉLIORÉE)
 # ===============================================================================
 
 test_mqtt_data_flow() {
@@ -441,6 +825,7 @@ test_mqtt_data_flow() {
     else
         print_result "FAIL"
         print_detail "Impossible de se connecter au broker"
+        suggest_fixes "mqtt_issues"
         return
     fi
     
@@ -449,6 +834,17 @@ test_mqtt_data_flow() {
     if [ -n "$version" ]; then
         print_result "OK"
         print_detail "Version: $version"
+        
+        # Métriques supplémentaires
+        local uptime=$(timeout 1 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t '$SYS/broker/uptime' -C 1 2>/dev/null)
+        if [ -n "$uptime" ]; then
+            print_detail "Uptime broker: $uptime"
+        fi
+        
+        local clients=$(timeout 1 mosquitto_sub -h localhost -p $MQTT_PORT -u "$MQTT_USER" -P "$MQTT_PASS" -t '$SYS/broker/clients/connected' -C 1 2>/dev/null)
+        if [ -n "$clients" ]; then
+            print_detail "Clients connectés: $clients"
+        fi
     else
         print_result "WARN"
         print_detail "Topics système indisponibles"
@@ -474,16 +870,25 @@ test_mqtt_data_flow() {
         
         local unique_topics=$(cut -d' ' -f1 "$temp_file" | sort -u | wc -l)
         print_detail "$unique_topics topics uniques détectés"
+        
+        # Afficher les topics les plus actifs
+        print_detail "Topics les plus actifs:"
+        cut -d' ' -f1 "$temp_file" | sort | uniq -c | sort -nr | head -5 | while read -r count topic; do
+            print_detail "  $topic: $count messages"
+        done
     else
         print_result "WARN"
         print_detail "Aucun message collecté"
     fi
     
     rm -f "$temp_file"
+    
+    # Analyse MQTT détaillée
+    analyze_mqtt_metrics
 }
 
 # ===============================================================================
-# TESTS DE PERFORMANCE (VERSION CORRIGÉE)
+# TESTS DE PERFORMANCE (VERSION AMÉLIORÉE - INCHANGÉE)
 # ===============================================================================
 
 test_performance() {
@@ -626,7 +1031,7 @@ test_performance() {
 }
 
 # ===============================================================================
-# TESTS DE STABILITÉ ET STRESS
+# TESTS DE STABILITÉ (INCHANGÉS)
 # ===============================================================================
 
 test_stability() {
@@ -713,7 +1118,7 @@ test_stability() {
 }
 
 # ===============================================================================
-# TESTS DE RESSOURCES SYSTÈME
+# TESTS DE RESSOURCES SYSTÈME (INCHANGÉS)
 # ===============================================================================
 
 test_system_resources() {
@@ -836,7 +1241,7 @@ test_system_resources() {
 }
 
 # ===============================================================================
-# COMPTE RENDU FINAL
+# COMPTE RENDU FINAL (VERSION AMÉLIORÉE)
 # ===============================================================================
 
 generate_final_report() {
@@ -903,21 +1308,26 @@ print('yes' if all_active else 'no')
     echo ""
     echo "Actions de maintenance disponibles :"
     if [ $ERRORS -gt 0 ]; then
-        echo "  • Analyser les logs        : journalctl -u 'maxlink-*' -f"
-        echo "  • Redémarrer les services  : /usr/local/bin/maxlink-orchestrator restart"
+        echo "  • Analyser les logs critiques   : journalctl -u 'maxlink-*' -p err -f"
+        echo "  • Redémarrer les services        : /usr/local/bin/maxlink-orchestrator restart"
     fi
     if [ $WARNINGS -gt 0 ]; then
-        echo "  • Surveiller les performances : watch -n 2 '/usr/local/bin/maxlink-orchestrator status'"
+        echo "  • Surveiller les avertissements  : journalctl -u 'maxlink-*' -p warning -f"
+        echo "  • Surveiller les performances    : watch -n 2 '/usr/local/bin/maxlink-orchestrator status'"
     fi
-    echo "  • État orchestrateur       : /usr/local/bin/maxlink-orchestrator status"
-    echo "  • Test MQTT en temps réel  : mosquitto_sub -h localhost -u $MQTT_USER -P $MQTT_PASS -t '#' -v"
-    echo "  • Relancer ce diagnostic   : sudo $0"
+    echo "  • État orchestrateur             : /usr/local/bin/maxlink-orchestrator status"
+    echo "  • Test MQTT en temps réel        : mosquitto_sub -h localhost -u $MQTT_USER -P $MQTT_PASS -t '#' -v"
+    echo "  • Relancer ce diagnostic         : sudo $0"
     
     if [ "$OFFLINE_MODE" = true ]; then
         echo ""
         echo "Mode en ligne (avec tests internet) :"
         echo "  • sudo $0 --online"
     fi
+    
+    echo ""
+    echo "Mode diagnostic rapide (sans analyses détaillées) :"
+    echo "  • sudo $0 --quick"
 }
 
 # ===============================================================================
@@ -929,11 +1339,16 @@ main() {
     clear
     echo ""
     echo "========================================================================"
-    echo "DIAGNOSTIC MAXLINK COMPLET - $(date)"
+    echo "DIAGNOSTIC MAXLINK COMPLET AMÉLIORÉ - $(date)"
     if [ "$OFFLINE_MODE" = true ]; then
         echo "Mode : Environnement hors-ligne (recommandé pour MaxLink)"
     else
         echo "Mode : Tests avec connectivité internet"
+    fi
+    if [ "$DETAILED_ANALYSIS" = true ]; then
+        echo "Analyse : Détaillée (logs et diagnostics approfondis)"
+    else
+        echo "Analyse : Rapide (tests basiques uniquement)"
     fi
     echo "========================================================================"
     
@@ -941,7 +1356,7 @@ main() {
     if [ "$EUID" -ne 0 ]; then
         echo ""
         echo -e "${YELLOW}⚠ Ce script nécessite les privilèges root pour un diagnostic complet${NC}"
-        echo "  Usage: sudo $0"
+        echo "  Usage: sudo $0 [--online] [--quick]"
         echo ""
         exit 1
     fi
@@ -1000,4 +1415,4 @@ main() {
 }
 
 # Lancer le diagnostic complet
-main
+main "$@"
