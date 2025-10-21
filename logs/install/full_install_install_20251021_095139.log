@@ -1,0 +1,29 @@
+
+================================================================================
+DÉMARRAGE: full_install_install
+Description: Installation complète MaxLink
+Date: Tue 21 Oct 09:51:39 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-10-21 09:51:39] [INFO] [full_install_install] Script full_install_install initialisé
+[2025-10-21 09:51:39] [INFO] [full_install_install] ========== DÉBUT DE L'INSTALLATION COMPLÈTE MAXLINK ==========
+[2025-10-21 09:51:39] [INFO] [full_install_install] Exécution de update_install.sh
+[2025-10-21 09:55:34] [SUCCESS] [full_install_install] update_install.sh installé avec succès
+[2025-10-21 09:55:44] [INFO] [full_install_install] Exécution de ap_install.sh
+[2025-10-21 09:56:17] [SUCCESS] [full_install_install] ap_install.sh installé avec succès
+[2025-10-21 09:56:27] [INFO] [full_install_install] Exécution de nginx_install.sh
+[2025-10-21 09:56:50] [SUCCESS] [full_install_install] nginx_install.sh installé avec succès
+[2025-10-21 09:57:00] [ERROR] [full_install_install] Script non trouvé: /media/prod/USBTOOL/scripts/install/fake_ncsi_install.sh
+[2025-10-21 09:57:00] [INFO] [full_install_install] Exécution de mqtt_install.sh
+[2025-10-21 09:57:16] [ERROR] [full_install_install] mqtt_install.sh a échoué
+[2025-10-21 09:57:26] [INFO] [full_install_install] Exécution de mqtt_wgs_install.sh
+[2025-10-21 09:57:27] [ERROR] [full_install_install] mqtt_wgs_install.sh a échoué
+[2025-10-21 09:57:38] [INFO] [full_install_install] Exécution de php_archives_install.sh
+[2025-10-21 09:57:54] [ERROR] [full_install_install] php_archives_install.sh a échoué
+[2025-10-21 09:58:04] [INFO] [full_install_install] Exécution de orchestrator_install.sh
+[2025-10-21 09:58:13] [SUCCESS] [full_install_install] orchestrator_install.sh installé avec succès
+[2025-10-21 09:58:13] [ERROR] [full_install_install] Installation terminée avec 4 erreurs
+[2025-10-21 10:00:13] [INFO] [full_install_install] Redémarrage du système malgré les erreurs
+[2025-10-21 10:00:13] [INFO] [full_install_install] Script full_install_install terminé avec le code 1

@@ -2,7 +2,7 @@
 """
 MaxLink Test Results Persistence Collector
 Persiste les résultats de tests CSV avec traçabilité hebdomadaire
-Version 3.1 - Architecture 1: Extension Simple + Sauvegarde USB automatique
+Version 3.0 - Architecture 1: Extension Simple
 """
 
 import os
@@ -46,10 +46,6 @@ class TestPersistCollector(BaseCollector):
         # Répertoire d'archives
         self.archives_path = self.base_path / self.archives_subdir
         
-        # Configuration sauvegarde USB (NOUVELLE FONCTIONNALITÉ)
-        self.usb_backup_path = Path('/media/prod/MAXLINKSAVE')
-        self.usb_backup_enabled = True  # Peut être désactivé via config si besoin
-        
         # Variables de suivi de semaine
         self.current_year, self.current_week = self._get_current_week_info()
         self.last_known_week = None
@@ -57,7 +53,6 @@ class TestPersistCollector(BaseCollector):
         # Verrous pour éviter les conflits d'écriture
         self.file_locks = {}
         self.archive_lock = threading.Lock()
-        self.usb_backup_lock = threading.Lock()  # NOUVEAU VERROU
         
         # Créer les répertoires nécessaires
         self._ensure_directories_exist()
@@ -155,93 +150,6 @@ class TestPersistCollector(BaseCollector):
         
         return previous_files
     
-    def _check_usb_availability(self):
-        """Vérifie si la clé USB MAXLINKSAVE est disponible et accessible"""
-        try:
-            if not self.usb_backup_enabled:
-                return False
-                
-            if not self.usb_backup_path.exists():
-                return False
-                
-            if not self.usb_backup_path.is_dir():
-                return False
-                
-            # Test d'écriture simple
-            test_file = self.usb_backup_path / '.maxlink_write_test'
-            try:
-                test_file.touch()
-                test_file.unlink()
-                return True
-            except (OSError, PermissionError):
-                return False
-                
-        except Exception:
-            return False
-    
-    def _backup_to_usb(self, archived_files_info):
-        """Sauvegarde automatique des fichiers archivés sur la clé USB MAXLINKSAVE"""
-        if not archived_files_info:
-            return
-            
-        with self.usb_backup_lock:
-            try:
-                # Vérifier la disponibilité de la clé USB
-                if not self._check_usb_availability():
-                    self.logger.debug("Clé USB MAXLINKSAVE non disponible - sauvegarde ignorée")
-                    return
-                
-                self.logger.info("Clé USB MAXLINKSAVE détectée - début sauvegarde")
-                
-                # Créer la structure d'archives sur USB
-                usb_archives_path = self.usb_backup_path / 'archives'
-                usb_archives_path.mkdir(exist_ok=True)
-                
-                backup_count = 0
-                backup_errors = 0
-                
-                for file_info in archived_files_info:
-                    source_path = file_info['archived_path']
-                    year = file_info['year']
-                    filename = file_info['filename']
-                    
-                    try:
-                        # Créer le répertoire de l'année sur USB
-                        usb_year_path = usb_archives_path / str(year)
-                        usb_year_path.mkdir(exist_ok=True)
-                        
-                        # Chemin de destination sur USB
-                        usb_dest_path = usb_year_path / filename
-                        
-                        # Vérifier l'espace disponible (approximatif)
-                        source_size = source_path.stat().st_size
-                        usb_stats = shutil.disk_usage(self.usb_backup_path)
-                        
-                        if usb_stats.free < source_size * 2:  # Marge de sécurité
-                            self.logger.warning(f"Espace insuffisant sur USB pour {filename}")
-                            backup_errors += 1
-                            continue
-                        
-                        # Copier le fichier sur USB
-                        shutil.copy2(source_path, usb_dest_path)
-                        backup_count += 1
-                        
-                        self.logger.debug(f"Fichier sauvegardé sur USB: {filename} → archives/{year}/")
-                        
-                    except Exception as e:
-                        backup_errors += 1
-                        self.logger.warning(f"Erreur sauvegarde USB {filename}: {e}")
-                
-                # Bilan de la sauvegarde USB
-                if backup_count > 0:
-                    self.logger.info(f"Sauvegarde USB terminée: {backup_count} fichier(s) sauvegardé(s)")
-                
-                if backup_errors > 0:
-                    self.logger.warning(f"Erreurs sauvegarde USB: {backup_errors} fichier(s) échoués")
-                    
-            except Exception as e:
-                self.logger.warning(f"Erreur générale sauvegarde USB: {e}")
-    
     def _archive_previous_weeks(self):
         """Archive automatiquement les fichiers de semaines précédentes"""
         with self.archive_lock:
@@ -252,7 +160,6 @@ class TestPersistCollector(BaseCollector):
                 return
             
             archived_count = 0
-            archived_files_info = []  # NOUVELLE LISTE pour tracking USB
             
             for file_path, file_year, file_week in previous_files:
                 try:
@@ -269,22 +176,11 @@ class TestPersistCollector(BaseCollector):
                     self.logger.info(f"Fichier archivé: {file_path.name} → Archives/{file_year}/")
                     archived_count += 1
                     
-                    # NOUVEAU : Ajouter les infos pour la sauvegarde USB
-                    archived_files_info.append({
-                        'filename': file_path.name,
-                        'year': file_year,
-                        'week': file_week,
-                        'archived_path': archive_dest
-                    })
-                    
                 except Exception as e:
                     self.logger.error(f"Erreur archivage {file_path.name}: {e}")
             
             if archived_count > 0:
                 self.logger.info(f"Archivage terminé: {archived_count} fichier(s) déplacé(s)")
-                
-                # NOUVELLE FONCTIONNALITÉ : Sauvegarde USB automatique
-                self._backup_to_usb(archived_files_info)
     
     def _ensure_current_week_files_exist(self):
         """S'assure que tous les fichiers de la semaine courante existent"""
@@ -340,12 +236,6 @@ class TestPersistCollector(BaseCollector):
         self.logger.info(f"Machines surveillées: {list(self.file_mapping.keys())}")
         self.logger.info(f"Semaine courante: S{self.current_week:02d}_{self.current_year}")
         self.logger.info(f"Archives activées: {self.archives_enabled}")
-        
-        # Vérifier la clé USB au démarrage (info seulement)
-        if self._check_usb_availability():
-            self.logger.info("Clé USB MAXLINKSAVE détectée - sauvegarde automatique active")
-        else:
-            self.logger.info("Clé USB MAXLINKSAVE non détectée - fonctionnement normal")
         
         # Configuration explicite du callback MQTT
         self.mqtt_client.on_message = self.on_message
