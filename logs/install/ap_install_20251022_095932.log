@@ -1,0 +1,19 @@
+
+================================================================================
+DÉMARRAGE: ap_install
+Description: Installation du mode Access Point
+Date: Wed 22 Oct 09:59:32 CEST 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-10-22 09:59:33] [INFO] [ap_install] Script ap_install initialisé
+[2025-10-22 09:59:33] [INFO] [ap_install] ========== DÉBUT DE L'INSTALLATION AP ==========
+[2025-10-22 09:59:33] [INFO] [ap_install] Progression: 10% - Vérifications initiales
+[2025-10-22 09:59:33] [INFO] [ap_install] Privilèges root confirmés
+[2025-10-22 09:59:33] [INFO] [ap_install] Interface wlan0 disponible
+[2025-10-22 09:59:33] [INFO] [ap_install] NetworkManager actif
+[2025-10-22 09:59:35] [INFO] [ap_install] Progression: 25% - Installation des paquets
+[2025-10-22 09:59:35] [INFO] [ap_install] Installation hybride de Point d'accès
+[2025-10-22 09:59:35] [INFO] [ap_install] Point d'accès déjà installé
+[2025-10-22 09:59:36] [SUCCESS] [ap_install] Tous les paquets AP installés
