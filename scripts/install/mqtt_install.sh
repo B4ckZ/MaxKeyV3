@@ -103,7 +103,7 @@ echo ""
 send_progress 30 "Installation de Mosquitto..."
 
 # Utiliser la fonction hybride pour installer
-if hybrid_package_install "Mosquitto et dépendances" "libmosquitto1 libdlt2 mosquitto mosquitto-clients"; then
+if hybrid_package_install "Mosquitto et dépendances" "libwebsockets19t64 libmosquitto1 libdlt2 mosquitto mosquitto-clients"; then
     echo ""
     log_success "Tous les paquets installés avec succès"
 else
