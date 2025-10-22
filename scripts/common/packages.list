@@ -1,4 +1,3 @@
-
 # Paquets de base (update_install.sh)
 base:git curl wget ca-certificates apt-transport-https gnupg lsb-release
 
@@ -16,6 +15,9 @@ python:python3-psutil python3-paho-mqtt python3-pip python3-setuptools
 
 # Outils système et RTC
 system:i2c-tools
+
+# Dépendances système PHP 8.4 pour Debian 13 Trixie
+php-deps:libargon2-1 libsodium23
 
 # Système PHP pour archives (php_archives_install.sh)
 php:php php-cli php-fpm
