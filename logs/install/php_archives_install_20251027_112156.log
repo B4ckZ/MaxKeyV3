@@ -1,0 +1,45 @@
+
+================================================================================
+DÉMARRAGE: php_archives_install
+Description: Installation Système PHP Archives
+Date: Mon 27 Oct 11:21:56 CET 2025
+Utilisateur: root
+Répertoire: /media/prod/USBTOOL
+================================================================================
+
+[2025-10-27 11:21:56] [INFO] [php_archives_install] Script php_archives_install initialisé
+[2025-10-27 11:21:56] [INFO] [php_archives_install] ========== DÉBUT INSTALLATION PHP ARCHIVES ==========
+[2025-10-27 11:21:56] [INFO] [php_archives_install] Progression: 5% - Initialisation...
+[2025-10-27 11:21:56] [INFO] [php_archives_install] Progression: 15% - Vérification des prérequis...
+[2025-10-27 11:21:56] [INFO] [php_archives_install] Vérification des prérequis
+[2025-10-27 11:21:56] [SUCCESS] [php_archives_install] Prérequis validés
+[2025-10-27 11:21:57] [INFO] [php_archives_install] Progression: 35% - Installation de PHP...
+[2025-10-27 11:21:57] [INFO] [php_archives_install] Installation de PHP depuis le cache
+[2025-10-27 11:21:57] [INFO] [php_archives_install] Vérification complète du cache pour la catégorie: php
+[2025-10-27 11:21:57] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php
+[2025-10-27 11:21:57] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-cli
+[2025-10-27 11:21:57] [SUCCESS] [php_archives_install] Paquet trouvé dans cache: php-fpm
+[2025-10-27 11:21:57] [SUCCESS] [php_archives_install] Cache complet pour php
+[2025-10-27 11:21:57] [INFO] [php_archives_install] Installation simultanée des paquets de la catégorie: php
+[2025-10-27 11:21:57] [INFO] [php_archives_install] Fichiers .deb collectés pour installation:  /var/cache/maxlink/packages/php-common_2%3a96_all.deb
+/var/cache/maxlink/packages/php-fpm_2%3a8.4+96_all.deb
+/var/cache/maxlink/packages/php8.4-cli_8.4.11-1_arm64.deb
+/var/cache/maxlink/packages/php-cli_2%3a8.4+96_all.deb
+/var/cache/maxlink/packages/php8.4_8.4.11-1_all.deb
+/var/cache/maxlink/packages/php_2%3a8.4+96_all.deb
+/var/cache/maxlink/packages/php8.4-opcache_8.4.11-1_arm64.deb
+/var/cache/maxlink/packages/php8.4-cgi_8.4.11-1_arm64.deb
+/var/cache/maxlink/packages/php8.4-readline_8.4.11-1_arm64.deb
+/var/cache/maxlink/packages/php8.4-common_8.4.11-1_arm64.deb
+/var/cache/maxlink/packages/php8.4-fpm_8.4.11-1_arm64.deb /var/cache/maxlink/packages/php-cli_2%3a8.4+96_all.deb /var/cache/maxlink/packages/php-fpm_2%3a8.4+96_all.deb
+[2025-10-27 11:21:57] [INFO] [php_archives_install] Lancement installation dpkg simultanée
+[2025-10-27 11:22:06] [SUCCESS] [php_archives_install] Installation simultanée réussie pour php
+[2025-10-27 11:22:06] [ERROR] [php_archives_install] PHP CLI non trouvé après installation
+[2025-10-27 11:22:06] [INFO] [php_archives_install] Script php_archives_install terminé avec le code 1
+
+================================================================================
+FIN: php_archives_install
+Code de sortie: 1
+Durée: 10 secondes
+================================================================================
+

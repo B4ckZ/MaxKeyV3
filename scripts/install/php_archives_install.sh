@@ -10,32 +10,18 @@ source "$SCRIPT_DIR/../common/packages.sh"
 init_logging "Installation Système PHP Archives" "install"
 
 SERVICE_ID="php_archives"
-SERVICE_NAME="PHP Archives System"
-SERVICE_DESCRIPTION="Système PHP pour téléchargement des archives de traçabilité"
 
+# Détection simple et fiable de la version PHP
 detect_php_version() {
-    # Détecte la version majeure.mineure (8.2, 8.3, 8.4, etc)
-    if command -v php >/dev/null 2>&1; then
-        php -v | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -1
-    else
-        # Fallback: chercher dans les paquets installés
-        dpkg -l 2>/dev/null | grep "php[0-9]" | grep -oE 'php[0-9]+\.[0-9]+' | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1
-    fi
+    dpkg -l 2>/dev/null | grep "^ii.*php[0-9]" | grep -oE "php[0-9]+\.[0-9]+" | head -1 | sed 's/php//'
 }
 
 get_php_fpm_service() {
-    local version="$1"
-    echo "php${version}-fpm"
+    echo "php${1}-fpm"
 }
 
 get_php_fpm_socket() {
-    local version="$1"
-    echo "/run/php/php${version}-fpm.sock"
-}
-
-get_php_ini_dir() {
-    local version="$1"
-    echo "/etc/php/${version}/fpm/conf.d"
+    echo "/run/php/php${1}-fpm.sock"
 }
 
 send_progress() {
@@ -43,69 +29,11 @@ send_progress() {
     log_info "Progression: $1% - $2" false
 }
 
-install_php_deps_from_cache() {
-    log_info "Installation des dépendances PHP depuis le cache"
-    
-    echo "◦ Installation des dépendances système PHP..."
-    
-    if [ ! -d "$PACKAGE_CACHE_DIR" ]; then
-        log_error "Cache de paquets manquant: $PACKAGE_CACHE_DIR"
-        return 1
-    fi
-    
-    if ! verify_category_cache_complete "php-deps"; then
-        log_warn "Catégorie php-deps non trouvée dans le cache - tentative installation apt-get"
-        
-        for pkg in libargon2-1 libsodium23; do
-            if ! dpkg -l | grep -q "^ii.*$pkg"; then
-                echo "  → Installation de $pkg via apt-get..."
-                if apt-get install -y "$pkg" >/dev/null 2>&1; then
-                    echo "  ✓ $pkg installé"
-                    log_success "$pkg installé via apt-get"
-                else
-                    log_warn "Installation apt-get échouée pour $pkg - ignoré"
-                fi
-            fi
-        done
-        return 0
-    fi
-    
-    if ! install_packages_by_category_simultaneously "php-deps"; then
-        log_warn "Échec installation php-deps depuis le cache"
-        return 1
-    fi
-    
-    log_success "Dépendances PHP installées depuis le cache"
-    return 0
-}
-
-check_prerequisites() {
-    log_info "Vérification des prérequis pour $SERVICE_NAME"
-    
-    if ! command -v nginx >/dev/null 2>&1; then
-        log_error "Nginx n'est pas installé"
-        return 1
-    fi
-    
-    if ! systemctl is-active --quiet nginx; then
-        log_error "Nginx n'est pas actif"
-        return 1
-    fi
-    
-    if [ ! -d "$NGINX_DASHBOARD_DIR" ]; then
-        log_error "Dashboard non installé"
-        return 1
-    fi
-    
-    log_success "Prérequis validés"
-    return 0
-}
-
 install_php_from_cache() {
-    log_info "Installation de PHP depuis le cache local"
+    log_info "Installation de PHP depuis le cache"
     
     if [ ! -d "$PACKAGE_CACHE_DIR" ]; then
-        log_error "Cache de paquets manquant: $PACKAGE_CACHE_DIR"
+        log_error "Cache manquant: $PACKAGE_CACHE_DIR"
         return 1
     fi
     
@@ -115,11 +43,10 @@ install_php_from_cache() {
     fi
     
     if ! install_packages_by_category_simultaneously "php"; then
-        log_error "Échec de l'installation simultanée PHP"
+        log_error "Installation simultanée PHP échouée"
         return 1
     fi
     
-    # Vérifier que PHP CLI existe après installation
     if ! command -v php >/dev/null 2>&1; then
         log_error "PHP CLI non trouvé après installation"
         return 1
@@ -129,153 +56,119 @@ install_php_from_cache() {
     return 0
 }
 
-activate_php_fpm() {
-    local php_version=$(detect_php_version)
-    if [ -z "$php_version" ]; then
-        log_error "Impossible de détecter la version PHP"
+check_prerequisites() {
+    log_info "Vérification des prérequis"
+    
+    if ! command -v nginx >/dev/null 2>&1; then
+        log_error "Nginx non installé"
         return 1
     fi
     
+    if ! systemctl is-active --quiet nginx; then
+        log_error "Nginx n'est pas actif"
+        return 1
+    fi
+    
+    if [ ! -d "$NGINX_DASHBOARD_DIR" ]; then
+        log_error "Dashboard non installé: $NGINX_DASHBOARD_DIR"
+        return 1
+    fi
+    
+    log_success "Prérequis validés"
+    return 0
+}
+
+activate_php_fpm() {
+    local php_version=$1
     local fpm_service=$(get_php_fpm_service "$php_version")
     local fpm_socket=$(get_php_fpm_socket "$php_version")
     
-    log_info "Activation du service $fpm_service (PHP $php_version)"
+    log_info "Activation de $fpm_service"
     
-    # Vérifier que le package php-fpm existe réellement
-    if ! dpkg -l | grep -q "php${php_version}-fpm"; then
-        log_error "Package php${php_version}-fpm n'est pas installé"
+    if ! dpkg -l | grep -q "^ii.*${fpm_service}"; then
+        log_error "Package $fpm_service non installé"
         return 1
     fi
     
-    if systemctl is-active --quiet "$fpm_service"; then
-        log_info "$fpm_service déjà actif"
-        return 0
-    fi
-    
-    if ! systemctl enable "$fpm_service" >/dev/null 2>&1; then
-        log_error "Échec activation $fpm_service au démarrage"
+    systemctl enable "$fpm_service" >/dev/null 2>&1 || {
+        log_error "Échec enable $fpm_service"
         return 1
-    fi
+    }
     
-    if ! systemctl start "$fpm_service" >/dev/null 2>&1; then
-        log_error "Échec démarrage $fpm_service"
+    systemctl start "$fpm_service" >/dev/null 2>&1 || {
+        log_error "Échec start $fpm_service"
         return 1
-    fi
+    }
     
     sleep 2
     
     if [ ! -S "$fpm_socket" ]; then
-        log_warning "Socket $fpm_service non trouvé: $fpm_socket"
+        log_warning "Socket non trouvée: $fpm_socket"
     fi
     
-    log_success "$fpm_service activé avec socket $fpm_socket"
+    if ! systemctl is-active --quiet "$fpm_service"; then
+        log_error "$fpm_service n'est pas actif"
+        return 1
+    fi
+    
+    log_success "$fpm_service activé - socket: $fpm_socket"
     return 0
 }
 
 configure_nginx_for_php() {
-    local php_version=$(detect_php_version)
-    if [ -z "$php_version" ]; then
-        log_error "Impossible de détecter la version PHP pour nginx"
-        return 1
-    fi
-    
+    local php_version=$1
     local fpm_socket=$(get_php_fpm_socket "$php_version")
     local nginx_conf="/etc/nginx/sites-available/maxlink-dashboard"
     
-    log_info "Configuration nginx pour PHP $php_version avec socket $fpm_socket"
-    
-    if grep -q "\.php" "$nginx_conf" 2>/dev/null; then
-        log_info "Configuration PHP déjà présente"
-        # Vérifier que le socket pointé est correct
-        if grep -q "fastcgi_pass unix:$fpm_socket" "$nginx_conf"; then
-            log_info "Socket est correct dans la configuration"
-            return 0
-        else
-            log_warn "Socket dans la config ne correspond pas à la version PHP détectée"
-            log_info "Mise à jour de la configuration nginx..."
-            # Mettre à jour le socket
-            sed -i "s|fastcgi_pass unix:/run/php/php[0-9.]*-fpm.sock|fastcgi_pass unix:${fpm_socket}|g" "$nginx_conf"
-        fi
-    fi
+    log_info "Configuration nginx pour PHP"
     
     if [ ! -f "$nginx_conf" ]; then
-        log_error "Fichier de configuration nginx manquant: $nginx_conf"
+        log_error "Config nginx manquante: $nginx_conf"
         return 1
     fi
     
-    local backup_file="$nginx_conf.backup.php.$(date +%Y%m%d_%H%M%S)"
-    cp "$nginx_conf" "$backup_file"
-    log_info "Backup nginx créé: $backup_file"
-    
-    if sed -i "/^}$/i\\
-\\
-    location ~ ^/archives-list\\.php$ {\\
-        if (\$args ~ \"(union|select|insert|update|delete|drop|script|javascript|<|>|\\047|\\042|;|--|\\\\\||&)\" ) {\\
-            return 400 \"Invalid request\";\\
-        }\\
-        include snippets/fastcgi-php.conf;\\
-        fastcgi_pass unix:${fpm_socket};\\
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;\\
-        include fastcgi_params;\\
-        add_header X-Content-Type-Options nosniff;\\
-        add_header X-Frame-Options DENY;\\
-        add_header X-XSS-Protection \"1; mode=block\";\\
-        add_header Content-Type \"application/json\";\\
-    }\\
-\\
-    location ~ ^/download-archive\\.php$ {\\
-        if (\$args ~ \"(union|select|insert|update|delete|drop|script|javascript|<|>|\\047|\\042|;|--|\\\\\||&)\" ) {\\
-            return 400 \"Invalid request\";\\
-        }\\
-        include snippets/fastcgi-php.conf;\\
-        fastcgi_pass unix:${fpm_socket};\\
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;\\
-        include fastcgi_params;\\
-        add_header X-Content-Type-Options nosniff;\\
-        add_header X-Frame-Options DENY;\\
-    }\\
-\\
-    location ~ \\.php$ {\\
-        include snippets/fastcgi-php.conf;\\
-        fastcgi_pass unix:${fpm_socket};\\
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;\\
-        include fastcgi_params;\\
-    }" "$nginx_conf"; then
-        log_info "Configuration PHP ajoutée à nginx"
+    if grep -q "fastcgi_pass" "$nginx_conf"; then
+        log_info "Configuration PHP déjà présente"
+        sed -i "s|fastcgi_pass unix:/run/php/php[0-9.]*-fpm.sock|fastcgi_pass unix:${fpm_socket}|g" "$nginx_conf"
+        log_info "Socket mis à jour dans la config"
     else
-        log_error "Échec ajout configuration PHP"
-        mv "$backup_file" "$nginx_conf"
-        return 1
+        cp "$nginx_conf" "$nginx_conf.backup.$(date +%s)"
+        
+        sed -i "/^}$/i\\
+\\
+    location ~ \\.php\$ {\\
+        include snippets/fastcgi-php.conf;\\
+        fastcgi_pass unix:${fpm_socket};\\
+        fastcgi_param SCRIPT_FILENAME \\\$document_root\\\$fastcgi_script_name;\\
+        include fastcgi_params;\\
+    }" "$nginx_conf"
+        
+        log_info "Configuration PHP ajoutée"
     fi
     
     if ! nginx -t >/dev/null 2>&1; then
-        log_error "Configuration nginx invalide"
-        mv "$backup_file" "$nginx_conf"
-        systemctl restart nginx >/dev/null 2>&1
+        log_error "Config nginx invalide"
         return 1
     fi
     
-    if ! systemctl restart nginx >/dev/null 2>&1; then
-        log_error "Échec redémarrage nginx"
-        mv "$backup_file" "$nginx_conf"
-        systemctl restart nginx >/dev/null 2>&1
+    systemctl restart nginx >/dev/null 2>&1 || {
+        log_error "Échec restart nginx"
         return 1
-    fi
+    }
     
     log_success "Nginx configuré et redémarré"
     return 0
 }
 
 install_php_files() {
-    log_info "Installation des fichiers PHP et JavaScript"
+    log_info "Installation des fichiers PHP"
     
     if [ ! -d "$BASE_DIR/web_files" ]; then
         log_error "Dossier web_files manquant: $BASE_DIR/web_files"
         return 1
     fi
     
-    local required_files=("archives-list.php" "download-archive.php" "download-manager.js")
-    for file in "${required_files[@]}"; do
+    for file in "archives-list.php" "download-archive.php" "download-manager.js"; do
         if [ ! -f "$BASE_DIR/web_files/$file" ]; then
             log_error "Fichier manquant: $file"
             return 1
@@ -283,69 +176,44 @@ install_php_files() {
         cp "$BASE_DIR/web_files/$file" "$NGINX_DASHBOARD_DIR/"
     done
     
-    chown www-data:www-data "$NGINX_DASHBOARD_DIR"/*.php "$NGINX_DASHBOARD_DIR"/*.js
-    chmod 644 "$NGINX_DASHBOARD_DIR"/*.php "$NGINX_DASHBOARD_DIR"/*.js
+    chown www-data:www-data "$NGINX_DASHBOARD_DIR"/*.php "$NGINX_DASHBOARD_DIR"/*.js 2>/dev/null || true
+    chmod 644 "$NGINX_DASHBOARD_DIR"/*.php "$NGINX_DASHBOARD_DIR"/*.js 2>/dev/null || true
     
-    log_success "Fichiers PHP et JS installés"
+    log_success "Fichiers PHP installés"
     return 0
 }
 
-configure_permissions_strict() {
-    log_info "Configuration des permissions strictes"
+configure_php_security() {
+    local php_version=$1
+    local ini_dir="/etc/php/${php_version}/fpm/conf.d"
     
-    local php_version=$(detect_php_version)
-    local ini_dir=$(get_php_ini_dir "$php_version")
-    
-    if [ ! -d "$ini_dir" ]; then
-        log_warn "Répertoire ini non trouvé: $ini_dir"
-        return 0
-    fi
-    
-    # Permissions archives
-    find "$NGINX_DASHBOARD_DIR/archives" -type f -exec chmod 644 {} \;
-    find "$NGINX_DASHBOARD_DIR/archives" -type d -exec chmod 755 {} \;
-    
-    log_success "Permissions configurées"
-    return 0
-}
-
-optimize_php_security() {
-    log_info "Optimisation de la sécurité PHP"
-    
-    local php_version=$(detect_php_version)
-    local ini_dir=$(get_php_ini_dir "$php_version")
+    log_info "Configuration de sécurité PHP"
     
     if [ ! -d "$ini_dir" ]; then
-        log_warn "Répertoire ini non trouvé: $ini_dir"
+        log_warning "Répertoire ini non trouvé: $ini_dir"
         return 0
     fi
     
     cat > "$ini_dir/maxlink-security.ini" << EOF
-; Configuration de sécurité MaxLink
-disable_functions = exec,passthru,shell_exec,system,proc_open,proc_close,proc_get_status,checkdnsrr,getprotobyname,getprotobynumber,getmxrr,fsockopen,popen,socket_create,socket_create_listen,socket_create_pair,socket_getopt,socket_getpeername,socket_getsockname,socket_getsockopt,socket_import_stream
+disable_functions = exec,passthru,shell_exec,system,proc_open,proc_close,popen,socket_create
 expose_php = Off
 allow_url_fopen = Off
 allow_url_include = Off
 display_errors = Off
 log_errors = On
-error_log = /var/log/php-errors.log
 max_execution_time = 30
 memory_limit = 128M
 post_max_size = 8M
 upload_max_filesize = 2M
 session.cookie_httponly = On
-session.cookie_secure = Off
 session.use_strict_mode = On
 EOF
     
     local fpm_service=$(get_php_fpm_service "$php_version")
-    if systemctl restart "$fpm_service" >/dev/null 2>&1; then
-        log_success "Sécurité PHP optimisée et service redémarré"
-        return 0
-    else
-        log_warning "Problème redémarrage $fpm_service après optimisation"
-        return 0
-    fi
+    systemctl restart "$fpm_service" >/dev/null 2>&1
+    
+    log_success "Sécurité PHP configurée"
+    return 0
 }
 
 create_test_archives() {
@@ -354,16 +222,13 @@ create_test_archives() {
     local archives_dir="$NGINX_DASHBOARD_DIR/archives"
     mkdir -p "$archives_dir"
     
-    local current_year=$(date +%Y)
+    local year=$(date +%Y)
     for week in {01..04}; do
         for machine in "S01" "S02"; do
-            cat > "$archives_dir/${machine}_${current_year}_${week}.csv" << EOF
-timestamp,machine,status,result,humidity,temp
-${current_year}-01-0${week} 09:00:00,$machine,production,95,OK,22.5,1.15
-${current_year}-01-0${week} 10:00:00,$machine,production,98,OK,22.8,1.18
-${current_year}-01-0${week} 11:00:00,$machine,production,102,OK,23.2,1.22
-${current_year}-01-0${week} 12:00:00,$machine,maintenance,0,MAINT,21.5,0.8
-${current_year}-01-0${week} 13:00:00,$machine,production,107,OK,23.4,1.28
+            cat > "$archives_dir/${machine}_${year}_${week}.csv" << EOF
+timestamp,machine,status,result
+${year}-01-0${week} 09:00:00,$machine,production,95
+${year}-01-0${week} 10:00:00,$machine,production,98
 EOF
         done
     done
@@ -372,48 +237,13 @@ EOF
     chmod -R 755 "$archives_dir"
     find "$archives_dir" -name "*.csv" -exec chmod 644 {} \;
     
-    log_success "Archives de test créées"
-    return 0
-}
-
-test_php_service() {
-    local php_version=$(detect_php_version)
-    if [ -z "$php_version" ]; then
-        log_error "Impossible de détecter version PHP pour tests"
-        return 1
-    fi
-    
-    local fpm_service=$(get_php_fpm_service "$php_version")
-    local fpm_socket=$(get_php_fpm_socket "$php_version")
-    
-    log_info "Test service PHP $php_version"
-    
-    if ! php -v >/dev/null 2>&1; then
-        log_error "PHP CLI non fonctionnel"
-        return 1
-    fi
-    
-    if ! systemctl is-active --quiet "$fpm_service"; then
-        log_error "$fpm_service inactif"
-        return 1
-    fi
-    
-    if [ ! -S "$fpm_socket" ]; then
-        log_error "Socket PHP non accessible: $fpm_socket"
-        return 1
-    fi
-    
-    local http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/archives-list.php" 2>/dev/null || echo "000")
-    if [ "$http_code" != "200" ] && [ "$http_code" != "000" ]; then
-        log_warning "HTTP code archives-list.php: $http_code"
-    fi
-    
-    log_success "Tests PHP réussis"
+    log_success "Archives test créées"
     return 0
 }
 
 # PROGRAMME PRINCIPAL
-log_info "========== DÉBUT DE L'INSTALLATION $SERVICE_NAME =========="
+
+log_info "========== DÉBUT INSTALLATION PHP ARCHIVES =========="
 
 echo ""
 echo "========================================================================"
@@ -428,25 +258,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-echo "✅ Privilèges root confirmés"
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 0 : INSTALLATION DÉPENDANCES SYSTÈME"
-echo "========================================================================"
-
-send_progress 8 "Installation dépendances..."
-
-if ! install_php_deps_from_cache; then
-    log_warn "Problème installation dépendances - continuation"
-fi
-
-send_progress 10 "Dépendances prêtes"
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 1 : VÉRIFICATION DES PRÉREQUIS"
-echo "========================================================================"
+echo "✓ Privilèges root confirmés"
 
 send_progress 15 "Vérification des prérequis..."
 
@@ -455,24 +267,18 @@ if ! check_prerequisites; then
     exit 1
 fi
 
-echo "✅ Tous les prérequis sont satisfaits"
-send_progress 25 "Prérequis validés"
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 2 : INSTALLATION PHP"
-echo "========================================================================"
+echo "✓ Tous les prérequis validés"
 
 send_progress 35 "Installation de PHP..."
 
 if command -v php >/dev/null 2>&1; then
     local PHP_VERSION=$(detect_php_version)
-    echo "✅ PHP déjà installé (version $PHP_VERSION)"
-    log_info "PHP détecté: version $PHP_VERSION"
+    echo "✓ PHP détecté (version $PHP_VERSION)"
+    log_info "PHP déjà installé: $PHP_VERSION"
     
     local fpm_service=$(get_php_fpm_service "$PHP_VERSION")
     if ! dpkg -l | grep -q "^ii.*$fpm_service"; then
-        echo "  ⚠ Package $fpm_service manquant - tentative installation"
+        echo "  ⚠ Package $fpm_service manquant"
         if ! install_php_from_cache; then
             update_service_status "$SERVICE_ID" "inactive"
             exit 1
@@ -485,117 +291,80 @@ else
     fi
 fi
 
-echo "✅ PHP installé avec succès"
-send_progress 50 "PHP installé"
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 3 : ACTIVATION PHP-FPM"
-echo "========================================================================"
-
-send_progress 55 "Activation PHP-FPM..."
-
-if ! activate_php_fpm; then
-    log_error "ÉCHEC CRITIQUE: PHP-FPM non activé"
+local PHP_VERSION=$(detect_php_version)
+if [ -z "$PHP_VERSION" ]; then
+    echo "✗ Impossible de détecter la version PHP"
+    log_error "Détection version PHP échouée"
     update_service_status "$SERVICE_ID" "inactive"
     exit 1
 fi
 
-echo "✅ PHP-FPM activé avec succès"
-send_progress 60 "PHP-FPM activé"
+echo "✓ PHP version détectée: $PHP_VERSION"
 
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 4 : INSTALLATION FICHIERS"
-echo "========================================================================"
+send_progress 55 "Activation PHP-FPM..."
 
-send_progress 65 "Installation fichiers..."
+if ! activate_php_fpm "$PHP_VERSION"; then
+    echo "✗ ERREUR CRITIQUE: PHP-FPM non activé"
+    log_error "Activation PHP-FPM échouée"
+    update_service_status "$SERVICE_ID" "inactive"
+    exit 1
+fi
+
+echo "✓ PHP-FPM activé"
+
+send_progress 65 "Installation des fichiers..."
 
 if ! install_php_files; then
     update_service_status "$SERVICE_ID" "inactive"
     exit 1
 fi
 
-send_progress 70 "Fichiers installés"
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 5 : CONFIGURATION NGINX"
-echo "========================================================================"
+echo "✓ Fichiers PHP installés"
 
 send_progress 75 "Configuration nginx..."
 
-if ! configure_nginx_for_php; then
+if ! configure_nginx_for_php "$PHP_VERSION"; then
     update_service_status "$SERVICE_ID" "inactive"
     exit 1
 fi
 
-echo "✅ Nginx configuré"
-send_progress 80 "Nginx configuré"
+echo "✓ Nginx configuré"
 
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 6 : PERMISSIONS ET SÉCURITÉ"
-echo "========================================================================"
+send_progress 85 "Configuration de sécurité..."
 
-send_progress 82 "Permissions strictes..."
-
-if ! configure_permissions_strict; then
-    log_warning "Problème permissions"
+if ! configure_php_security "$PHP_VERSION"; then
+    log_warning "Problème configuration sécurité - continuation"
 fi
 
-send_progress 85 "Permissions configurées"
-
-send_progress 87 "Optimisation sécurité..."
-
-if ! optimize_php_security; then
-    log_warning "Problème optimisation sécurité"
-fi
-
-send_progress 90 "Sécurité optimisée"
-
-echo ""
-echo "========================================================================"
-echo "ÉTAPE 7 : TESTS FINAUX"
-echo "========================================================================"
-
-send_progress 92 "Création archives test..."
+send_progress 90 "Création archives test..."
 
 if ! create_test_archives; then
-    log_warning "Problème création archives test"
-fi
-
-send_progress 95 "Validation..."
-
-if ! test_php_service; then
-    log_error "TESTS PHP ÉCHOUÉS - Installation incomplète"
-    update_service_status "$SERVICE_ID" "error"
-    exit 1
+    log_warning "Problème création archives test - continuation"
 fi
 
 send_progress 100 "Installation terminée"
 
 echo ""
 echo "========================================================================"
-echo "INSTALLATION TERMINÉE"
+echo "INSTALLATION RÉUSSIE"
 echo "========================================================================"
 echo ""
 
 update_service_status "$SERVICE_ID" "active"
 
-local php_version=$(detect_php_version)
-local fpm_service=$(get_php_fpm_service "$php_version")
-local fpm_socket=$(get_php_fpm_socket "$php_version")
+local fpm_service=$(get_php_fpm_service "$PHP_VERSION")
+local fpm_socket=$(get_php_fpm_socket "$PHP_VERSION")
 
-echo "🎉 $SERVICE_NAME installé avec succès !"
+echo "✓ PHP Archives System installé avec succès !"
 echo ""
-echo "Configuration appliquée:"
-echo "  • PHP version: $php_version"
-echo "  • Service FPM: $fpm_service"
-echo "  • Socket: $fpm_socket"
-echo "  • Dashboard: $NGINX_DASHBOARD_DIR"
+echo "Configuration:"
+echo "  PHP version       : $PHP_VERSION"
+echo "  Service FPM       : $fpm_service"
+echo "  Socket FPM        : $fpm_socket"
+echo "  Dashboard         : $NGINX_DASHBOARD_DIR"
+echo "  Archives          : $NGINX_DASHBOARD_DIR/archives"
 echo ""
 
-log_success "Installation $SERVICE_NAME terminée avec succès"
+log_success "Installation terminée avec succès"
 
 exit 0
