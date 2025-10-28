@@ -1,0 +1,35 @@
+2025-10-27 11:30:18,434 - MaxLinkApp - INFO - ======================================================================
+2025-10-27 11:30:18,437 - MaxLinkApp - INFO - Démarrage de MaxLink Admin Panel (version simplifiée)
+2025-10-27 11:30:18,437 - MaxLinkApp - INFO - ======================================================================
+2025-10-27 11:30:18,437 - MaxLinkApp - INFO - Variables chargées: 1 variables
+2025-10-27 11:30:18,485 - MaxLinkApp - INFO - Initialisation de l'application MaxLink (version simplifiée)
+2025-10-27 11:30:18,520 - MaxLinkApp - INFO - Mode root: False
+2025-10-27 11:30:18,520 - MaxLinkApp - INFO - Services chargés: 8
+2025-10-27 11:30:18,533 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour fake_ncsi: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour php_archives: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-10-27 11:30:18,535 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour fake_ncsi: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour php_archives: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-10-27 11:30:18,536 - MaxLinkApp - DEBUG - Rafraîchissement des indicateurs effectué
+2025-10-27 11:30:18,536 - MaxLinkApp - INFO - Interface prête
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour update: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour ap: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour nginx: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour fake_ncsi: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour mqtt_wgs: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour php_archives: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Indicateur mis à jour pour orchestrator: rouge
+2025-10-27 11:30:20,536 - MaxLinkApp - DEBUG - Rafraîchissement des indicateurs effectué
+2025-10-27 11:30:20,886 - MaxLinkApp - INFO - Fermeture de l'application

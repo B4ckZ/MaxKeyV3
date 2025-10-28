@@ -27,7 +27,6 @@ INSTALL_SCRIPTS=(
     "update_install.sh:Mise à jour système et cache"
     "ap_install.sh:Point d'accès WiFi"
     "nginx_install.sh:Serveur Web et Dashboard"
-	"fake_ncsi_install.sh:Correctif NCSI Windows"
     "mqtt_install.sh:Broker MQTT"
     "mqtt_wgs_install.sh:Widgets MQTT"
 	"php_archives_install.sh:Systeme php"
