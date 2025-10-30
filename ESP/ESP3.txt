@@ -1,0 +1,1320 @@
+/*
+ * MaxLink - Traçabilité poches IBC - Platform v2.3 NeoPixel + Health Check
+ * ESP32-S3 Feather | Scanner Datalogic GFS4150-9 | ILI9341 2.2"
+ * 
+ * NeoPixels RGBW (10 LEDs) : 0-7 monitoring global, 8=MQTT, 9=WiFi
+ * Health Check Auto-Reconnexion (non-bloquant) toutes les 5s
+ * Backoff exponentiel pour éviter flood
+ * 
+ */
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
+#include <Adafruit_NeoPixel.h>
+#include <HardwareSerial.h>
+#include <time.h>
+#include <sys/time.h>
+
+const char* ssid = "MaxLink-NETWORK";
+const char* password = "MDPsupersecret007";
+
+const char* mqtt_server = "192.168.4.1";
+const int mqtt_port = 1883;
+const char* mqtt_user = "mosquitto";
+const char* mqtt_password = "mqtt";
+const char* mqtt_topic = "SOUFFLAGE/ESP32/RTP";
+const char* mqtt_client_id = "MaxTrace_ESP32_RTP";
+
+#define TFT_CS          5
+#define TFT_DC          6
+#define TFT_RST         9
+#define TFT_MOSI        35
+#define TFT_SCK         36
+#define TFT_MISO        37
+#define TFT_LITE        10
+
+#define CONTACT_OK      A1
+#define CONTACT_FV      A2
+#define CONTACT_FP      A3
+#define BUTTON_PIN      12
+
+#define NEOPIXEL_PIN    13
+#define NEOPIXEL_COUNT  10
+
+#define SCREEN_WIDTH    320
+#define SCREEN_HEIGHT   240
+#define TOP_BAR_HEIGHT  50
+#define LOG_START_Y     50
+#define LOG_HEIGHT      190
+#define LOG_LINE_HEIGHT 10
+#define MAX_LOG_LINES   (LOG_HEIGHT / LOG_LINE_HEIGHT)
+
+struct HeaderElementConfig {
+  int16_t x, y;
+  uint8_t textSize;
+  uint16_t color;
+};
+
+struct HeaderSeparatorConfig {
+  int16_t x;
+  uint8_t thickness;
+  uint16_t color;
+  bool enabled;
+};
+
+struct HeaderConfig {
+  uint16_t width;
+  uint16_t height;
+  uint16_t bgColor;
+  
+  HeaderElementConfig team;
+  HeaderElementConfig dateTime;
+  HeaderElementConfig wifi;
+  HeaderElementConfig appVersion;
+  
+  HeaderSeparatorConfig sep1;
+  HeaderSeparatorConfig sep2;
+  HeaderSeparatorConfig sep3;
+};
+
+HeaderConfig headerConfig;
+
+#define COLOR_HEADER      ILI9341_ORANGE
+#define COLOR_ORANGE      0xFC00
+#define COLOR_SUCCESS     ILI9341_GREEN
+#define COLOR_WARNING     ILI9341_YELLOW
+#define COLOR_ERROR       ILI9341_RED
+#define COLOR_INFO        ILI9341_CYAN
+#define COLOR_BACKGROUND  ILI9341_BLACK
+
+#define BACKLIGHT_PWM_MAX     255
+#define BACKLIGHT_PWM_MIN     0
+#define BACKLIGHT_TIMEOUT     60000
+#define BACKLIGHT_FADE_STEP   5
+#define BACKLIGHT_FADE_DELAY  20
+
+#define BUTTON_SHORT_PRESS  50
+#define BUTTON_LONG_PRESS   2000
+#define BUTTON_DEBOUNCE     50
+
+enum ButtonState {
+  BTN_IDLE,
+  BTN_PRESSED,
+  BTN_SHORT_DETECTED,
+  BTN_LONG_DETECTED
+};
+
+enum LEDState {
+  LED_INIT,
+  LED_CONNECTING_WIFI,
+  LED_TIME_SYNC,
+  LED_READY,
+  LED_SCANNING,
+  LED_TEST_RUNNING,
+  LED_SENDING,
+  LED_SUCCESS,
+  LED_ERROR
+};
+
+enum ConnectionState {
+  CONN_IDLE,
+  CONN_CONNECTING,
+  CONN_CONNECTED,
+  CONN_FAILED
+};
+
+struct RGBWColor {
+  uint8_t r, g, b, w;
+};
+
+#define COLOR_BLUE          {0, 0, 255, 0}
+#define COLOR_GREEN         {0, 255, 0, 0}
+#define COLOR_YELLOW        {255, 255, 0, 0}
+#define COLOR_ORANGE        {255, 128, 0, 0}
+#define COLOR_RED           {255, 0, 0, 0}
+#define COLOR_WHITE         {0, 0, 0, 255}
+#define COLOR_CYAN          {0, 255, 255, 0}
+
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
+Adafruit_NeoPixel leds(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRBW + NEO_KHZ800);
+WiFiClient espClient;
+PubSubClient mqtt(espClient);
+
+String currentBarcode = "";
+bool barcodeReceived = false;
+
+struct TestData {
+  String barcode;
+  String result;
+  String team;
+} currentTest;
+
+String barcodeBuffer = "";
+unsigned long lastScanTime = 0;
+unsigned long lastBarcodeTime = 0;
+String lastBarcode = "";
+const unsigned long SCAN_TIMEOUT = 500;
+const unsigned long BARCODE_COOLDOWN = 2000;
+const unsigned long SCAN_DEBOUNCE = 100;
+
+String logBuffer[MAX_LOG_LINES];
+
+bool timeSync = false;
+unsigned long timeSyncStart = 0;
+const unsigned long TIME_SYNC_TIMEOUT = 30000;
+
+ButtonState buttonState = BTN_IDLE;
+unsigned long buttonPressStart = 0;
+bool buttonPressed = false;
+bool lastButtonState = HIGH;
+
+int backlightLevel = BACKLIGHT_PWM_MAX;
+unsigned long backlightTimer = 0;
+bool isBacklightActive = true;
+bool backlightFading = false;
+
+String systemStatus = "Initialisation";
+String wifiStatus = "Deconnecte";
+String mqttStatus = "Deconnecte";
+long wifiRSSI = 0;
+
+LEDState currentLEDState = LED_INIT;
+uint8_t neoPixelBrightness = 100;
+unsigned long lastLEDUpdate = 0;
+float animationPhase = 0.0f;
+
+unsigned long lastWiFiScan = 0;
+const unsigned long WIFI_SCAN_INTERVAL = 5000;
+
+ConnectionState wifiState = CONN_IDLE;
+ConnectionState mqttState = CONN_IDLE;
+
+unsigned long lastHealthCheck = 0;
+const unsigned long HEALTH_CHECK_INTERVAL = 5000;
+
+unsigned long lastWiFiAttempt = 0;
+unsigned long lastMqttAttempt = 0;
+unsigned long wifiBackoffTime = 1000;
+unsigned long mqttBackoffTime = 1000;
+const unsigned long MAX_BACKOFF = 30000;
+
+uint8_t wifiFailCount = 0;
+uint8_t mqttFailCount = 0;
+
+String lastDisplayedTime = "";
+long lastDisplayedRSSI = 0;
+
+void initDisplay();
+void initHeaderConfig();
+void drawHeader();
+void drawHeaderElement(String text, HeaderElementConfig cfg);
+void drawHeaderSeparator(HeaderSeparatorConfig cfg);
+void updateUI();
+void logToScreen(String message, uint16_t color = ILI9341_WHITE, bool showTimestamp = false);
+void clearLogArea();
+
+void initBacklight();
+void setBacklightLevel(int level);
+void fadeBacklightTo(int targetLevel);
+void backlightOn();
+void backlightOff();
+void updateBacklight();
+
+void initButton();
+void updateButton();
+void handleShortPress();
+void handleLongPress();
+
+void connectWiFi();
+void connectMQTT();
+void checkWiFiQuality();
+void mqttCallback(char* topic, byte* payload, unsigned int length);
+bool sendMQTTData();
+
+void readBarcode();
+void processBarcode();
+bool isValidBarcode(String barcode);
+void clearScannerBuffer();
+
+void checkContacts();
+
+bool waitForTimeSync(unsigned long timeout);
+void setESP32SystemTime(long timestamp);
+void setTeamFromHour();
+
+String getDateCSV();
+String getTimeCSV();
+int getResultNumber(String result);
+
+void rebootSystem();
+void healthCheck();
+
+void initNeoPixels();
+void setLEDState(LEDState newState);
+void updateLEDs();
+void setNeoPixelBrightness(uint8_t brightness);
+void setLED(uint16_t index, RGBWColor color);
+void fillLEDs(RGBWColor color, uint16_t from = 0, uint16_t to = 7);
+void clearLEDs();
+void updateStatusLEDs();
+void animateInit();
+void animateConnecting();
+void animateTimeSync();
+void animateReady();
+void animateScanning();
+void animateTestRunning();
+void animateSending();
+void animateSuccess();
+void animateError();
+void updateWiFiLED();
+void updateMQTTLED();
+
+void setup() {
+  Serial.begin(115200);
+  Serial1.begin(9600);
+
+  initBacklight();
+  initButton();
+  initNeoPixels();
+  
+  initDisplay();
+  initHeaderConfig();
+  systemStatus = "Demarrage systeme";
+  setLEDState(LED_INIT);
+  drawHeader();
+
+  pinMode(CONTACT_OK, INPUT_PULLUP);
+  pinMode(CONTACT_FV, INPUT_PULLUP);
+  pinMode(CONTACT_FP, INPUT_PULLUP);
+
+  systemStatus = "Connexion WiFi";
+  logToScreen("Initialisation reseau...", COLOR_INFO);
+  delay(500);
+  connectWiFi();
+
+  mqtt.setServer(mqtt_server, mqtt_port);
+  mqtt.setCallback(mqttCallback);
+  mqtt.setBufferSize(512);
+  systemStatus = "Connexion MQTT";
+  connectMQTT();
+
+  systemStatus = "Synchronisation";
+  logToScreen("Synchronisation temporelle...", COLOR_WARNING);
+  setLEDState(LED_TIME_SYNC);
+  
+  if (!waitForTimeSync(TIME_SYNC_TIMEOUT)) {
+    systemStatus = "ERREUR CRITIQUE";
+    logToScreen("ERREUR: Pas de synchronisation !", COLOR_ERROR);
+    logToScreen("ARRET DU SYSTEME", COLOR_ERROR);
+    Serial.println("ERREUR CRITIQUE: Synchronisation temporelle impossible");
+    setLEDState(LED_ERROR);
+    while(1) {
+      updateLEDs();
+      delay(1000);
+    }
+  }
+
+  logToScreen("Horloge synchronisee avec succes", COLOR_SUCCESS);
+
+  logToScreen("Equipe de production: " + currentTest.team, COLOR_INFO);
+  drawHeader();
+
+  systemStatus = "Systeme Pret";
+  setLEDState(LED_READY);
+  logToScreen("=== SYSTEME OPERATIONNEL ===", COLOR_SUCCESS);
+  logToScreen("En attente du code-barres...", ILI9341_WHITE);
+
+  updateUI();
+  delay(2000);
+}
+
+void loop() {
+  mqtt.loop();
+
+  updateButton();
+  updateBacklight();
+  
+  healthCheck();
+  updateLEDs();
+
+  static unsigned long lastUIUpdate = 0;
+  if (millis() - lastUIUpdate >= 1000) {
+    updateUI();
+    lastUIUpdate = millis();
+  }
+
+  static unsigned long lastWiFiCheck = 0;
+  if (millis() - lastWiFiCheck >= 5000) {
+    checkWiFiQuality();
+    lastWiFiCheck = millis();
+  }
+
+  if (!barcodeReceived) {
+    readBarcode();
+  }
+
+  if (barcodeReceived) {
+    checkContacts();
+  }
+}
+
+void healthCheck() {
+  unsigned long now = millis();
+  
+  if (now - lastHealthCheck < HEALTH_CHECK_INTERVAL) {
+    return;
+  }
+  lastHealthCheck = now;
+
+  if (WiFi.status() != WL_CONNECTED) {
+    if (wifiState == CONN_CONNECTED) {
+      logToScreen("WiFi perdu", COLOR_WARNING);
+      wifiState = CONN_IDLE;
+      wifiFailCount = 0;
+      wifiBackoffTime = 1000;
+    }
+    
+    if (wifiState == CONN_IDLE && (now - lastWiFiAttempt >= wifiBackoffTime)) {
+      wifiState = CONN_CONNECTING;
+      WiFi.begin(ssid, password);
+      lastWiFiAttempt = now;
+      wifiFailCount++;
+      wifiBackoffTime = min(wifiBackoffTime * 2, MAX_BACKOFF);
+      logToScreen("WiFi reconnexion (tent: " + String(wifiFailCount) + ")", COLOR_INFO);
+    }
+  } else {
+    if (wifiState != CONN_CONNECTED) {
+      wifiState = CONN_CONNECTED;
+      wifiFailCount = 0;
+      wifiBackoffTime = 1000;
+      logToScreen("WiFi reconnecter", COLOR_SUCCESS);
+    }
+  }
+
+  if (!mqtt.connected()) {
+    if (mqttState == CONN_CONNECTED) {
+      logToScreen("MQTT perdu", COLOR_WARNING);
+      mqttState = CONN_IDLE;
+      mqttFailCount = 0;
+      mqttBackoffTime = 1000;
+    }
+    
+    if (mqttState == CONN_IDLE && (now - lastMqttAttempt >= mqttBackoffTime)) {
+      mqttState = CONN_CONNECTING;
+      mqtt.connect(mqtt_client_id, mqtt_user, mqtt_password);
+      lastMqttAttempt = now;
+      mqttFailCount++;
+      mqttBackoffTime = min(mqttBackoffTime * 2, MAX_BACKOFF);
+      logToScreen("MQTT reconnexion (tent: " + String(mqttFailCount) + ")", COLOR_INFO);
+    }
+  } else {
+    if (mqttState != CONN_CONNECTED) {
+      mqttState = CONN_CONNECTED;
+      mqttFailCount = 0;
+      mqttBackoffTime = 1000;
+      logToScreen("MQTT reconnecter", COLOR_SUCCESS);
+    }
+  }
+}
+
+void initNeoPixels() {
+  leds.begin();
+  leds.setBrightness(neoPixelBrightness);
+  clearLEDs();
+  leds.show();
+  Serial.println("NeoPixel RGBW initialises - Pin 13 - 10 LEDs");
+}
+
+void setNeoPixelBrightness(uint8_t brightness) {
+  neoPixelBrightness = constrain(brightness, 0, 255);
+  leds.setBrightness(neoPixelBrightness);
+  Serial.println("Intensite NeoPixel: " + String(neoPixelBrightness));
+}
+
+void setLED(uint16_t index, RGBWColor color) {
+  if (index < NEOPIXEL_COUNT) {
+    leds.setPixelColor(index, leds.Color(color.r, color.g, color.b, color.w));
+  }
+}
+
+void fillLEDs(RGBWColor color, uint16_t from, uint16_t to) {
+  for (uint16_t i = from; i <= to && i < NEOPIXEL_COUNT; i++) {
+    setLED(i, color);
+  }
+}
+
+void clearLEDs() {
+  for (uint16_t i = 0; i < NEOPIXEL_COUNT; i++) {
+    leds.setPixelColor(i, 0);
+  }
+  leds.show();
+}
+
+void setLEDState(LEDState newState) {
+  currentLEDState = newState;
+  animationPhase = 0.0f;
+  lastLEDUpdate = 0;
+}
+
+void updateLEDs() {
+  unsigned long now = millis();
+  
+  if (now - lastLEDUpdate < 50) return;
+  lastLEDUpdate = now;
+
+  switch (currentLEDState) {
+    case LED_INIT:
+      animateInit();
+      break;
+    case LED_CONNECTING_WIFI:
+      animateConnecting();
+      break;
+    case LED_TIME_SYNC:
+      animateTimeSync();
+      break;
+    case LED_READY:
+      animateReady();
+      break;
+    case LED_SCANNING:
+      animateScanning();
+      break;
+    case LED_TEST_RUNNING:
+      animateTestRunning();
+      break;
+    case LED_SENDING:
+      animateSending();
+      break;
+    case LED_SUCCESS:
+      animateSuccess();
+      break;
+    case LED_ERROR:
+      animateError();
+      break;
+  }
+
+  updateStatusLEDs();
+  leds.show();
+}
+
+void animateInit() {
+  RGBWColor white = COLOR_WHITE;
+  
+  uint16_t step = (animationPhase * 8);
+  clearLEDs();
+  
+  for (uint16_t i = 0; i <= step && i < 8; i++) {
+    setLED(i, white);
+  }
+
+  animationPhase += 0.02f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateConnecting() {
+  RGBWColor blue = COLOR_BLUE;
+  
+  uint16_t pos = (int)(animationPhase * 8) % 8;
+  clearLEDs();
+  setLED(pos, blue);
+
+  animationPhase += 0.04f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateTimeSync() {
+  RGBWColor yellow = COLOR_YELLOW;
+  RGBWColor orange = COLOR_ORANGE;
+  
+  if (animationPhase < 0.5f) {
+    fillLEDs(yellow, 0, 7);
+  } else {
+    fillLEDs(orange, 0, 7);
+  }
+
+  animationPhase += 0.02f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateReady() {
+  RGBWColor green = COLOR_GREEN;
+  fillLEDs(green, 0, 7);
+}
+
+void animateScanning() {
+  RGBWColor cyan = COLOR_CYAN;
+  
+  uint16_t brightness = (int)(sin(animationPhase * 3.14159f) * 127 + 128);
+  
+  for (uint16_t i = 0; i <= 7; i++) {
+    leds.setPixelColor(i, leds.Color(0, brightness, brightness, 0));
+  }
+
+  animationPhase += 0.02f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateTestRunning() {
+  RGBWColor white = COLOR_WHITE;
+  
+  uint16_t pos = (int)(animationPhase * 8) % 8;
+  clearLEDs();
+  
+  setLED(pos, white);
+  if (pos > 0) setLED(pos - 1, white);
+
+  animationPhase += 0.06f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateSending() {
+  RGBWColor yellow = COLOR_YELLOW;
+  
+  uint16_t brightness = (int)(sin(animationPhase * 3.14159f) * 127 + 128);
+  
+  for (uint16_t i = 0; i <= 7; i++) {
+    leds.setPixelColor(i, leds.Color(brightness, brightness, 0, 0));
+  }
+
+  animationPhase += 0.03f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateSuccess() {
+  RGBWColor green = COLOR_GREEN;
+  
+  if (animationPhase < 0.2f) {
+    fillLEDs(green, 0, 2);
+  } else if (animationPhase < 0.4f) {
+    fillLEDs(green, 0, 4);
+  } else if (animationPhase < 0.6f) {
+    fillLEDs(green, 0, 6);
+  } else if (animationPhase < 0.8f) {
+    fillLEDs(green, 0, 7);
+  } else {
+    clearLEDs();
+  }
+
+  animationPhase += 0.02f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void animateError() {
+  RGBWColor red = COLOR_RED;
+  
+  if (animationPhase < 0.5f) {
+    fillLEDs(red, 0, 7);
+  } else {
+    clearLEDs();
+  }
+
+  animationPhase += 0.04f;
+  if (animationPhase > 1.0f) animationPhase = 0.0f;
+}
+
+void updateStatusLEDs() {
+  updateWiFiLED();
+  updateMQTTLED();
+}
+
+void updateWiFiLED() {
+  RGBWColor wifiColor;
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiColor = COLOR_GREEN;
+  } else {
+    wifiColor = COLOR_RED;
+  }
+  
+  setLED(9, wifiColor);
+}
+
+void updateMQTTLED() {
+  RGBWColor mqttColor;
+  
+  if (mqtt.connected()) {
+    mqttColor = COLOR_GREEN;
+  } else {
+    mqttColor = COLOR_RED;
+  }
+  
+  setLED(8, mqttColor);
+}
+
+void initBacklight() {
+  pinMode(TFT_LITE, OUTPUT);
+  setBacklightLevel(BACKLIGHT_PWM_MAX);
+}
+
+void setBacklightLevel(int level) {
+  backlightLevel = constrain(level, BACKLIGHT_PWM_MIN, BACKLIGHT_PWM_MAX);
+  analogWrite(TFT_LITE, backlightLevel);
+}
+
+void fadeBacklightTo(int targetLevel) {
+  backlightFading = true;
+  
+  while (backlightLevel != targetLevel) {
+    if (backlightLevel < targetLevel) {
+      backlightLevel = min(backlightLevel + BACKLIGHT_FADE_STEP, targetLevel);
+    } else {
+      backlightLevel = max(backlightLevel - BACKLIGHT_FADE_STEP, targetLevel);
+    }
+    
+    setBacklightLevel(backlightLevel);
+    delay(BACKLIGHT_FADE_DELAY);
+  }
+  
+  backlightFading = false;
+}
+
+void backlightOn() {
+  isBacklightActive = true;
+  backlightTimer = millis();
+  setBacklightLevel(BACKLIGHT_PWM_MAX);
+}
+
+void backlightOff() {
+  isBacklightActive = false;
+  setBacklightLevel(BACKLIGHT_PWM_MIN);
+}
+
+void updateBacklight() {
+  if (!isBacklightActive) {
+    return;
+  }
+
+  if (millis() - backlightTimer > BACKLIGHT_TIMEOUT) {
+    fadeBacklightTo(BACKLIGHT_PWM_MIN);
+    isBacklightActive = false;
+  }
+}
+
+void initButton() {
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  Serial.println("Bouton initialise - Pin 12");
+}
+
+void updateButton() {
+  bool currentButtonState = digitalRead(BUTTON_PIN);
+
+  if (currentButtonState != lastButtonState) {
+    delay(BUTTON_DEBOUNCE);
+
+    if (currentButtonState == LOW) {
+      buttonPressed = true;
+      buttonPressStart = millis();
+      buttonState = BTN_PRESSED;
+    }
+  }
+
+  if (buttonPressed) {
+    unsigned long pressDuration = millis() - buttonPressStart;
+
+    if (currentButtonState == HIGH && pressDuration >= BUTTON_SHORT_PRESS) {
+      if(pressDuration >= BUTTON_LONG_PRESS) {
+        buttonState = BTN_LONG_DETECTED;
+        handleLongPress();
+      } else if(pressDuration >= BUTTON_SHORT_PRESS) {
+        buttonState = BTN_SHORT_DETECTED;
+        handleShortPress();
+      }
+
+      buttonPressed = false;
+      buttonState = BTN_IDLE;
+    }
+  }
+
+  lastButtonState = currentButtonState;
+}
+
+void handleShortPress() {
+  backlightOn();
+}
+
+void handleLongPress() {
+  rebootSystem();
+}
+
+void initDisplay() {
+  tft.begin();
+  tft.setRotation(1);
+  tft.fillScreen(COLOR_BACKGROUND);
+
+  for(int i = 0; i < MAX_LOG_LINES; i++) {
+    logBuffer[i] = "";
+  }
+
+  Serial.println("Ecran ILI9341 initialise - 320x240");
+}
+
+void initHeaderConfig() {
+  headerConfig = {
+    .width = SCREEN_WIDTH,
+    .height = TOP_BAR_HEIGHT,
+    .bgColor = COLOR_HEADER,
+    
+    .team = {
+      .x = 17, .y = 10,
+      .textSize = 4,
+      .color = ILI9341_WHITE
+    },
+    
+    .dateTime = {
+      .x = 63, .y = 8,
+      .textSize = 2,
+      .color = ILI9341_WHITE
+    },
+    
+    .wifi = {
+      .x = 176, .y = 10,
+      .textSize = 4,
+      .color = ILI9341_WHITE
+    },
+    
+    .appVersion = {
+      .x = 240, .y = 15,
+      .textSize = 3,
+      .color = ILI9341_WHITE
+    },
+    
+    .sep1 = {.x = 55, .thickness = 1, .color = ILI9341_WHITE, .enabled = true},
+    .sep2 = {.x = 165, .thickness = 1, .color = ILI9341_WHITE, .enabled = true},
+    .sep3 = {.x = 230, .thickness = 1, .color = ILI9341_WHITE, .enabled = true}
+  };
+}
+
+void drawHeaderElement(String text, HeaderElementConfig cfg) {
+  tft.setTextColor(cfg.color, headerConfig.bgColor);
+  tft.setTextSize(cfg.textSize);
+  tft.setCursor(cfg.x, cfg.y);
+  tft.println(text);
+}
+
+void drawHeaderSeparator(HeaderSeparatorConfig cfg) {
+  if (!cfg.enabled) return;
+  
+  for (uint8_t i = 0; i < cfg.thickness; i++) {
+    tft.drawFastVLine(cfg.x + i, 0, headerConfig.height, cfg.color);
+  }
+}
+
+void drawHeader() {
+  tft.fillRect(0, 0, headerConfig.width, headerConfig.height, headerConfig.bgColor);
+  
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+  
+  char dateStr[12];
+  char timeStr[10];
+  sprintf(dateStr, "%02d/%02d/%02d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year % 100);
+  sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  
+  drawHeaderElement(currentTest.team, headerConfig.team);
+  
+  drawHeaderSeparator(headerConfig.sep1);
+  
+  tft.setTextColor(headerConfig.dateTime.color, headerConfig.bgColor);
+  tft.setTextSize(headerConfig.dateTime.textSize);
+  tft.setCursor(headerConfig.dateTime.x, headerConfig.dateTime.y);
+  tft.println(dateStr);
+  tft.setCursor(headerConfig.dateTime.x, headerConfig.dateTime.y + 12);
+  tft.println(timeStr);
+  
+  drawHeaderSeparator(headerConfig.sep2);
+  
+  String wifiStr = (wifiRSSI != 0) ? String(abs(wifiRSSI)) : "--";
+  drawHeaderElement(wifiStr, headerConfig.wifi);
+  
+  drawHeaderSeparator(headerConfig.sep3);
+  
+  drawHeaderElement("v2.3", headerConfig.appVersion);
+  
+  tft.drawLine(0, headerConfig.height - 1, headerConfig.width, headerConfig.height - 1, ILI9341_WHITE);
+}
+
+void updateUI() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return;
+  
+  char timeStr[12];
+  sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  String currentTime = String(timeStr);
+  
+  bool timeChanged = (currentTime != lastDisplayedTime);
+  bool wifiChanged = (wifiRSSI != lastDisplayedRSSI);
+  
+  if (!timeChanged && !wifiChanged) {
+    return;
+  }
+  
+  if (timeChanged || wifiChanged) {
+    drawHeader();
+    lastDisplayedTime = currentTime;
+    lastDisplayedRSSI = wifiRSSI;
+  }
+}
+
+void logToScreen(String message, uint16_t color, bool showTimestamp) {
+  for(int i = 0; i < MAX_LOG_LINES - 1; i++) {
+    logBuffer[i] = logBuffer[i + 1];
+  }
+
+  String newLog = "";
+  if (showTimestamp && timeSync) {
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      char timeStr[9];
+      sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      newLog = String(timeStr) + " " + message;
+    } else {
+      newLog = message;
+    }
+  } else {
+    newLog = message;
+  }
+
+  logBuffer[MAX_LOG_LINES - 1] = newLog;
+
+  tft.fillRect(0, LOG_START_Y, SCREEN_WIDTH, LOG_HEIGHT, COLOR_BACKGROUND);
+
+  for(int i = 0; i < MAX_LOG_LINES; i++) {
+    if(logBuffer[i].length() > 0) {
+      int yPos = LOG_START_Y + (i * LOG_LINE_HEIGHT);
+      tft.setCursor(4, yPos);
+      tft.setTextSize(1);
+
+      if(i == MAX_LOG_LINES - 1) {
+        tft.setTextColor(color, COLOR_BACKGROUND);
+      } else {
+        tft.setTextColor(ILI9341_LIGHTGREY, COLOR_BACKGROUND);
+      }
+
+      String displayMessage = logBuffer[i];
+      if (displayMessage.length() > 52) {
+        displayMessage = displayMessage.substring(0, 49) + "...";
+      }
+
+      tft.println(displayMessage);
+    }
+  }
+
+  Serial.println("LOG: " + message);
+}
+
+void clearLogArea() {
+  for(int i = 0; i < MAX_LOG_LINES; i++) {
+    logBuffer[i] = "";
+  }
+
+  tft.fillRect(0, LOG_START_Y, SCREEN_WIDTH, LOG_HEIGHT, COLOR_BACKGROUND);
+}
+
+void connectWiFi() {
+  wifiStatus = "Connexion";
+  setLEDState(LED_CONNECTING_WIFI);
+  logToScreen("Connexion au reseau WiFi...", COLOR_INFO);
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(1000);
+    Serial.print(".");
+    attempts++;
+
+    updateButton();
+    updateBacklight();
+    updateLEDs();
+  }
+
+  if(WiFi.status() == WL_CONNECTED) {
+    wifiStatus = "Connecte";
+    logToScreen("WiFi connecte !", COLOR_SUCCESS);
+    wifiRSSI = WiFi.RSSI();
+    Serial.print("RSSI: ");
+    Serial.println(wifiRSSI);
+  } else {
+    wifiStatus = "Echec";
+    logToScreen("Impossible de se connecter au WiFi", COLOR_ERROR);
+    Serial.println("WiFi failed after 30 attempts");
+  }
+}
+
+void connectMQTT() {
+  wifiStatus = "Connexion";
+  logToScreen("Connexion au serveur MQTT...", COLOR_INFO);
+
+  int attempts = 0;
+  while (!mqtt.connected() && attempts < 5) {
+    attempts++;
+    Serial.print("Tentative MQTT ");
+    Serial.print(attempts);
+    Serial.println("/5");
+
+    if (mqtt.connect(mqtt_client_id, mqtt_user, mqtt_password)) {
+      mqttStatus = "Connecte";
+      logToScreen("MQTT connecte !", COLOR_SUCCESS);
+      Serial.println("MQTT connecte");
+
+      mqtt.subscribe("rpi/system/time");
+      Serial.println("Abone au topic temporel");
+    } else {
+      delay(2000);
+      updateButton();
+      updateBacklight();
+      updateLEDs();
+    }
+  }
+
+  if (!mqtt.connected()) {
+    mqttStatus = "Echec";
+    logToScreen("Echec connexion MQTT", COLOR_ERROR);
+    Serial.println("MQTT connexion echouee");
+  }
+}
+
+void checkWiFiQuality() {
+  long rssi = WiFi.RSSI();
+  if (rssi != 0) {
+    wifiRSSI = rssi;
+  }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String topicStr = String(topic);
+
+  if (topicStr == "rpi/system/time") {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, payload, length);
+
+    if (error) {
+      Serial.print("Erreur parsing JSON: ");
+      Serial.println(error.c_str());
+      return;
+    }
+
+    if (doc["timestamp"].is<double>() || doc["timestamp"].is<float>() || doc["timestamp"].is<long>() || doc["timestamp"].is<int>()) {
+      double timestamp_double = doc["timestamp"];
+      long timestamp = (long)timestamp_double;
+      Serial.print("Timestamp recu: ");
+      Serial.println(timestamp);
+      setESP32SystemTime(timestamp);
+    }
+  }
+}
+
+bool sendMQTTData() {
+  if (!mqtt.connected()) {
+    return false;
+  }
+
+  setLEDState(LED_SENDING);
+  
+  String csvLine = getDateCSV() + "," +
+                   getTimeCSV() + "," +
+                   currentTest.team + "," +
+                   currentTest.barcode + "," +
+                   String(getResultNumber(currentTest.result));
+
+  bool success = mqtt.publish(mqtt_topic, csvLine.c_str(), true);
+
+  if (success) {
+    Serial.println("MQTT Publie CSV: " + csvLine);
+  }
+
+  return success;
+}
+
+bool waitForTimeSync(unsigned long timeout) {
+  timeSyncStart = millis();
+  timeSync = false;
+  Serial.println("Attente de synchronisation temporelle...");
+
+  while (!timeSync && (millis() - timeSyncStart < timeout)) {
+    mqtt.loop();
+    updateButton();
+    updateBacklight();
+    updateLEDs();
+
+    delay(100);
+  }
+
+  return timeSync;
+}
+
+void setESP32SystemTime(long timestamp) {
+  struct timeval tv;
+  tv.tv_sec = timestamp;
+  tv.tv_usec = 0;
+
+  if (settimeofday(&tv, NULL) == 0) {
+    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+    tzset();
+
+    setTeamFromHour();
+
+    timeSync = true;
+    Serial.println("Horloge ESP32 synchronisee");
+    Serial.print("Timestamp recu: ");
+    Serial.println(timestamp);
+
+    mqtt.unsubscribe("rpi/system/time");
+    Serial.println("Desabonnement du topic temporel");
+
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      Serial.printf("Heure synchronisee: %02d:%02d:%02d %02d/%02d/%04d\n",
+                    timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+                    timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+    }
+  } else {
+    Serial.println("ERREUR: Impossible de synchroniser l'horloge ESP32");
+  }
+}
+
+void setTeamFromHour() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    currentTest.team = "X";
+    return;
+  }
+  
+  int hour = timeinfo.tm_hour;
+  if (hour >= 6 && hour < 14) {
+    currentTest.team = "A";
+  } else if (hour >= 14 && hour < 22) {
+    currentTest.team = "B";
+  } else {
+    currentTest.team = "C";
+  }
+}
+
+void readBarcode() {
+  static unsigned long readStartTime = 0;
+
+  if (barcodeReceived) {
+    return;
+  }
+
+  while (Serial1.available()) {
+    if (readStartTime == 0) {
+      readStartTime = millis();
+    }
+
+    char c = Serial1.read();
+
+    if (c == '\r' || c == '\n') {
+      if (barcodeBuffer.length() > 0) {
+        processBarcode();
+        barcodeBuffer = "";
+        readStartTime = 0;
+        return;
+      }
+    }
+    else if (c >= '0' && c <= '9') {
+      barcodeBuffer += c;
+
+      if (barcodeBuffer.length() > 30) {
+        barcodeBuffer = "";
+        readStartTime = 0;
+        return;
+      }
+    }
+
+    if (millis() - readStartTime > SCAN_TIMEOUT) {
+      if (barcodeBuffer.length() > 0) {
+        processBarcode();
+      }
+      barcodeBuffer = "";
+      readStartTime = 0;
+      return;
+    }
+  }
+}
+
+void processBarcode() {
+  String barcode = barcodeBuffer;
+  barcode.trim();
+
+  unsigned long currentTime = millis();
+
+  if (currentTime - lastScanTime < SCAN_DEBOUNCE) {
+    Serial.println("Scan ignore (anti-rebond)");
+    return;
+  }
+
+  if (barcode == lastBarcode && (currentTime - lastBarcodeTime < BARCODE_COOLDOWN)) {
+    Serial.println("Code-barres duplique ignore: " + barcode);
+    return;
+  }
+
+  if (isValidBarcode(barcode)) {
+    currentBarcode = barcode;
+    barcodeReceived = true;
+    currentTest.barcode = barcode;
+
+    setTeamFromHour();
+
+    lastBarcode = barcode;
+    lastBarcodeTime = currentTime;
+    lastScanTime = currentTime;
+
+    systemStatus = "Test en cours";
+    setLEDState(LED_TEST_RUNNING);
+
+    clearLogArea();
+    logToScreen("=== NOUVEAU TEST ===", COLOR_SUCCESS);
+    logToScreen("Code-barres: " + barcode, COLOR_INFO);
+    logToScreen("Attente du resultat...", COLOR_WARNING);
+
+    Serial.println("Code-barres valide recu: " + barcode);
+    clearScannerBuffer();
+  } else {
+    lastScanTime = currentTime;
+    if (barcode.length() > 0) {
+      logToScreen("Code invalide: " + barcode, COLOR_ERROR);
+      Serial.println("Code invalide ignore: " + barcode + " (len: " + String(barcode.length()) + ")");
+    }
+  }
+}
+
+bool isValidBarcode(String barcode) {
+  if (barcode.length() != 26) {
+    return false;
+  }
+
+  for (int i = 0; i < barcode.length(); i++) {
+    if (!isDigit(barcode.charAt(i))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void clearScannerBuffer() {
+  while (Serial1.available()) {
+    Serial1.read();
+  }
+  Serial.println("Buffer scanner nettoye - Pret pour nouveau scan");
+}
+
+void checkContacts() {
+  bool contactOK = (digitalRead(CONTACT_OK) == LOW);
+  bool contactFV = (digitalRead(CONTACT_FV) == LOW);
+  bool contactFP = (digitalRead(CONTACT_FP) == LOW);
+
+  String result = "";
+  uint16_t resultColor = ILI9341_WHITE;
+
+  if (contactOK) {
+    result = "Poche OK";
+    resultColor = COLOR_SUCCESS;
+  } else if (contactFV) {
+    result = "Fuite Vanne";
+    resultColor = COLOR_WARNING;
+  } else if (contactFP) {
+    result = "Fuite Poche";
+    resultColor = COLOR_ERROR;
+  }
+
+  if (result != "") {
+    currentTest.result = result;
+    logToScreen("=== RESULTAT ===", COLOR_INFO);
+    logToScreen(result, resultColor);
+
+    if (sendMQTTData()) {
+      logToScreen("Donnees transmises !", COLOR_SUCCESS);
+      logToScreen("Envoi reussi vers serveur", COLOR_SUCCESS);
+      setLEDState(LED_SUCCESS);
+      delay(2000);
+
+      clearLogArea();
+      clearScannerBuffer();
+      currentBarcode = "";
+      barcodeReceived = false;
+      currentTest = TestData();
+      setTeamFromHour();
+
+      barcodeBuffer = "";
+      lastBarcode = "";
+      lastBarcodeTime = 0;
+      lastScanTime = 0;
+
+      systemStatus = "Systeme Pret";
+      setLEDState(LED_READY);
+      logToScreen("=== PRET POUR NOUVEAU TEST ===", COLOR_SUCCESS);
+      logToScreen("En attente du code-barres...", ILI9341_WHITE);
+    } else {
+      logToScreen("ERREUR: Envoi echoue !", COLOR_ERROR);
+      logToScreen("Probleme de transmission", COLOR_ERROR);
+      systemStatus = "Erreur MQTT";
+      setLEDState(LED_ERROR);
+    }
+  }
+}
+
+void rebootSystem() {
+  systemStatus = "Redemarrage";
+  setLEDState(LED_ERROR);
+  clearLogArea();
+  logToScreen("=== REDEMARRAGE PROPRE ===", COLOR_WARNING);
+  logToScreen("Fermeture des connexions...", COLOR_INFO);
+
+  backlightOff();
+
+  if (mqtt.connected()) {
+    mqtt.disconnect();
+    delay(100);
+    logToScreen("MQTT deconnecte", COLOR_SUCCESS);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect();
+    delay(100);
+    logToScreen("WiFi deconnecte", COLOR_SUCCESS);
+  }
+
+  clearScannerBuffer();
+  logToScreen("Redemarrage en cours...", ILI9341_WHITE);
+  delay(2000);
+
+  ESP.restart();
+}
+
+String getDateCSV() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return "01/01/1970";
+  }
+
+  char buffer[32];
+  sprintf(buffer, "%02d/%02d/%04d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+  return String(buffer);
+}
+
+String getTimeCSV() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return "00H00";
+  }
+
+  char buffer[6];
+  sprintf(buffer, "%02dH%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  return String(buffer);
+}
+
+int getResultNumber(String result) {
+  if (result == "Poche OK") {
+    return 1;
+  } else if (result == "Fuite Vanne") {
+    return 2;
+  } else if (result == "Fuite Poche") {
+    return 3;
+  } else {
+    return 0;
+  }
+}
