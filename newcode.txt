@@ -47,31 +47,30 @@ const char* mqtt_client_id = "MaxTrace_ESP32_RTP";
 
 #define SCREEN_WIDTH    320
 #define SCREEN_HEIGHT   240
-#define HEADER_HEIGHT   55
-#define STATUS_HEIGHT   35
-#define LOG_START_Y     80
-#define LOG_HEIGHT      150
+#define TOP_BAR_HEIGHT  50
+#define STATUS_BAR_HEIGHT 25
+#define LOG_START_Y     75
+#define LOG_HEIGHT      165
 #define LOG_LINE_HEIGHT 10
 #define MAX_LOG_LINES   (LOG_HEIGHT / LOG_LINE_HEIGHT)
 
-#define HEADER_ZONE_TEAM_X      0
-#define HEADER_ZONE_TEAM_W      60
-#define HEADER_TEAM_OFFSET_X    17
-#define HEADER_TEAM_OFFSET_Y    9
-#define HEADER_TEAM_TEXTSIZE    5
-#define HEADER_ZONE_DATETIME_X  76
-#define HEADER_ZONE_DATETIME_W  128
-#define HEADER_DATETIME_OFFSET_X 8
-#define HEADER_DATETIME_LINE1_Y  8
-#define HEADER_DATETIME_SPACING_Y 25
-#define HEADER_DATETIME_TEXTSIZE 2
+#define TOP_BAR_TEAM_X         15
+#define TOP_BAR_TEAM_Y         8
+#define TOP_BAR_TEAM_SIZE      5
 
-#define HEADER_ZONE_APP_X       205
-#define HEADER_ZONE_APP_W       115
-#define HEADER_APP_OFFSET_X     17
-#define HEADER_APP_LINE1_Y       8
-#define HEADER_APP_SPACING_Y     25
-#define HEADER_APP_TEXTSIZE      2
+#define TOP_BAR_SEPARATOR_1_X  55
+
+#define TOP_BAR_DATE_X         70
+#define TOP_BAR_DATE_Y         6
+#define TOP_BAR_TIME_Y         29
+#define TOP_BAR_DATETIME_SIZE  2
+
+#define TOP_BAR_SEPARATOR_2_X  190
+
+#define TOP_BAR_APP_X          200
+#define TOP_BAR_APP_Y1         5
+#define TOP_BAR_APP_Y2         25
+#define TOP_BAR_APP_SIZE       2
 
 #define COLOR_HEADER      0xFC00
 #define COLOR_ORANGE      0xFC00
@@ -195,12 +194,17 @@ const unsigned long MAX_BACKOFF = 30000;
 uint8_t wifiFailCount = 0;
 uint8_t mqttFailCount = 0;
 
+String lastDisplayedTime = "";
+String lastWifiStatus = "";
+String lastMqttStatus = "";
+
 void initDisplay();
-void drawHeader();
+void drawTopBar();
+void updateTopBar();
 void drawStatusBar();
+void updateStatusBar();
 void logToScreen(String message, uint16_t color = ILI9341_WHITE, bool showTimestamp = false);
 void clearLogArea();
-void updateHeaderTime();
 void updateSystemInfo();
 
 void initBacklight();
@@ -230,8 +234,7 @@ void checkContacts();
 
 bool waitForTimeSync(unsigned long timeout);
 void setESP32SystemTime(long timestamp);
-void determineTeam();
-String getCurrentTeam();
+void setTeamFromHour();
 
 String getDateCSV();
 String getTimeCSV();
@@ -271,7 +274,7 @@ void setup() {
   initDisplay();
   systemStatus = "Demarrage systeme";
   setLEDState(LED_INIT);
-  drawHeader();
+  drawTopBar();
   drawStatusBar();
 
   pinMode(CONTACT_OK, INPUT_PULLUP);
@@ -307,8 +310,9 @@ void setup() {
 
   logToScreen("Horloge synchronisee avec succes", COLOR_SUCCESS);
 
-  determineTeam();
   logToScreen("Equipe de production: " + currentTest.team, COLOR_INFO);
+  drawTopBar();
+  drawStatusBar();
 
   systemStatus = "Systeme Pret";
   setLEDState(LED_READY);
@@ -330,7 +334,6 @@ void loop() {
 
   static unsigned long lastUIUpdate = 0;
   if (millis() - lastUIUpdate >= 1000) {
-    updateHeaderTime();
     updateSystemInfo();
     lastUIUpdate = millis();
   }
@@ -780,103 +783,113 @@ void initDisplay() {
   Serial.println("Ecran ILI9341 initialise - 320x240");
 }
 
-void drawHeader() {
-  tft.fillRect(0, 0, SCREEN_WIDTH, HEADER_HEIGHT, COLOR_HEADER);
+void drawTopBar() {
+  tft.fillRect(0, 0, SCREEN_WIDTH, TOP_BAR_HEIGHT, COLOR_HEADER);
   
   struct tm timeinfo;
   getLocalTime(&timeinfo);
-  String team = getCurrentTeam();
-  
-  tft.setTextColor(ILI9341_WHITE);
-  
-  tft.setTextSize(HEADER_TEAM_TEXTSIZE);
-  tft.setCursor(HEADER_ZONE_TEAM_X + HEADER_TEAM_OFFSET_X, HEADER_TEAM_OFFSET_Y);
-  tft.print(team);
-  
-  tft.drawLine(HEADER_ZONE_TEAM_X + HEADER_ZONE_TEAM_W, 5, HEADER_ZONE_TEAM_X + HEADER_ZONE_TEAM_W, 50, ILI9341_WHITE);
   
   char dateStr[10];
   char timeStr[10];
   sprintf(dateStr, "%02d/%02d/%02d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year % 100);
   sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   
-  tft.setTextSize(HEADER_DATETIME_TEXTSIZE);
-  tft.setCursor(HEADER_ZONE_DATETIME_X + HEADER_DATETIME_OFFSET_X, HEADER_DATETIME_LINE1_Y);
+  tft.setTextColor(ILI9341_WHITE);
+  
+  tft.setTextSize(TOP_BAR_TEAM_SIZE);
+  tft.setCursor(TOP_BAR_TEAM_X, TOP_BAR_TEAM_Y);
+  tft.print(currentTest.team);
+  
+  tft.drawLine(TOP_BAR_SEPARATOR_1_X, 2, TOP_BAR_SEPARATOR_1_X, 48, ILI9341_WHITE);
+  
+  tft.setTextSize(TOP_BAR_DATETIME_SIZE);
+  tft.setCursor(TOP_BAR_DATE_X, TOP_BAR_DATE_Y);
   tft.print(dateStr);
-  tft.setCursor(HEADER_ZONE_DATETIME_X + HEADER_DATETIME_OFFSET_X, HEADER_DATETIME_LINE1_Y + HEADER_DATETIME_SPACING_Y);
+  tft.setCursor(TOP_BAR_DATE_X, TOP_BAR_TIME_Y);
   tft.print(timeStr);
   
-  tft.drawLine(HEADER_ZONE_DATETIME_X + HEADER_ZONE_DATETIME_W, 5, HEADER_ZONE_DATETIME_X + HEADER_ZONE_DATETIME_W, 50, ILI9341_WHITE);
+  tft.drawLine(TOP_BAR_SEPARATOR_2_X, 2, TOP_BAR_SEPARATOR_2_X, 48, ILI9341_WHITE);
   
-  tft.setTextSize(HEADER_APP_TEXTSIZE);
-  tft.setCursor(HEADER_ZONE_APP_X + HEADER_APP_OFFSET_X, HEADER_APP_LINE1_Y);
+  tft.setTextSize(TOP_BAR_APP_SIZE);
+  tft.setCursor(TOP_BAR_APP_X, TOP_BAR_APP_Y1);
   tft.print("MAXLINK");
-  tft.setCursor(HEADER_ZONE_APP_X + HEADER_APP_OFFSET_X + 8, HEADER_APP_LINE1_Y + HEADER_APP_SPACING_Y);
+  tft.setCursor(TOP_BAR_APP_X, TOP_BAR_APP_Y2);
   tft.print("v1.5");
   
-  tft.drawLine(0, HEADER_HEIGHT, SCREEN_WIDTH, HEADER_HEIGHT, ILI9341_WHITE);
+  tft.drawLine(0, TOP_BAR_HEIGHT - 1, SCREEN_WIDTH, TOP_BAR_HEIGHT - 1, ILI9341_WHITE);
+}
+
+void updateTopBar() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return;
+  
+  char timeStr[10];
+  sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  
+  String currentTime = String(timeStr);
+  if (currentTime != lastDisplayedTime) {
+    lastDisplayedTime = currentTime;
+    
+    tft.fillRect(TOP_BAR_DATE_X, TOP_BAR_DATE_Y, 170, 40, COLOR_HEADER);
+    
+    char dateStr[10];
+    sprintf(dateStr, "%02d/%02d/%02d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year % 100);
+    
+    tft.setTextSize(TOP_BAR_DATETIME_SIZE);
+    tft.setTextColor(ILI9341_WHITE);
+    tft.setCursor(TOP_BAR_DATE_X, TOP_BAR_DATE_Y);
+    tft.print(dateStr);
+    tft.setCursor(TOP_BAR_DATE_X, TOP_BAR_TIME_Y);
+    tft.print(timeStr);
+  }
 }
 
 void drawStatusBar() {
-  int statusY = HEADER_HEIGHT + 2;
-
-  tft.fillRect(0, statusY, SCREEN_WIDTH, STATUS_HEIGHT, COLOR_BACKGROUND);
-
+  int statusY = TOP_BAR_HEIGHT;
+  tft.fillRect(0, statusY, SCREEN_WIDTH, STATUS_BAR_HEIGHT, COLOR_BACKGROUND);
   tft.setTextSize(1);
-  tft.setCursor(8, statusY + 2);
   tft.setTextColor(COLOR_INFO);
+  
+  tft.setCursor(8, statusY + 4);
   tft.print("Status: ");
   tft.setTextColor(ILI9341_WHITE);
   tft.print(systemStatus);
-
-  tft.setCursor(200, statusY + 2);
-  tft.setTextColor(COLOR_INFO);
-  tft.print("BL: ");
-  tft.setTextColor(isBacklightActive ? COLOR_SUCCESS : COLOR_WARNING);
-  tft.print(isBacklightActive ? "ON" : "OFF");
-
-  tft.setCursor(8, statusY + 14);
+  
+  tft.setCursor(140, statusY + 4);
   tft.setTextColor(COLOR_INFO);
   tft.print("WiFi: ");
   tft.setTextColor(wifiStatus == "Connecte" ? COLOR_SUCCESS : COLOR_ERROR);
   tft.print(wifiStatus);
-
   if(wifiRSSI != 0) {
     tft.setTextColor(COLOR_INFO);
     tft.print(" (");
     tft.print(wifiRSSI);
     tft.print("dBm)");
   }
-
+  
+  tft.setCursor(240, statusY + 4);
   tft.setTextColor(COLOR_INFO);
-  tft.print(" | MQTT: ");
+  tft.print("MQTT: ");
   tft.setTextColor(mqttStatus == "Connecte" ? COLOR_SUCCESS : COLOR_ERROR);
   tft.print(mqttStatus);
-
-  tft.drawLine(0, statusY + STATUS_HEIGHT - 2, SCREEN_WIDTH, statusY + STATUS_HEIGHT - 2, ILI9341_DARKGREY);
+  
+  tft.drawLine(0, statusY + STATUS_BAR_HEIGHT - 1, SCREEN_WIDTH, statusY + STATUS_BAR_HEIGHT - 1, ILI9341_DARKGREY);
 }
 
-void updateHeaderTime() {
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    char dateStr[10];
-    char timeStr[10];
-    sprintf(dateStr, "%02d/%02d/%02d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year % 100);
-    sprintf(timeStr, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    
-    tft.fillRect(HEADER_ZONE_DATETIME_X, 5, HEADER_ZONE_DATETIME_W, 40, COLOR_HEADER);
-    
-    tft.setTextSize(HEADER_DATETIME_TEXTSIZE);
-    tft.setTextColor(ILI9341_WHITE);
-    tft.setCursor(HEADER_ZONE_DATETIME_X + HEADER_DATETIME_OFFSET_X, HEADER_DATETIME_LINE1_Y);
-    tft.print(dateStr);
-    tft.setCursor(HEADER_ZONE_DATETIME_X + HEADER_DATETIME_OFFSET_X, HEADER_DATETIME_LINE1_Y + HEADER_DATETIME_SPACING_Y);
-    tft.print(timeStr);
+void updateStatusBar() {
+  if (wifiStatus == lastWifiStatus && mqttStatus == lastMqttStatus && systemStatus == systemStatus) {
+    return;
   }
+  
+  lastWifiStatus = wifiStatus;
+  lastMqttStatus = mqttStatus;
+  
+  drawStatusBar();
 }
 
 void updateSystemInfo() {
-  drawStatusBar();
+  updateTopBar();
+  updateStatusBar();
 }
 
 void logToScreen(String message, uint16_t color, bool showTimestamp) {
@@ -1091,6 +1104,8 @@ void setESP32SystemTime(long timestamp) {
     setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
     tzset();
 
+    setTeamFromHour();
+
     timeSync = true;
     Serial.println("Horloge ESP32 synchronisee");
     Serial.print("Timestamp recu: ");
@@ -1110,37 +1125,20 @@ void setESP32SystemTime(long timestamp) {
   }
 }
 
-void determineTeam() {
+void setTeamFromHour() {
   struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    int hour = timeinfo.tm_hour;
-
-    if (hour >= 6 && hour < 14) {
-      currentTest.team = "A";
-    } else if (hour >= 14 && hour < 22) {
-      currentTest.team = "B";
-    } else {
-      currentTest.team = "C";
-    }
-  } else {
+  if (!getLocalTime(&timeinfo)) {
     currentTest.team = "X";
+    return;
   }
-}
-
-String getCurrentTeam() {
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    int hour = timeinfo.tm_hour;
-
-    if (hour >= 6 && hour < 14) {
-      return "A";
-    } else if (hour >= 14 && hour < 22) {
-      return "B";
-    } else {
-      return "C";
-    }
+  
+  int hour = timeinfo.tm_hour;
+  if (hour >= 6 && hour < 14) {
+    currentTest.team = "A";
+  } else if (hour >= 14 && hour < 22) {
+    currentTest.team = "B";
   } else {
-    return "X";
+    currentTest.team = "C";
   }
 }
 
@@ -1207,6 +1205,8 @@ void processBarcode() {
     currentBarcode = barcode;
     barcodeReceived = true;
     currentTest.barcode = barcode;
+
+    setTeamFromHour();
 
     lastBarcode = barcode;
     lastBarcodeTime = currentTime;
@@ -1287,7 +1287,7 @@ void checkContacts() {
       currentBarcode = "";
       barcodeReceived = false;
       currentTest = TestData();
-      determineTeam();
+      setTeamFromHour();
 
       barcodeBuffer = "";
       lastBarcode = "";
