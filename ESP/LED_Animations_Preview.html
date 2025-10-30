@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MaxLink - LED Animations Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #0f0f1e 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #ff6b35;
+        }
+        
+        h1 {
+            color: #ff6b35;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #888;
+            font-size: 1.1em;
+        }
+        
+        .animations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .animation-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 107, 53, 0.3);
+            border-radius: 12px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        
+        .animation-card:hover {
+            border-color: #ff6b35;
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.2);
+        }
+        
+        .card-title {
+            font-size: 1.3em;
+            color: #ff6b35;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .card-description {
+            color: #aaa;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        canvas {
+            width: 100%;
+            height: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 107, 53, 0.2);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: #ff6b35;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #ff5722;
+            transform: scale(1.05);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        .status {
+            font-size: 0.85em;
+            color: #888;
+            text-align: center;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 107, 53, 0.1);
+        }
+        
+        .legend {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 107, 53, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 40px;
+        }
+        
+        .legend h3 {
+            color: #ff6b35;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .legend-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+        
+        .legend-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .feature-badge {
+            display: inline-block;
+            background: rgba(255, 107, 53, 0.2);
+            color: #ff6b35;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin: 2px;
+            font-weight: bold;
+        }
+        
+        .features {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .animations-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 MaxLink LED Animations Preview</h1>
+            <p class="subtitle">Visualisez les animations NeoPixel pour choisir votre préférée</p>
+        </header>
+        
+        <div class="animations-grid">
+            <!-- Animation 1: Boot (No Animation) -->
+            <div class="animation-card">
+                <div class="card-title">1. Démarrage (Statique)</div>
+                <div class="card-description">
+                    Pas d'animation pendant le boot. Simple LED verte statique pour indiquer que le système s'initialise.
+                </div>
+                <canvas id="canvas-boot" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('boot')">Démarrer</button>
+                </div>
+                <div class="status">État: Statique - Pas d'animation</div>
+                <div class="features">
+                    <span class="feature-badge">Simple</span>
+                    <span class="feature-badge">Minimaliste</span>
+                </div>
+            </div>
+            
+            <!-- Animation 2: Breathing (Attente) -->
+            <div class="animation-card">
+                <div class="card-title">2. Attente - Respiration Smooth</div>
+                <div class="card-description">
+                    Respiration douce et fluide en vert. Toutes les LEDs (0-7) respirent en synchrone avec un cycle lent et apaisant.
+                </div>
+                <canvas id="canvas-breathing" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('breathing')">Démarrer</button>
+                </div>
+                <div class="status">Timing: 2.5s par cycle | Cycle: Infini</div>
+                <div class="features">
+                    <span class="feature-badge">Smooth</span>
+                    <span class="feature-badge">Apaisant</span>
+                    <span class="feature-badge">Sine Wave</span>
+                </div>
+            </div>
+            
+            <!-- Animation 3: 3-LED Gradient (Scan) -->
+            <div class="animation-card">
+                <div class="card-title">3. Code Scanné - 3-LED Gradient</div>
+                <div class="card-description">
+                    3 LEDs avec gradient: milieu brillant (100%), côtés dégradés (50%). L'ensemble tourne autour du cercle de manière fluide.
+                </div>
+                <canvas id="canvas-gradient" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('gradient')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: CYAN | Timing: Continu | Smooth</div>
+                <div class="features">
+                    <span class="feature-badge">Gradient</span>
+                    <span class="feature-badge">Fluide</span>
+                    <span class="feature-badge">3-LED</span>
+                </div>
+            </div>
+            
+            <!-- Animation 4: Wave Success (Centre → Extérieur) -->
+            <div class="animation-card">
+                <div class="card-title">4. Succès - Onde Symétrique + Flash</div>
+                <div class="card-description">
+                    Onde symétrique du centre (LEDs 3-4) vers l'extérieur (LEDs 0-7) suivi de 3 flashes rapides en VERT pour confirmer l'action.
+                </div>
+                <canvas id="canvas-wave-success" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('wave-success')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: VERT | Timing: 0.9s onde + 0.6s flashes (3×) | Centre: LEDs 3-4</div>
+                <div class="features">
+                    <span class="feature-badge">Symétrique</span>
+                    <span class="feature-badge">Flash</span>
+                    <span class="feature-badge">Spectaculaire</span>
+                </div>
+            </div>
+            
+            <!-- Animation 5: Wave Error (Centre → Extérieur) -->
+            <div class="animation-card">
+                <div class="card-title">5. Erreur - Onde Symétrique + Flash</div>
+                <div class="card-description">
+                    Identique au succès mais en ROUGE. Onde symétrique depuis le centre (LEDs 3-4) + 3 flashes rapides pour indiquer une erreur d'envoi.
+                </div>
+                <canvas id="canvas-wave-error" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('wave-error')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: ROUGE | Timing: 0.9s onde + 0.6s flashes (3×) | Centre: LEDs 3-4</div>
+                <div class="features">
+                    <span class="feature-badge">Alerte</span>
+                    <span class="feature-badge">Symétrique</span>
+                    <span class="feature-badge">Flash</span>
+                </div>
+            </div>
+            
+            <!-- BONUS Animation A: Ripple Explosion -->
+            <div class="animation-card">
+                <div class="card-title">BONUS A - Ripple Explosion (Succès Alt)</div>
+                <div class="card-description">
+                    Alternative spectaculaire: anneaux concentriques qui s'épaississent progressivement depuis le centre. Plus d'impact visuel.
+                </div>
+                <canvas id="canvas-ripple" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('ripple')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: VERT | Timing: 1s ripple + 0.5s flashes</div>
+                <div class="features">
+                    <span class="feature-badge">Épique</span>
+                    <span class="feature-badge">Rings</span>
+                    <span class="feature-badge">Concentrique</span>
+                </div>
+            </div>
+            
+            <!-- BONUS Animation B: Double Chase -->
+            <div class="animation-card">
+                <div class="card-title">BONUS B - Double Chase (Scan Alt)</div>
+                <div class="card-description">
+                    Alternative au gradient: Deux LEDs qui se croisent en sens inverse. Effet "versus" plus dynamique et intéressant.
+                </div>
+                <canvas id="canvas-chase" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('chase')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: CYAN | Timing: Continu | Crossing</div>
+                <div class="features">
+                    <span class="feature-badge">Dynamique</span>
+                    <span class="feature-badge">Double</span>
+                    <span class="feature-badge">Versus</span>
+                </div>
+            </div>
+            
+            <!-- BONUS Animation C: Lightning Strike -->
+            <div class="animation-card">
+                <div class="card-title">BONUS C - Lightning Strike (Erreur Alt)</div>
+                <div class="card-description">
+                    Alternative dramatique pour erreur: 3 flashes très rapides + zigzag aléatoire + onde rouge finale. Très "alerte".
+                </div>
+                <canvas id="canvas-lightning" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('lightning')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: ROUGE | Timing: 0.6s flashes + 0.5s onde</div>
+                <div class="features">
+                    <span class="feature-badge">Dramatique</span>
+                    <span class="feature-badge">Aléatoire</span>
+                    <span class="feature-badge">Alert</span>
+                </div>
+            </div>
+            
+            <!-- BONUS Animation D: Cascade -->
+            <div class="animation-card">
+                <div class="card-title">BONUS D - Cascade (Succès Alt 2)</div>
+                <div class="card-description">
+                    Cascade fluide: 4→3→5→2→6→1→7→0 puis cascade inverse. Effet "vague" plus naturel que l'onde symétrique.
+                </div>
+                <canvas id="canvas-cascade" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('cascade')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: VERT | Timing: 0.8s cascade + 0.5s flashes</div>
+                <div class="features">
+                    <span class="feature-badge">Cascade</span>
+                    <span class="feature-badge">Naturel</span>
+                    <span class="feature-badge">Vague</span>
+                </div>
+            </div>
+            
+            <!-- BONUS Animation E: Pulse -->
+            <div class="animation-card">
+                <div class="card-title">BONUS E - Pulse (Attente Alt)</div>
+                <div class="card-description">
+                    Alternative à la respiration: pulses discrets (on/off) plutôt qu'une variation continue. Plus "cliquant", moins "vivant".
+                </div>
+                <canvas id="canvas-pulse" width="400" height="100"></canvas>
+                <div class="controls">
+                    <button onclick="startAnimation('pulse')">Démarrer</button>
+                </div>
+                <div class="status">Couleur: VERT | Timing: 0.3s ON / 0.7s OFF</div>
+                <div class="features">
+                    <span class="feature-badge">Discret</span>
+                    <span class="feature-badge">Simple</span>
+                    <span class="feature-badge">Blink</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="legend">
+            <h3>📋 Légende & Notes</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #00ff00;"></div>
+                    <span><strong>VERT</strong> = Bon / Succès / Opérationnel</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #ff0000;"></div>
+                    <span><strong>ROUGE</strong> = Erreur / Alerte / Problème</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #00ffff;"></div>
+                    <span><strong>CYAN</strong> = Acquisition / En cours</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #ffff00;"></div>
+                    <span><strong>JAUNE</strong> = Attente / Warning doux</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #ff8800;"></div>
+                    <span><strong>ORANGE</strong> = Signal faible WiFi</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #ffffff;"></div>
+                    <span><strong>BLANC</strong> = Général / Normal</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255, 107, 53, 0.2);">
+                <h4 style="color: #ff6b35; margin-bottom: 10px;">Recommandations:</h4>
+                <ul style="color: #aaa; line-height: 1.8;">
+                    <li><strong>État normal:</strong> Animation 2 (Respiration) - Calme et invite à agir</li>
+                    <li><strong>Test en cours:</strong> Animation 3 (3-LED Gradient) - Smooth et visuellement intéressant</li>
+                    <li><strong>Succès:</strong> Animation 4 (Onde Symétrique) - Spectaculaire et satisfaisant</li>
+                    <li><strong>Erreur:</strong> Animation 5 (Onde Rouge) - Clair et alarmant</li>
+                    <li><strong>Alternatives:</strong> Testez BONUS A/D pour plus d'impact; BONUS B pour plus de dynamisme</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Color Definitions
+        const COLORS = {
+            green: { r: 0, g: 255, b: 0 },
+            red: { r: 255, g: 0, b: 0 },
+            cyan: { r: 0, g: 255, b: 255 },
+            yellow: { r: 255, g: 255, b: 0 },
+            orange: { r: 255, g: 128, b: 0 },
+            white: { r: 255, g: 255, b: 255 },
+            dark: { r: 30, g: 30, b: 50 }
+        };
+        
+        // Animation State
+        let animationStates = {};
+        let animationFrames = {};
+        
+        function rgbToCSS(color, brightness = 255) {
+            const factor = brightness / 255;
+            return `rgb(${Math.floor(color.r * factor)}, ${Math.floor(color.g * factor)}, ${Math.floor(color.b * factor)})`;
+        }
+        
+        function drawLED(ctx, x, y, color, brightness) {
+            const radius = 12;
+            ctx.fillStyle = rgbToCSS(color, brightness);
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 107, 53, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        function drawLEDs(canvas, brightnesses, color) {
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(30, 30, 30, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const ledCount = 8;
+            const spacing = canvas.width / (ledCount + 1);
+            const y = canvas.height / 2;
+            
+            for (let i = 0; i < ledCount; i++) {
+                const x = spacing * (i + 1);
+                drawLED(ctx, x, y, color, brightnesses[i]);
+            }
+        }
+        
+        // Boot Animation (Static)
+        function animateBoot(canvas, time) {
+            const brightnesses = Array(8).fill(150);
+            drawLEDs(canvas, brightnesses, COLORS.green);
+        }
+        
+        // Breathing Animation
+        function animateBreathing(canvas, time) {
+            const cycleTime = 2.5;
+            const t = (time % cycleTime) / cycleTime;
+            const brightness = Math.sin(t * Math.PI * 2) * 100 + 155;
+            const brightnesses = Array(8).fill(brightness);
+            drawLEDs(canvas, brightnesses, COLORS.green);
+        }
+        
+        // 3-LED Gradient (Scan)
+        function animateGradient(canvas, time) {
+            const cycleTime = 1.5;
+            const t = (time % cycleTime) / cycleTime;
+            const pos = (t * 8) % 8;
+            const brightnesses = Array(8).fill(0);
+            
+            for (let i = 0; i < 8; i++) {
+                const distance = Math.abs(i - pos);
+                const minDist = Math.min(distance, 8 - distance);
+                
+                if (minDist < 1.5) {
+                    if (minDist < 0.5) brightnesses[i] = 255;
+                    else brightnesses[i] = 128;
+                }
+            }
+            drawLEDs(canvas, brightnesses, COLORS.cyan);
+        }
+        
+        // Wave Success
+        function animateWaveSuccess(canvas, time) {
+            const brightnesses = Array(8).fill(0);
+            const cycleTime = 1.5;
+            const t = time % cycleTime;
+            
+            if (t < 0.9) {
+                const waveProgress = t / 0.9;
+                const ring = waveProgress * 4;
+                
+                // Centre: LEDs 3 et 4 | Expansion symétrique
+                const rings = [[3, 4], [2, 5], [1, 6], [0, 7]];
+                rings.forEach((ledIndices, ringIdx) => {
+                    if (ringIdx <= ring) {
+                        const brightness = Math.max(0, 255 * (1 - Math.abs(ring - ringIdx)));
+                        ledIndices.forEach(idx => {
+                            brightnesses[idx] = Math.max(brightnesses[idx], brightness);
+                        });
+                    }
+                });
+            } else {
+                // 3 Flashes rapides
+                const flashT = (t - 0.9) / 0.6;
+                const flashPhase = Math.floor(flashT * 6); // 6 = 3 flashes × 2 (on/off)
+                if (flashPhase % 2 === 0) {
+                    brightnesses.fill(255);
+                }
+            }
+            
+            drawLEDs(canvas, brightnesses, COLORS.green);
+        }
+        
+        // Wave Error
+        function animateWaveError(canvas, time) {
+            const brightnesses = Array(8).fill(0);
+            const cycleTime = 1.5;
+            const t = time % cycleTime;
+            
+            if (t < 0.9) {
+                const waveProgress = t / 0.9;
+                const ring = waveProgress * 4;
+                
+                // Centre: LEDs 3 et 4 | Expansion symétrique
+                const rings = [[3, 4], [2, 5], [1, 6], [0, 7]];
+                rings.forEach((ledIndices, ringIdx) => {
+                    if (ringIdx <= ring) {
+                        const brightness = Math.max(0, 255 * (1 - Math.abs(ring - ringIdx)));
+                        ledIndices.forEach(idx => {
+                            brightnesses[idx] = Math.max(brightnesses[idx], brightness);
+                        });
+                    }
+                });
+            } else {
+                // 3 Flashes rapides
+                const flashT = (t - 0.9) / 0.6;
+                const flashPhase = Math.floor(flashT * 6); // 6 = 3 flashes × 2 (on/off)
+                if (flashPhase % 2 === 0) {
+                    brightnesses.fill(255);
+                }
+            }
+            
+            drawLEDs(canvas, brightnesses, COLORS.red);
+        }
+        
+        // Ripple Explosion
+        function animateRipple(canvas, time) {
+            const brightnesses = Array(8).fill(0);
+            const cycleTime = 1.5;
+            const t = time % cycleTime;
+            
+            if (t < 1) {
+                const rippleProgress = t;
+                
+                brightnesses[4] = 255;
+                brightnesses[3] = Math.max(0, 255 * (1 - Math.abs(rippleProgress * 4 - 1)));
+                brightnesses[5] = brightnesses[3];
+                
+                brightnesses[2] = Math.max(0, 255 * (1 - Math.abs(rippleProgress * 4 - 2)));
+                brightnesses[6] = brightnesses[2];
+                
+                brightnesses[1] = Math.max(0, 255 * (1 - Math.abs(rippleProgress * 4 - 3)));
+                brightnesses[7] = brightnesses[1];
+                
+                brightnesses[0] = Math.max(0, 255 * (1 - Math.abs(rippleProgress * 4 - 4)));
+            } else {
+                const flashT = (t - 1) * 2;
+                if (Math.floor(flashT * 2) % 2 === 0) {
+                    brightnesses.fill(255);
+                }
+            }
+            
+            drawLEDs(canvas, brightnesses, COLORS.green);
+        }
+        
+        // Double Chase
+        function animateChase(canvas, time) {
+            const cycleTime = 1.2;
+            const t = (time % cycleTime) / cycleTime;
+            const pos1 = (t * 8) % 8;
+            const pos2 = (8 - (t * 8) % 8) % 8;
+            
+            const brightnesses = Array(8).fill(0);
+            brightnesses[Math.floor(pos1)] = 200;
+            brightnesses[Math.floor(pos2)] = 200;
+            
+            drawLEDs(canvas, brightnesses, COLORS.cyan);
+        }
+        
+        // Lightning Strike
+        function animateLightning(canvas, time) {
+            const brightnesses = Array(8).fill(0);
+            const cycleTime = 1.1;
+            const t = time % cycleTime;
+            
+            if (t < 0.6) {
+                // Flashes rapides
+                const flashCount = Math.floor((t / 0.6) * 6);
+                if (flashCount % 2 === 0) {
+                    const randomIdx = Math.floor(Math.random() * 8);
+                    brightnesses[randomIdx] = 255;
+                }
+            } else {
+                // Onde finale
+                const waveT = t - 0.6;
+                const ring = waveT * 4;
+                
+                const rings = [[4, 3], [3, 5], [2, 6], [1, 7], [0]];
+                rings.forEach((ledIndices, ringIdx) => {
+                    if (ringIdx <= ring) {
+                        const brightness = Math.max(0, 255 * (1 - Math.abs(ring - ringIdx)));
+                        ledIndices.forEach(idx => {
+                            brightnesses[idx] = Math.max(brightnesses[idx], brightness);
+                        });
+                    }
+                });
+            }
+            
+            drawLEDs(canvas, brightnesses, COLORS.red);
+        }
+        
+        // Cascade
+        function animateCascade(canvas, time) {
+            const brightnesses = Array(8).fill(0);
+            const cycleTime = 1.3;
+            const t = time % cycleTime;
+            
+            if (t < 0.8) {
+                const cascadeT = t / 0.8;
+                const order1 = [4, 3, 5, 2, 6, 1, 7, 0];
+                const order2 = [0, 7, 1, 6, 2, 5, 3, 4];
+                
+                if (cascadeT < 0.5) {
+                    const progress = cascadeT * 2;
+                    const idx = Math.floor(progress * order1.length);
+                    for (let i = 0; i <= idx; i++) {
+                        brightnesses[order1[i]] = 255 - (i - progress * order1.length) * 50;
+                    }
+                } else {
+                    const progress = (cascadeT - 0.5) * 2;
+                    const idx = Math.floor(progress * order2.length);
+                    for (let i = 0; i <= idx; i++) {
+                        brightnesses[order2[i]] = 255 - (i - progress * order2.length) * 50;
+                    }
+                }
+            } else {
+                const flashT = (t - 0.8) * 2;
+                if (Math.floor(flashT * 2) % 2 === 0) {
+                    brightnesses.fill(255);
+                }
+            }
+            
+            drawLEDs(canvas, brightnesses, COLORS.green);
+        }
+        
+        // Pulse
+        function animatePulse(canvas, time) {
+            const cycleTime = 1;
+            const t = (time % cycleTime) / cycleTime;
+            const brightness = t < 0.3 ? 200 : 50;
+            const brightnesses = Array(8).fill(brightness);
+            drawLEDs(canvas, brightnesses, COLORS.green);
+        }
+        
+        // Animation Mapping
+        const animations = {
+            'boot': animateBoot,
+            'breathing': animateBreathing,
+            'gradient': animateGradient,
+            'wave-success': animateWaveSuccess,
+            'wave-error': animateWaveError,
+            'ripple': animateRipple,
+            'chase': animateChase,
+            'lightning': animateLightning,
+            'cascade': animateCascade,
+            'pulse': animatePulse
+        };
+        
+        function startAnimation(name) {
+            const canvas = document.getElementById(`canvas-${name}`);
+            if (!canvas) return;
+            
+            if (animationFrames[name]) {
+                cancelAnimationFrame(animationFrames[name]);
+            }
+            
+            animationStates[name] = { startTime: Date.now() };
+            
+            function animate() {
+                const elapsed = (Date.now() - animationStates[name].startTime) / 1000;
+                animations[name](canvas, elapsed);
+                animationFrames[name] = requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // Auto-start all animations on load
+        window.addEventListener('load', () => {
+            Object.keys(animations).forEach(name => {
+                setTimeout(() => startAnimation(name), 100);
+            });
+        });
+    </script>
+</body>
+</html>
