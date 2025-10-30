@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MaxLink Interface</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #222;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .screen {
+            width: 320px;
+            height: 240px;
+            background: #000;
+            border: 3px solid #666;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: #FFA500;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            box-sizing: border-box;
+            border-bottom: 2px solid #fff;
+            gap: 8px;
+        }
+        
+        .zone {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2px;
+        }
+        
+        .zone-team {
+            width: 50px;
+            border-right: 2px solid #fff;
+            padding-right: 8px;
+        }
+        
+        .zone-datetime {
+            flex: 1;
+            border-right: 2px solid #fff;
+            padding-right: 8px;
+        }
+        
+        .zone-wifi {
+            width: 60px;
+            border-right: 2px solid #fff;
+            padding-right: 8px;
+        }
+        
+        .zone-app {
+            width: 80px;
+        }
+        
+        .team-letter {
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            line-height: 1;
+        }
+        
+        .date-text {
+            font-size: 11px;
+            color: #fff;
+        }
+        
+        .time-text {
+            font-size: 11px;
+            color: #fff;
+        }
+        
+        .wifi-signal {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            line-height: 1;
+        }
+        
+        .app-name {
+            font-size: 10px;
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .app-version {
+            font-size: 9px;
+            color: #fff;
+        }
+        
+        .logs {
+            flex: 1;
+            background: #000;
+            padding: 8px;
+            overflow: hidden;
+            border-top: 1px solid #444;
+        }
+        
+        .log-line {
+            color: #00FFFF;
+            font-size: 11px;
+            line-height: 10px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .label {
+            margin-top: 20px;
+            color: #ccc;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="screen">
+        <!-- HEADER -->
+        <div class="header">
+            <!-- Zone 1: Équipe (gros) -->
+            <div class="zone zone-team">
+                <div class="team-letter">A</div>
+            </div>
+            
+            <!-- Zone 2: Date/Heure -->
+            <div class="zone zone-datetime">
+                <div class="date-text">30/10/25</div>
+                <div class="time-text">10:12:48</div>
+            </div>
+            
+            <!-- Zone 3: Signal WiFi dBm -->
+            <div class="zone zone-wifi">
+                <div class="wifi-signal">-65</div>
+            </div>
+            
+            <!-- Zone 4: MAXLINK Version -->
+            <div class="zone zone-app">
+                <div class="app-name">MAXLINK</div>
+                <div class="app-version">v1.5</div>
+            </div>
+        </div>
+        
+        <!-- LOGS -->
+        <div class="logs">
+            <div class="log-line">=== NOUVEAU TEST ===</div>
+            <div class="log-line">Code-barres: 123456...</div>
+            <div class="log-line">Attente du resultat...</div>
+            <div class="log-line"></div>
+            <div class="log-line">=== RESULTAT ===</div>
+            <div class="log-line">Poche OK</div>
+            <div class="log-line">Donnees transmises !</div>
+            <div class="log-line">Envoi reussi vers serveur</div>
+            <div class="log-line"></div>
+            <div class="log-line">=== PRET POUR NOUVEAU TEST ===</div>
+            <div class="log-line">En attente du code-barres...</div>
+        </div>
+    </div>
+    
+    <div class="label">Interface : Équipe | Date/Heure | Signal WiFi (valeur) | MAXLINK v1.5</div>
+</body>
+</html>
